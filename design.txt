@@ -1,0 +1,7 @@
+pictl set <var=value>...
+pictl get
+pictl get --json
+
+pictl set i2c=on spi=on
+pictl get i2c
+
