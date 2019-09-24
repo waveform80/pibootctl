@@ -2,6 +2,8 @@ import sys
 import gettext
 import argparse
 
+from .parser import ConfigTxtParser
+
 _ = gettext.gettext
 
 try:
@@ -17,8 +19,8 @@ COMPONENTS = {
     "gpio.uart",
     "gpio.1wire",
     "gpio.remote",
-    "camera",
-    "audio",
+    "camera.enabled",
+    "audio.out",
     "wifi.country",
     "video.overscan",
     "video.pixel_2x",  # XXX ?
@@ -56,88 +58,20 @@ def main(args=None):
         do_list()
 
 
-def parse_lines(filename):
-    dtoverlay = 'base'
-    for var, value in parse_syntax(filename):
-        if var in {'device_tree_overlay', 'dtoverlay'}:
-            if not value:
-                dtoverlay = 'base'
-            elif ':' in value:
-                dtoverlay, params = value.split(':', 1)
-                for param in params.split(','):
-                    yield parse_dtparam(dtoverlay, param)
-            else:
-                dtoverlay = value
-        elif var in {'device_tree_param', 'dtparam'}:
-            yield parse_dtparam(dtoverlay, value)
-        else:
-            yield None, var, value
-
-
-def parse_syntax(filename):
-    for line in io.open(filename, 'r', encoding='ascii'):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if '=' in line:
-            var, value = line.split('=', 1)
-            var = var.strip()
-            value = value.strip()
-            yield None, var, value
-        elif line.startswith('include'):
-            command, included_filename = line.split(None, 1)
-            yield from parse_syntax(included_filename)
-        elif line.startswith('initramfs'):
-            # Yes this is technically "initramfs <filename> <address>" but
-            # we don't care about parsing this anyway
-            var, value = line.split(None, 1)
-            yield None, var, value
-
-
-def parse_dtparam(dtoverlay, dtparam):
-    bool_params = {
-        'audio':        False,
-        'axiperf':      False,
-        'eee':          True,
-        'i2c_arm':      False,
-        'i2c_vc':       False,
-        'i2s':          False,
-        'random':       True,
-        'sd_debug':     False,
-        'sd_force_pio': False,
-        'spi':          False,
-        'uart0':        True,
-        'uart1':        False,
-        'watchdog':     False,
-    }
-    if '=' in dtparam:
-        dtparam, value = dtparam.split('=', 1)
-        dtparam = dtparam.strip()
-        value = value.strip()
-    else:
-        value = None
-    if dtoverlay == 'base':
-        if dtparam in {'i2c', 'i2c_arm', 'i2c1'}:
-            dtparam = 'i2c_arm'
-        elif dtparam in {'i2c_vc', 'i2c0'}:
-            dtparam = 'i2c_vc'
-        elif dtparam == 'i2c_baudrate':
-            dtparam = 'i2c_arm_baudrate'
-        if dtparam in bool_params:
-            value = not value or value == 'on'
-    yield dtoverlay, dtparam, value
-
-
-def parse_config(filename='/boot/firmware/syscfg.txt'):
-    
-
-
 def update_config(filename, values):
-    pass
+    reboot_required()
+
+
+def reboot_required():
+    subprocess.check_call(
+        ['/usr/share/update-notifier/notify-reboot-required'],
+        env={'DPKG_MAINTSCRIPT_PACKAGE': 'pictl'})
 
 
 def do_list():
-    pass
+    parser = ConfigTxtParser()
+    for item in parser.parse('../pi3-gadget/configs/config.txt.armhf'):
+        if isinstance
 
 
 def do_get(args):
