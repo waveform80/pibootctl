@@ -5,3 +5,53 @@ pictl get --json
 pictl set i2c=on spi=on
 pictl get i2c
 
+Example output:
+
+$ pictl get
+  Setting                        Value             Config
+  =================              =====             ======
+x audio.enabled                  off               dtparam=audio
+  bt.enabled                     off               dtoverlay?
+x i2c.enabled                    on                dtparam=i2c_arm
+x i2c.baud                       100000            dtparam=i2c_arm_baudrate
+x i2s.enabled                    off               dtparam=i2s
+  w1.enabled                     off               dtoverlay=w1-gpio
+  w1.gpio                        4                 dtparam=gpiopin=4
+x spi.enabled                    on                dtparam=spi
+  uart.enabled                   on                enable_uart
+  camera.enabled                 off               start_x/start
+x video.cec.enabled              on                hdmi_ignore_cec
+x video.cec.init                 on                hdmi_ignore_cec_init
+x video.cec.osd_name             "Raspberry Pi"    cec_osd_name
+x video.hdmi.force_3d            off               hdmi_force_edid_3d
+x video.hdmi.blanking            off               hdmi_blanking
+  video.hdmi.timings             auto              hdmi_timings
+  video.hdmi.pixel_encoding      0                 hdmi_pixel_encoding
+  video.hdmi.boost               5                 config_hdmi_boost
+  video.hdmi0.flip               none              display_hdmi_rotate
+  video.hdmi0.force_mode         off               hdmi_force_mode
+  video.hdmi0.group              auto              hdmi_group
+  video.hdmi0.mode               auto              hdmi_mode
+  video.hdmi0.rotate             0                 display_hdmi_rotate
+  video.hdmi1.flip               off               display_hdmi_rotate:1
+  video.hdmi1.force_mode         off               hdmi_force_mode:1
+  video.hdmi1.group              auto              hdmi_group:1
+  video.hdmi1.mode               auto              hdmi_mode:1
+  video.hdmi1.rotate             0                 display_hdmi_rotate:1
+  video.dpi.enabled              off               enable_dpi_lcd
+  video.dpi.group                auto              dpi_group
+  video.dpi.mode                 auto              dpi_mode
+  video.dpi.timings              auto              dpi_timings
+  video.lcd.default              on                display_default_lcd
+  video.lcd.flip                 off               display_lcd_rotate
+  video.lcd.framerate            60                lcd_framerate
+  video.lcd.ignore               off               ignore_lcd
+  video.lcd.rotate               0                 lcd_rotate / display_lcd_rotate
+  video.lcd.touchscreen          on                disable_touchscreen
+  video.mem                      auto              gpu_mem
+x video.overscan.enabled         off               disable_overscan
+x video.overscan.left            0                 overscan_left
+x video.overscan.right           0                 overscan_left
+x video.overscan.top             0                 overscan_top
+x video.overscan.bottom          0                 overscan_bottom
+x watchdog.enabled               off               dtparam=watchdog

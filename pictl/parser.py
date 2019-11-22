@@ -1,113 +1,194 @@
-import errno
 from pathlib import Path
-from collections import namedtuple
+from collections import defaultdict
+
+from .info import get_board_types, get_board_serial
 
 
-ConfigLoc = namedtuple('ConfigLoc', ('path', 'lineno'))
-ConfigParam = namedtuple('ConfigParam', ('overlay', 'param', 'value', 'loc'))
-ConfigCommand = namedtuple('ConfigCommand', ('command', 'value', 'loc'))
-ConfigOverlay = namedtuple('ConfigOverlay', ('overlay', 'loc'))
-ConfigInclude = namedtuple('ConfigInclude', ('include', 'loc'))
-ConfigSection = namedtuple('ConfigSection', ('section', 'loc'))
+class Line:
+    def __init__(self, path, lineno):
+        assert isinstance(path, Path)
+        self.path = path
+        self.lineno = lineno
 
 
-BASE_PARAMS = {
-    'audio':        False,
-    'axiperf':      False,
-    'eee':          True,
-    'i2c_arm':      False,
-    'i2c_vc':       False,
-    'i2s':          False,
-    'random':       True,
-    'sd_debug':     False,
-    'sd_force_pio': False,
-    'spi':          False,
-    'uart0':        True,
-    'uart1':        False,
-    'watchdog':     False,
-}
+class Section(Line):
+    def __init__(self, path, lineno, section):
+        super().__init__(path, lineno)
+        self.section = section
+
+    def __str__(self):
+        return '[{self.section}]'.format(self=self)
 
 
-class ConfigTxtParser:
+class Command(Line):
+    def __init__(self, path, lineno, command, params, hdmi=None):
+        super().__init__(path, lineno)
+        self.command = command
+        self.params = params
+        self.hdmi = hdmi
+
+    def __str__(self):
+        if self.command == 'initramfs':
+            template = '{self.command} {self.params[0]} {self.params[1]}'
+        elif not self.hdmi:
+            template = '{self.command}={self.params}'
+        else:
+            template = '{self.command}:{self.hdmi}={self.params}'
+        return template.format(self=self)
+
+
+class Include(Line):
+    def __init__(self, path, lineno, include):
+        super().__init__(path, lineno)
+        assert isinstance(include, Path)
+        self.include = include
+
+    def __str__(self):
+        return 'include {self.include}'.format(self=self)
+
+
+class Overlay(Line):
+    def __init__(self, path, lineno, overlay):
+        super().__init__(path, lineno)
+        self.overlay = overlay
+
+    def __str__(self):
+        return 'dtoverlay={self.overlay}'.format(self=self)
+
+
+class Param(Line):
+    def __init__(self, path, lineno, overlay, param, value):
+        super().__init__(path, lineno)
+        self.overlay = overlay
+        self.param = param
+        self.value = value
+
+    def __str__(self):
+        return 'dtparam={self.param}={self.value}'.format(self=self)
+
+
+class Filter:
+    def __init__(self):
+        self.pi = True
+        self.hdmi = 0
+        self.serial = True
+
+    def evaluate(self, section):
+        # Derived from information at:
+        # https://www.raspberrypi.org/documentation/configuration/config-txt/conditional.md
+        if section == 'all':
+            self.pi = self.serial = True
+        elif section == 'none':
+            self.pi = False
+        elif section.startswith('HDMI:'):
+            self.hdmi = 1 if section == 'HDMI:1' else 0
+        elif section.startswith('EDID='):
+            # We can't currently evaluate this at runtime so just assume it
+            # doesn't alter the current filter state
+            pass
+        elif section.startswith('gpio'):
+            # We can't evaluate the GPIO filters either (the GPIO state has
+            # potentially changed since boot and we shouldn't mess with their
+            # modes at this point)
+            pass
+        elif section.startswith('0x'):
+            try:
+                self.serial = int(section, base=16) == get_board_serial()
+            except ValueError:
+                # Ignore invalid filters (as the bootloader does)
+                pass
+        elif section.startswith('pi'):
+            self.pi = section in get_board_types()
+
+    @property
+    def enabled(self):
+        return self.pi and self.serial
+
+
+class Parser:
     def __init__(self):
         self._content = defaultdict(list)
 
-    def parse(self, filename='/boot/firmware/config.txt'):
-        return list(self._parse(self._read(filename)))
+    def parse(self, filename):
+        return list(self._parse(Path(filename)))
 
-    def _read(self, filename):
-        config_path = Path(filename)
-        for lineno, line in enumerate(config_path.open('r', encoding='ascii')):
-            self._content[config_path].append(line)
-            # The bootloader ignores everything beyond column 80
-            line = line.strip()[:80]
-            if not line or line.startswith('#'):
-                continue
-            if line.startswith('include'):
-                command, included_filename = line.split(None, 1)
-                included_path = config_path.parent.joinpath(included_filename)
-                yield line, ConfigLoc(config_path, lineno)
-                try:
-                    yield from self._read(str(included_path))
-                except OSError as e:
-                    if e.errno == errno.ENOENT:
-                        # Ignore non-existent includes, just like the
-                        # bootloader does
-                        # TODO Warning?
-                        pass
-            else:
-                yield line, ConfigLoc(config_path, lineno)
-
-    def _parse(self, lines):
+    def _parse(self, path):
         overlay = 'base'
-        for line, loc in lines:
-            if '=' in line:
-                cmd, value = line.split('=', 1)
-                cmd = cmd.strip()
-                value = value.strip()
-                if cmd in {'device_tree_overlay', 'dtoverlay'}:
-                    if ':' in value:
-                        overlay, params = value.split(':', 1)
-                        yield ConfigOverlay(overlay, loc)
-                        for param in params.split(','):
-                            yield self._parse_param(overlay, param, loc)
+        filter = Filter()
+        for lineno, content in self._read(path):
+            if content.startswith('[') and content.endswith(']'):
+                content = content[1:-1]
+                filter.evaluate(content)
+                yield Section(path, lineno, content)
+            elif filter.enabled:
+                if '=' in content:
+                    cmd, value = content.split('=', 1)
+                    # NOTE: We deliberately don't strip cmd or value here
+                    # because the bootloader doesn't either; whitespace on
+                    # either side of the = is significant and can invalidate
+                    # lines
+                    if cmd in {'device_tree_overlay', 'dtoverlay'}:
+                        if ':' in value:
+                            overlay, params = value.split(':', 1)
+                            yield Overlay(
+                                path, lineno, overlay, prefix, newline)
+                            for param, value in self._parse_params(overlay, params):
+                                yield Param(path, lineno, overlay, param, value)
+                        else:
+                            overlay = value or 'base'
+                            yield Overlay(path, lineno, overlay)
+                    elif cmd in {'device_tree_param', 'dtparam'}:
+                        for param, value in self._parse_params(overlay, value):
+                            yield Param(path, lineno, overlay, param, value)
                     else:
-                        overlay = value or 'base'
-                        yield ConfigOverlay(overlay, loc)
-                elif cmd in {'device_tree_param', 'dtparam'}:
-                    yield self._parse_param(overlay, value, line)
+                        if ':' in cmd:
+                            cmd, hdmi = cmd.split(':', 1)
+                            try:
+                                hdmi = int(hdmi)
+                            except ValueError:
+                                hdmi = 0
+                        else:
+                            hdmi = filter.hdmi
+                        yield Command(path, lineno, cmd, value, hdmi=hdmi)
+                elif content.startswith('include'):
+                    command, filename = content.split(None, 1)
+                    included_path = path.parent.joinpath(filename)
+                    yield Include(path, lineno, included_path)
+                    yield from self._parse(included_path)
+                elif content.startswith('initramfs'):
+                    command, filename, address = content.split(None, 2)
+                    yield Command(path, lineno, command, (filename, address))
                 else:
-                    yield ConfigCommand(cmd, value, loc)
-            elif line.startswith('include'):
-                command, filename = line.split(None, 1)
-                yield ConfigInclude(filename, loc)
-            elif line.startswith('initramfs'):
-                command, filename, address = line.split(None, 2)
-                yield ConfigCommand(command, (filename, address), loc)
-            elif line.startswith('[') and line.endswith(']'):
-                yield ConfigSection(line[1:-1], loc)
+                    # TODO warning?
+                    assert False, repr(line)
+
+    def _parse_params(self, overlay, params):
+        for token in params.split(','):
+            if '=' in token:
+                param, value = token.split('=', 1)
+                # NOTE: Again, we deliberately don't strip param or value
             else:
-                # TODO warning?
-                assert False
+                param = token
+                value = 'on'
+            if overlay == 'base':
+                if param in {'i2c', 'i2c_arm', 'i2c1'}:
+                    param = 'i2c_arm'
+                elif param in {'i2c_vc', 'i2c0'}:
+                    param = 'i2c_vc'
+                elif param == 'i2c_baudrate':
+                    param = 'i2c_arm_baudrate'
+            yield param, value
 
-    def _parse_param(self, overlay, line, loc):
-        if '=' in line:
-            param, value = line.split('=', 1)
-            param = param.strip()
-            value = value.strip()
-        else:
-            param = line
-            value = None
-        if overlay == 'base':
-            if param in {'i2c', 'i2c_arm', 'i2c1'}:
-                param = 'i2c_arm'
-            elif param in {'i2c_vc', 'i2c0'}:
-                param = 'i2c_vc'
-            elif param == 'i2c_baudrate':
-                param = 'i2c_arm_baudrate'
-            if param in bool_params:
-                value = not value or value == 'on'
-        return ConfigParam(overlay, param, value, loc)
-
-
-
+    def _read(self, path):
+        with path.open('r', encoding='ascii') as f:
+            for lineno, line in enumerate(f):
+                self._content[path].append(line)
+                content = line.rstrip()
+                # NOTE: The bootloader ignores everything beyond column 80 and
+                # leading whitespace. The following slicing and stripping of
+                # the string is done in a precise order to ensure we excise
+                # chars beyond column 80 *before* stripping leading spaces
+                content = content[:80].lstrip()
+                if not content or content.startswith('#'):
+                    continue
+                yield lineno, content
