@@ -12,6 +12,50 @@ from .term import term_size
 _ = gettext.gettext
 
 
+def print_table(table, fp):
+    width = min(120, term_size()[0])
+    renderer = TableWrapper(width=width, **unicode_table)
+    for line in renderer.wrap(table):
+        fp.write(line)
+        fp.write('\n')
+
+
+def dump_store(style, store, fp):
+    {
+        'user':  dump_store_user,
+        'shell': dump_store_shell,
+        'json':  dump_store_json,
+        'yaml':  dump_store_yaml,
+    }[style](store, fp)
+
+def dump_store_user(store, fp):
+    print_table([
+        (_('Name'), _('Active'), _('Timestamp'))
+    ] + [
+        (name, '✓' if active else '', timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+        for name, active, timestamp in store
+    ], fp)
+
+def dump_store_json(store, fp):
+    json.dump([
+        {'name': name, 'active': active, 'timestamp': timestamp.isoformat()}
+        for name, active, timestamp in store
+    ], fp)
+
+def dump_store_yaml(store, fp):
+    yaml.dump([
+        {'name': name, 'active': active, 'timestamp': timestamp}
+        for name, active, timestamp in store
+    ], fp)
+
+def dump_store_shell(store, fp):
+    for name, active, timestamp in store:
+        fp.write(' '.join(
+            (timestamp.isoformat(), ('inactive', 'active')[active], name)
+        ))
+        fp.write('\n')
+
+
 def dump_settings(style, settings, fp):
     {
         'user':  dump_settings_user,
@@ -20,23 +64,17 @@ def dump_settings(style, settings, fp):
         'yaml':  dump_settings_yaml,
     }[style](settings, fp)
 
-
 def dump_settings_json(settings, fp):
     json.dump({setting.name: setting.value for setting in settings}, fp)
 
-
 def dump_settings_yaml(settings, fp):
     yaml.dump({setting.name: setting.value for setting in settings}, fp)
-
 
 def dump_settings_shell(settings, fp):
     for setting in settings:
         fp.write('{}\n'.format(format_setting_shell(setting)))
 
-
 def dump_settings_user(settings, fp):
-    width = min(120, term_size()[0])
-    renderer = TableWrapper(width=width, **unicode_table)
     data = [
         (_('Name'), _('Mod'), _('Value'))
     ] + [
@@ -47,9 +85,25 @@ def dump_settings_user(settings, fp):
         )
         for setting in sorted(settings, key=attrgetter('name'))
     ]
-    for line in renderer.wrap(data):
-        fp.write(line)
-        fp.write('\n')
+    print_table(data, fp)
+
+
+def load_settings(style, fp):
+    return {
+        'json':  load_settings_json,
+        'yaml':  load_settings_yaml,
+        'shell': load_settings_shell,
+    }[style](fp)
+
+def load_settings_json(fp):
+    return json.load(fp)
+
+def load_settings_yaml(fp):
+    return yaml.load(fp)
+
+def load_settings_shell(fp):
+    # TODO
+    raise NotImplementedError
 
 
 def dump_setting_user(setting, fp):
@@ -63,27 +117,6 @@ Default: {default}
         default=format_setting_user(setting),
         doc=render(setting.doc, width=width, table_style=unicode_table),
     ))
-
-
-def load_settings(style, fp):
-    return {
-        'json':  load_settings_json,
-        'yaml':  load_settings_yaml,
-        'shell': load_settings_shell,
-    }[style](fp)
-
-
-def load_settings_json(fp):
-    return json.load(fp)
-
-
-def load_settings_yaml(fp):
-    return yaml.load(fp)
-
-
-def load_settings_shell(fp):
-    # TODO
-    raise NotImplementedError
 
 
 def format_setting_shell(setting):
@@ -110,16 +143,13 @@ def format_value(style, value):
         'yaml':  format_value_yaml,
     }[style](value)
 
-
 def format_value_json(value):
     return json.dumps(value)
-
 
 def format_value_yaml(value):
     with io.StringIO() as fp:
         yaml.dump(value, fp)
         return fp.getvalue()
-
 
 def format_value_shell(value):
     if value is None:
@@ -130,7 +160,6 @@ def format_value_shell(value):
         return '({})'.format(' '.join(format_value_shell(e) for e in value))
     else:
         return shlex.quote(str(value))
-
 
 def format_value_user(value):
     if value is None:

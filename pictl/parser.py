@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 from collections import defaultdict
 
@@ -108,9 +109,22 @@ class Filter:
 class Parser:
     def __init__(self):
         self._content = defaultdict(list)
+        self._hash = None
+
+    @property
+    def content(self):
+        return self._content
+
+    @property
+    def hash(self):
+        return self._hash
 
     def parse(self, filename):
-        return list(self._parse(Path(filename)))
+        if not isinstance(filename, Path):
+            filename = Path(filename)
+        self._content.clear()
+        self._hash = hashlib.sha1()
+        return list(self._parse(filename))
 
     def _parse(self, path):
         overlay = 'base'
@@ -180,10 +194,11 @@ class Parser:
             yield param, value
 
     def _read(self, path):
-        with path.open('r', encoding='ascii') as f:
+        with path.open('rb') as f:
             for lineno, line in enumerate(f):
+                self._hash.update(line)
                 self._content[path].append(line)
-                content = line.rstrip()
+                content = line.decode('ascii').rstrip()
                 # NOTE: The bootloader ignores everything beyond column 80 and
                 # leading whitespace. The following slicing and stripping of
                 # the string is done in a precise order to ensure we excise

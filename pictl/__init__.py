@@ -1,17 +1,25 @@
 import io
 import os
 import sys
-import errno
 import gettext
 import argparse
 import configparser
+from pathlib import Path
 from fnmatch import fnmatch
+from datetime import datetime
+from zipfile import ZipFile, ZIP_DEFLATED
 
+from .term import ErrorHandler
 from .parser import Parser
 from .settings import Settings
-from .term import term_color, term_size
 from .formatter import render, unicode_table
-from .formats import format_value, dump_setting_user, dump_settings, load_settings
+from .formats import (
+    format_value,
+    dump_store,
+    dump_setting_user,
+    dump_settings,
+    load_settings,
+)
 
 _ = gettext.gettext
 
@@ -30,17 +38,30 @@ class InvalidSetting(Exception):
 
 
 def main(args=None):
+    sys.excepthook = ErrorHandler()
+    sys.excepthook[PermissionError] = (permission_error, 1)
+    if not int(os.environ.get('DEBUG', '0')):
+        sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
     parser = get_parser()
     args = parser.parse_args(args)
     args.func(args)
 
 
+def permission_error(exc_type, exc_value, exc_tb):
+    msg = [exc_value]
+    if os.geteuid() != 0:
+        msg.append(_(
+            "You need root permissions to modify the boot configuration"))
+    return msg
+
+
 def get_parser():
     config = configparser.ConfigParser(
         defaults={
-            'config_read': '/boot/config.txt',
-            'config_write': '/boot/config.txt',
-            'config_store': '/boot/pictl',
+            'boot_path':    '/boot',
+            'store_path':   '/boot/pictl',
+            'config_read':  'config.txt',
+            'config_write': 'config.txt',
         },
         default_section='defaults',
         interpolation=None)
@@ -55,23 +76,29 @@ def get_parser():
     parser.add_argument(
         '--version', action='version', version='0.1')
     parser.add_argument(
+        '-B', '--boot-path', metavar='DIR', type=Path,
+        default=config.get('defaults', 'boot_path'),
+        help=_(
+            "The path on which the boot partition is mounted. Defaults to "
+            "%(default)r."))
+    parser.add_argument(
         '-r', '--config-read', metavar='FILE',
         default=config.get('defaults', 'config_read'),
         help=_(
-            "The path to the config.txt file read by the bootloader. Defaults "
-            "to %(default)s."))
+            "The name of the config.txt file read by the bootloader, relative "
+            "to --boot-path. Defaults to %(default)r."))
     parser.add_argument(
         '-w', '--config-write', metavar='FILE',
         default=config.get('defaults', 'config_write'),
         help=_(
-            "The path to the config.txt file written by this tool. Default to "
-            "%(default)s (but can be a file included by another)."))
+            "The name of the config.txt file written by this tool, relative "
+            "to --boot-path. Defaults to %(default)r."))
     parser.add_argument(
-        '-s', '--config-store', metavar='DIR',
-        default=config.get('defaults', 'config_store'),
+        '-s', '--store-path', metavar='DIR', type=Path,
+        default=config.get('defaults', 'store_path'),
         help=_(
             "The path in which to store saved boot configurations. Defaults "
-            "to %(default)s."))
+            "to %(default)r."))
     parser.set_defaults(func=do_help)
     commands = parser.add_subparsers(title=_("commands"))
 
@@ -137,7 +164,8 @@ def get_parser():
         help=_("Store the current boot configuration for later use"))
     save_cmd.add_argument(
         "name",
-        help=_("The name to save the current boot configuration under"))
+        help=_("The name to save the current boot configuration under; can "
+               "include any characters legal in a filename"))
     save_cmd.set_defaults(func=do_save)
 
     load_cmd = commands.add_parser(
@@ -153,9 +181,10 @@ def get_parser():
     ls_cmd = commands.add_parser(
         "list", aliases=["ls"],
         description=_(
-            "List all stored boot configurations (see the save command)."),
+            "List all stored boot configurations."),
         help=_("List the stored boot configurations"))
-    ls_cmd.set_defaults(func=do_list)
+    add_format_args(ls_cmd)
+    ls_cmd.set_defaults(func=do_list, style='user')
 
     rm_cmd = commands.add_parser(
         "remove", aliases=["rm"],
@@ -198,7 +227,7 @@ def do_dump(args):
     parser = Parser()
     default = Settings()
     current = default.copy()
-    current.extract(parser.parse(args.config_read))
+    current.extract(parser.parse(args.boot_path / args.config_read))
     # NOTE: need to keep a reference to the current set; some settings depend
     # on the overall context to determine their value and their reference to it
     # is weak
@@ -224,7 +253,7 @@ def do_get(args):
     parser = Parser()
     default = Settings()
     current = default.copy()
-    current.extract(parser.parse(args.config_read))
+    current.extract(parser.parse(args.boot_path / args.config_read))
     if len(args.get_vars) == 1:
         try:
             print(format_value(args.style, current[args.get_vars[0]].value))
@@ -245,7 +274,7 @@ def do_set(args):
     parser = Parser()
     default = Settings()
     current = default.copy()
-    current.extract(parser.parse(args.config_read))
+    current.extract(parser.parse(args.boot_path / args.config_read))
     updated = current.copy()
     if args.style == 'user':
         settings = {}
@@ -262,34 +291,58 @@ def do_set(args):
         except KeyError:
             raise InvalidSetting(name)
     updated.validate()
-    try:
-        with io.open(args.config_write, 'w', encoding='ascii') as out:
-            out.write(updated.output())
-    except PermissionError:
-        if os.geteuid() != 0:
-            raise PermissionError(
-                errno.EACCESS,
-                "Unable to re-write {}; you may need to be root (try "
-                "sudo)".format(args.config_write))
-    else:
-        reboot_required()
+    with io.open(str(args.boot_path / args.config_write),
+                 'w', encoding='ascii') as out:
+        out.write(updated.output())
+    reboot_required()
     # TODO Check for efficacy (overriden values)
 
 
 def do_save(args):
-    raise NotImplementedError
+    parser = Parser()
+    parser.parse(args.boot_path / args.config_read)
+    zip_path = (args.store_path / args.name).with_suffix('.zip')
+    # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
+    with ZipFile(str(zip_path), 'w', compression=ZIP_DEFLATED) as arc:
+        arc.comment = 'pictl:0:{}'.format(parser.hash.hexdigest()).encode('ascii')
+        for path, lines in parser.content.items():
+            arc.writestr(str(path), b''.join(lines))
 
 
 def do_load(args):
-    raise NotImplementedError
+    zip_path = (args.store_path / args.name).with_suffix('.zip')
+    with ZipFile(str(zip_path), 'r') as arc:
+        if not arc.comment.startswith(b'pictl:0:'):
+            raise ValueError(
+                _("{file} is not a valid pictl boot configuration"
+                  ).format(file=zip_path))
+        # TODO Add a --force parameter and prompt before overwriting
+        for info in arc.infolist():
+            arc.extract(info, path=str(args.boot_path))
+    reboot_required()
 
 
 def do_list(args):
-    raise NotImplementedError
+    parser = Parser()
+    parser.parse(args.boot_path / args.config_read)
+    active_hash = parser.hash.hexdigest().lower()
+    table = []
+    for p in args.store_path.glob('*.zip'):
+        with ZipFile(str(p), 'r') as arc:
+            if arc.comment.startswith(b'pictl:0:'):
+                arc_hash = arc.comment[8:48].decode('ascii').lower()
+                table.append((
+                    p.stem,
+                    arc_hash == active_hash,
+                    datetime.fromtimestamp(p.stat().st_mtime),
+                ))
+    dump_store(args.style, table, fp=sys.stdout)
 
 
 def do_remove(args):
-    raise NotImplementedError
+    zip_path = (args.store_path / args.name).with_suffix('.zip')
+    # TODO Add a --force parameter and prompt before removing
+    zip_path.unlink()
 
 
 def reboot_required():
