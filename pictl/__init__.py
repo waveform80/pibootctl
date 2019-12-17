@@ -10,12 +10,13 @@ from datetime import datetime
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from .term import ErrorHandler
-from .parser import Parser
+from .parser import BootParser
 from .settings import Settings
 from .formatter import render, unicode_table
 from .formats import (
     format_value,
     dump_store,
+    dump_diff,
     dump_setting_user,
     dump_settings,
     load_settings,
@@ -27,10 +28,6 @@ try:
     import argcomplete
 except ImportError:
     argcomplete = None
-
-
-class EmptySettings(Exception):
-    "Raised when no settings match filtering criteria"
 
 
 class InvalidSetting(Exception):
@@ -117,7 +114,7 @@ def get_parser():
             "Output the current value of the boot time settings that match "
             "the specified pattern (or all if no pattern is provided)"),
         help=_("Output the current boot time configuration"))
-    dump_cmd.add_argument("list_vars", nargs="?", metavar="pattern")
+    dump_cmd.add_argument("vars", nargs="?", metavar="pattern")
     dump_cmd.add_argument(
         "--modified", action="store_true",
         help=_("Only include modified settings in the output"))
@@ -178,13 +175,46 @@ def get_parser():
         help=_("The name of the boot configuration to restore"))
     load_cmd.set_defaults(func=do_load)
 
+    diff_cmd = commands.add_parser(
+        "diff",
+        description=_(
+            "Display the settings that differ between two stored boot "
+            "configurations, or between one stored boot configuration and the "
+            "current configuration."),
+        help=_("Show the differences between boot configurations"))
+    diff_cmd.add_argument(
+        "left", nargs="?",
+        help=_("The boot configuration to compare from, or the current "
+               "configuration if omitted"))
+    diff_cmd.add_argument(
+        "right",
+        help=_("The boot configuration to compare against"))
+    add_format_args(diff_cmd)
+    diff_cmd.set_defaults(func=do_diff, style="user")
+
+    show_cmd = commands.add_parser(
+        "show", aliases=["cat"],
+        description=_(
+            "Display the specified stored boot configuration, or the sub-set "
+            "of settings that match the specified pattern."),
+        help=_("Show the specified stored configuration"))
+    show_cmd.add_argument(
+        "name",
+        help=_("The name of the boot configuration to display"))
+    show_cmd.add_argument("vars", nargs="?", metavar="pattern")
+    show_cmd.add_argument(
+        "--modified", action="store_true",
+        help=_("Only include modified settings in the output"))
+    add_format_args(show_cmd)
+    show_cmd.set_defaults(func=do_show, style="user")
+
     ls_cmd = commands.add_parser(
         "list", aliases=["ls"],
         description=_(
             "List all stored boot configurations."),
         help=_("List the stored boot configurations"))
     add_format_args(ls_cmd)
-    ls_cmd.set_defaults(func=do_list, style='user')
+    ls_cmd.set_defaults(func=do_list, style="user")
 
     rm_cmd = commands.add_parser(
         "remove", aliases=["rm"],
@@ -224,19 +254,28 @@ def do_help(args):
 
 
 def do_dump(args):
-    parser = Parser()
+    do_dump_or_show(args, args.boot_path)
+
+
+def do_show(args):
+    zip_path = (args.store_path / args.name).with_suffix('.zip')
+    do_dump_or_show(args, zip_path)
+
+
+def do_dump_or_show(args, path):
+    parser = BootParser()
     default = Settings()
-    current = default.copy()
-    current.extract(parser.parse(args.boot_path / args.config_read))
-    # NOTE: need to keep a reference to the current set; some settings depend
+    stored = default.copy()
+    stored.extract(parser.parse(path, args.config_read))
+    # NOTE: need to keep a reference to the stored set; some settings depend
     # on the overall context to determine their value and their reference to it
     # is weak
-    settings = current
-    if args.list_vars:
+    settings = stored
+    if args.vars:
         settings = {
             setting
             for setting in settings
-            if fnmatch(setting.name, args.list_vars)
+            if fnmatch(setting.name, args.vars)
         }
     if args.modified:
         settings = {
@@ -244,16 +283,14 @@ def do_dump(args):
             for setting in settings
             if setting.value is not setting.default
         }
-    if not settings:
-        raise EmptySettings('no settings match the filtering criteria')
     dump_settings(args.style, settings, fp=sys.stdout)
 
 
 def do_get(args):
-    parser = Parser()
+    parser = BootParser()
     default = Settings()
     current = default.copy()
-    current.extract(parser.parse(args.boot_path / args.config_read))
+    current.extract(parser.parse(args.boot_path, args.config_read))
     if len(args.get_vars) == 1:
         try:
             print(format_value(args.style, current[args.get_vars[0]].value))
@@ -271,10 +308,10 @@ def do_get(args):
 
 
 def do_set(args):
-    parser = Parser()
+    parser = BootParser()
     default = Settings()
     current = default.copy()
-    current.extract(parser.parse(args.boot_path / args.config_read))
+    current.extract(parser.parse(args.boot_path, args.config_read))
     updated = current.copy()
     if args.style == 'user':
         settings = {}
@@ -299,8 +336,8 @@ def do_set(args):
 
 
 def do_save(args):
-    parser = Parser()
-    parser.parse(args.boot_path / args.config_read)
+    parser = BootParser()
+    parser.parse(args.boot_path, args.config_read)
     zip_path = (args.store_path / args.name).with_suffix('.zip')
     # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
     with ZipFile(str(zip_path), 'w', compression=ZIP_DEFLATED) as arc:
@@ -322,9 +359,23 @@ def do_load(args):
     reboot_required()
 
 
+def do_diff(args):
+    parser = BootParser()
+    left = Settings()
+    right = left.copy()
+    if args.left is None:
+        left_path = args.boot_path
+    else:
+        left_path = (args.store_path / args.name).with_suffix('.zip')
+    left.extract(parser.parse(left_path, args.config_read))
+    right_path = (args.store_path / args.right).with_suffix('.zip')
+    right.extract(parser.parse(right_path, args.config_read))
+    dump_diff(args.style, args.left, args.right, left.diff(right), fp=sys.stdout)
+
+
 def do_list(args):
-    parser = Parser()
-    parser.parse(args.boot_path / args.config_read)
+    parser = BootParser()
+    parser.parse(args.boot_path, args.config_read)
     active_hash = parser.hash.hexdigest().lower()
     table = []
     for p in args.store_path.glob('*.zip'):

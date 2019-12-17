@@ -6,6 +6,7 @@ from operator import attrgetter
 
 import yaml
 
+from .settings import Missing
 from .formatter import TableWrapper, unicode_table, render
 from .term import term_size
 
@@ -29,12 +30,16 @@ def dump_store(style, store, fp):
     }[style](store, fp)
 
 def dump_store_user(store, fp):
-    print_table([
-        (_('Name'), _('Active'), _('Timestamp'))
-    ] + [
-        (name, '✓' if active else '', timestamp.strftime('%Y-%m-%d %H:%M:%S'))
-        for name, active, timestamp in store
-    ], fp)
+    if not store:
+        fp.write(_("No stored boot configurations found"))
+        fp.write("\n")
+    else:
+        print_table([
+            (_('Name'), _('Active'), _('Timestamp'))
+        ] + [
+            (name, '✓' if active else '', timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+            for name, active, timestamp in store
+        ], fp)
 
 def dump_store_json(store, fp):
     json.dump([
@@ -50,8 +55,65 @@ def dump_store_yaml(store, fp):
 
 def dump_store_shell(store, fp):
     for name, active, timestamp in store:
-        fp.write(' '.join(
+        fp.write(':'.join(
             (timestamp.isoformat(), ('inactive', 'active')[active], name)
+        ))
+        fp.write('\n')
+
+
+def dump_diff(style, left, right, diff, fp):
+    {
+        'user':  dump_diff_user,
+        'shell': dump_diff_shell,
+        'json':  dump_diff_json,
+        'yaml':  dump_diff_yaml,
+    }[style](left, right, diff, fp)
+
+def dump_diff_user(left, right, diff, fp):
+    if not diff:
+        fp.write(
+            _("No differences between {left} and {right}").format(
+                left=_('Current') if left is None else left,
+                right=right))
+        fp.write("\n")
+    else:
+        print_table([
+            (_('Name'), '<{}>'.format(_('Current')) if left is None else left, right)
+        ] + sorted([
+            (l.name if l is not Missing else r.name,
+             '-' if l is Missing else format_setting_user(l),
+             '-' if r is Missing else format_setting_user(r),
+             )
+            for (l, r) in diff
+        ]), fp)
+
+def values(l, r):
+    obj = {}
+    if l is not Missing:
+        obj['left'] = l.value
+    if r is not Missing:
+        obj['right'] = r.value
+    return obj
+
+def dump_diff_json(left, right, diff, fp):
+    json.dump({
+        (l.name if l is not Missing else r.name): values(l, r)
+        for (l, r) in diff
+    }, fp)
+
+def dump_diff_yaml(left, right, diff, fp):
+    yaml.dump({
+        (l.name if l is not Missing else r.name): values(l, r)
+        for (l, r) in diff
+    }, fp)
+
+def dump_diff_shell(left, right, diff, fp):
+    for l, r in diff:
+        fp.write(':'.join(
+            (l.name if l is not Missing else r.name,
+             '' if l is Missing else str(l.value),
+             '' if r is Missing else str(r.value)
+             )
         ))
         fp.write('\n')
 
@@ -75,17 +137,21 @@ def dump_settings_shell(settings, fp):
         fp.write('{}\n'.format(format_setting_shell(setting)))
 
 def dump_settings_user(settings, fp):
-    data = [
-        (_('Name'), _('Mod'), _('Value'))
-    ] + [
-        (
-            setting.name,
-            '✓' if setting.value != setting.default else '',
-            format_setting_user(setting),
-        )
-        for setting in sorted(settings, key=attrgetter('name'))
-    ]
-    print_table(data, fp)
+    if not settings:
+        fp.write(_("No settings matching the pattern found"))
+        fp.write("\n")
+    else:
+        data = [
+            (_('Name'), _('Mod'), _('Value'))
+        ] + [
+            (
+                setting.name,
+                '✓' if setting.value != setting.default else '',
+                format_setting_user(setting),
+            )
+            for setting in sorted(settings, key=attrgetter('name'))
+        ]
+        print_table(data, fp)
 
 
 def load_settings(style, fp):

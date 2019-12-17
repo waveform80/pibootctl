@@ -356,6 +356,8 @@ _settings |= {s for i in (0, 1) for s in (
 )}
 
 
+Missing = object()
+
 class Settings:
     def __init__(self):
         self._settings = {
@@ -386,7 +388,24 @@ class Settings:
         return new
 
     def diff(self, other):
-        raise NotImplementedError
+        """
+        Returns a mapping of setting names to tuple of (self, other) values for
+        settings that differ between self and other (another :class:`Settings`
+        instance). If a particular setting is missing from either side, the
+        value is :data:`Missing`.
+        """
+        return {
+            (setting, other[setting.name]
+                      if setting.name in other else
+                      Missing)
+            for setting in self
+            if setting.name not in other or
+            other[setting.name].value != setting.value
+        } | {
+            (Missing, setting)
+            for setting in other
+            if setting.name not in self
+        }
 
     def extract(self, config):
         for setting in self:

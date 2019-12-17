@@ -1,8 +1,8 @@
 import gettext
 from textwrap import dedent
 
-from . import parser
 from .formatter import FormatDict
+from .parser import BootParam, BootCommand
 from .tools import to_bool, to_tri_bool, int_ranges, TransMap
 
 _ = gettext.gettext
@@ -108,7 +108,7 @@ class Setting:
         """
         Sets :attr:`value` from *config* which must be an iterable of
         :class:`Line` items (e.g. as obtained by calling
-        :meth:`Parser.parse`).
+        :meth:`BootParser.parse`).
         """
         raise NotImplementedError
 
@@ -177,7 +177,7 @@ class BaseOverlayInt(Setting):
 
     def extract(self, config):
         for item in config:
-            if isinstance(item, parser.Param):
+            if isinstance(item, BootParam):
                 if item.overlay == 'base' and item.param == self.param:
                     self._value = int(item.value)
                     # NOTE: No break here because later settings override
@@ -203,7 +203,7 @@ class BaseOverlayBool(BaseOverlayInt):
 
     def extract(self, config):
         for item in config:
-            if isinstance(item, parser.Param):
+            if isinstance(item, BootParam):
                 if item.overlay == 'base' and item.param == self.param:
                     self._value = item.value == 'on'
                     # NOTE: No break here because later settings override
@@ -253,7 +253,7 @@ class Command(Setting):
     def extract(self, config):
         for item in config:
             if (
-                    isinstance(item, parser.Command) and
+                    isinstance(item, BootCommand) and
                     item.command == self.command and
                     item.hdmi == self.index):
                 self._value = self.from_file(item.params)
@@ -417,7 +417,7 @@ class CommandForceIgnore(Setting):
     def extract(self, config):
         for item in config:
             if (
-                    isinstance(item, parser.Command) and
+                    isinstance(item, BootCommand) and
                     item.command in (self.force, self.ignore) and
                     int(item.params)):
                 self._value = item.command == self.force
@@ -702,7 +702,7 @@ class CommandDisplayRotate(CommandInt):
     def extract(self, config):
         for item in config:
             if (
-                    isinstance(item, parser.Command) and
+                    isinstance(item, BootCommand) and
                     item.command in (self.command, 'display_rotate') and
                     item.hdmi == self.index):
                 self._value = self.from_file(item.params)
@@ -748,7 +748,7 @@ class CommandDisplayFlip(CommandInt):
     def extract(self, config):
         for item in config:
             if (
-                    isinstance(item, parser.Command) and
+                    isinstance(item, BootCommand) and
                     item.command in (self.command, 'display_rotate') and
                     item.hdmi == self.index):
                 self._value = self.from_file(item.params)

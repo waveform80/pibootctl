@@ -4,6 +4,7 @@ import fcntl
 import struct
 import termios
 import argparse
+import traceback
 from collections import OrderedDict, namedtuple
 
 
@@ -131,5 +132,5 @@ class ErrorHandler:
         # file for debugging purposes
         for line in traceback.format_exception(exc_type, exc_value, exc_tb):
             for msg in line.rstrip().split('\n'):
-                print(line, file=sys.stderr)
+                print(msg, file=sys.stderr)
         return 1
