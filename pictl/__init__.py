@@ -13,7 +13,7 @@ from .term import ErrorHandler
 from .parser import BootParser
 from .settings import Settings
 from .formatter import render, unicode_table
-from .formats import (
+from .output import (
     format_value,
     dump_store,
     dump_diff,
@@ -28,10 +28,6 @@ try:
     import argcomplete
 except ImportError:
     argcomplete = None
-
-
-class InvalidSetting(Exception):
-    "Raised when a setting name is not recognized"
 
 
 def main(args=None):
@@ -295,15 +291,14 @@ def do_get(args):
         try:
             print(format_value(args.style, current[args.get_vars[0]].value))
         except KeyError:
-            raise InvalidSetting(
-                'unknown setting: {}'.format(args.get_vars[0]))
+            raise ValueError(_('unknown setting: {}').format(args.get_vars[0]))
     else:
         settings = set()
         for var in args.get_vars:
             try:
                 settings.add(current[var])
             except KeyError:
-                raise InvalidSetting(var)
+                raise ValueError(_('unknown setting: {}').format(var))
         dump_settings(args.style, settings, fp=sys.stdout)
 
 
@@ -317,7 +312,7 @@ def do_set(args):
         settings = {}
         for var in args.set_vars:
             if not '=' in var:
-                raise InvalidSetting('expected "=" in {}'.format(var))
+                raise ValueError(_('expected "=" in {}').format(var))
             name, value = var.split('=', 1)
             settings[name] = value
     else:
@@ -326,7 +321,7 @@ def do_set(args):
         try:
             updated[name].update(value)
         except KeyError:
-            raise InvalidSetting(name)
+            raise ValueError(_('unknown setting: {}').format(name))
     updated.validate()
     with io.open(str(args.boot_path / args.config_write),
                  'w', encoding='ascii') as out:
