@@ -12,11 +12,25 @@ class BootLine:
         self.path = path
         self.lineno = lineno
 
+    def __eq__(self, other):
+        return (
+            isinstance(other, BootLine) and
+            other.path == self.path and
+            other.lineno == self.lineno
+        )
+
 
 class BootSection(BootLine):
     def __init__(self, path, lineno, section):
         super().__init__(path, lineno)
         self.section = section
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            isinstance(other, BootSection) and
+            other.section == self.section
+        )
 
     def __str__(self):
         return '[{self.section}]'.format(self=self)
@@ -28,6 +42,15 @@ class BootCommand(BootLine):
         self.command = command
         self.params = params
         self.hdmi = hdmi
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            isinstance(other, BootCommand) and
+            other.command == self.command and
+            other.params == self.params and
+            other.hdmi == self.hdmi
+        )
 
     def __str__(self):
         if self.command == 'initramfs':
@@ -45,6 +68,13 @@ class BootInclude(BootLine):
         assert isinstance(include, Path)
         self.include = include
 
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            isinstance(other, BootInclude) and
+            other.include == self.include
+        )
+
     def __str__(self):
         return 'include {self.include}'.format(self=self)
 
@@ -53,6 +83,13 @@ class BootOverlay(BootLine):
     def __init__(self, path, lineno, overlay):
         super().__init__(path, lineno)
         self.overlay = overlay
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            isinstance(other, BootOverlay) and
+            other.overlay == self.overlay
+        )
 
     def __str__(self):
         return 'dtoverlay={self.overlay}'.format(self=self)
@@ -64,6 +101,15 @@ class BootParam(BootLine):
         self.overlay = overlay
         self.param = param
         self.value = value
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            isinstance(other, BootParam) and
+            other.overlay == self.overlay and
+            other.param == self.param and
+            other.value == self.value
+        )
 
     def __str__(self):
         return 'dtparam={self.param}={self.value}'.format(self=self)
@@ -216,7 +262,7 @@ class BootParser:
         else:
             context = lambda: path.open(str(filename), 'r')
         with context() as text:
-            for lineno, line in enumerate(text):
+            for lineno, line in enumerate(text, start=1):
                 self._hash.update(line)
                 self._content[filename].append(line)
                 content = line.decode('ascii', errors='replace').rstrip()
