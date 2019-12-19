@@ -1,3 +1,5 @@
+import zipfile
+import warnings
 from pathlib import Path
 from unittest import mock
 from hashlib import sha1
@@ -19,9 +21,38 @@ def test_str():
     assert str(BootParam(Path('config.txt'), 1, 'base', 'spi', 'on')) == 'dtparam=spi=on'
 
 
+def test_repr():
+    assert repr(BootLine(Path('config.txt'), 2)) == (
+        "BootLine(path=PosixPath('config.txt'), lineno=2)")
+    assert repr(BootSection(Path('config.txt'), 1, 'all')) == (
+        "BootSection(path=PosixPath('config.txt'), lineno=1, section='all')")
+    assert repr(BootCommand(
+        Path('config.txt'), 1, 'initramfs', ('initrd.img', 'followkernel')
+    )) == (
+        "BootCommand(path=PosixPath('config.txt'), lineno=1, "
+        "command='initramfs', params=('initrd.img', 'followkernel'), "
+        "hdmi=None)"
+    )
+    assert repr(BootCommand(Path('config.txt'), 1, 'hdmi_group', '1')) == (
+        "BootCommand(path=PosixPath('config.txt'), lineno=1, "
+        "command='hdmi_group', params='1', hdmi=None)")
+    assert repr(BootCommand(Path('config.txt'), 1, 'hdmi_group', '2', 1)) == (
+        "BootCommand(path=PosixPath('config.txt'), lineno=1, "
+        "command='hdmi_group', params='2', hdmi=1)")
+    assert repr(BootInclude(Path('config.txt'), 1, Path('syscfg.txt'))) == (
+        "BootInclude(path=PosixPath('config.txt'), lineno=1, "
+        "include=PosixPath('syscfg.txt'))")
+    assert repr(BootOverlay(Path('config.txt'), 1, 'foo')) == (
+        "BootOverlay(path=PosixPath('config.txt'), lineno=1, overlay='foo')")
+    assert repr(BootParam(Path('config.txt'), 1, 'base', 'spi', 'on')) == (
+        "BootParam(path=PosixPath('config.txt'), lineno=1, overlay='base', "
+        "param='spi', value='on')")
+
+
 def test_parse_basic(tmpdir):
     tmpdir.join('config.txt').write("""# This is a comment
 kernel=vmlinuz
+initramfs initrd.img followkernel
 device_tree_address=0x3000000
 dtoverlay=vc4-fkms-v3d
 """)
@@ -29,8 +60,42 @@ dtoverlay=vc4-fkms-v3d
     l = p.parse(str(tmpdir))
     assert l == [
         BootCommand(Path('config.txt'), 2, 'kernel', 'vmlinuz', 0),
-        BootCommand(Path('config.txt'), 3, 'device_tree_address', '0x3000000', 0),
-        BootOverlay(Path('config.txt'), 4, 'vc4-fkms-v3d'),
+        BootCommand(Path('config.txt'), 3, 'initramfs', ('initrd.img', 'followkernel')),
+        BootCommand(Path('config.txt'), 4, 'device_tree_address', '0x3000000', 0),
+        BootOverlay(Path('config.txt'), 5, 'vc4-fkms-v3d'),
+    ]
+
+
+def test_parse_invalid(tmpdir):
+    tmpdir.join('config.txt').write("""# This is a comment
+This is not
+""")
+    p = BootParser()
+    with pytest.warns(BootInvalid) as w:
+        l = p.parse(str(tmpdir))
+        assert l == []
+        assert len(w) == 1
+        assert w[0].message.args[0] == 'config.txt:2 invalid line'
+
+
+def test_parse_overlay_and_params(tmpdir):
+    tmpdir.join('config.txt').write("""\
+dtparam=audio=on,i2c=on,i2c_baudrate=400000
+dtparam=spi,i2c0
+dtoverlay=lirc-rpi:gpio_out_pin=16,gpio_in_pin=17,gpio_in_pull=down
+""")
+    p = BootParser()
+    l = p.parse(str(tmpdir))
+    assert l == [
+        BootParam(Path('config.txt'), 1, 'base', 'audio', 'on'),
+        BootParam(Path('config.txt'), 1, 'base', 'i2c_arm', 'on'),
+        BootParam(Path('config.txt'), 1, 'base', 'i2c_arm_baudrate', '400000'),
+        BootParam(Path('config.txt'), 2, 'base', 'spi', 'on'),
+        BootParam(Path('config.txt'), 2, 'base', 'i2c_vc', 'on'),
+        BootOverlay(Path('config.txt'), 3, 'lirc-rpi'),
+        BootParam(Path('config.txt'), 3, 'lirc-rpi', 'gpio_out_pin', '16'),
+        BootParam(Path('config.txt'), 3, 'lirc-rpi', 'gpio_in_pin', '17'),
+        BootParam(Path('config.txt'), 3, 'lirc-rpi', 'gpio_in_pull', 'down'),
     ]
 
 
@@ -80,6 +145,21 @@ hdmi_mode=28
         BootSection(Path('config.txt'), 5, 'HDMI:1'),
         BootCommand(Path('config.txt'), 6, 'hdmi_group', '2', 1),
         BootCommand(Path('config.txt'), 7, 'hdmi_mode', '28', 1),
+    ]
+
+
+def test_parse_hdmi_suffix(tmpdir):
+    tmpdir.join('config.txt').write("""\
+hdmi_group:0=1
+hdmi_mode:1=4
+hdmi_mode:a=4
+""")
+    p = BootParser()
+    l = p.parse(str(tmpdir))
+    assert l == [
+        BootCommand(Path('config.txt'), 1, 'hdmi_group', '1', 0),
+        BootCommand(Path('config.txt'), 2, 'hdmi_mode', '4', 1),
+        BootCommand(Path('config.txt'), 3, 'hdmi_mode', '4', 0),
     ]
 
 
@@ -211,3 +291,19 @@ kernel=uboot_4_32b.bin
         for line in content:
             h.update(line)
         assert p.hash.digest() == h.digest()
+
+
+def test_parse_store(tmpdir):
+    with zipfile.ZipFile(str(tmpdir.join('stored.zip')), 'w') as arc:
+        arc.writestr('config.txt', b"""# This is a comment
+kernel=vmlinuz
+device_tree_address=0x3000000
+dtoverlay=vc4-fkms-v3d
+""")
+    p = BootParser()
+    l = p.parse(str(tmpdir.join('stored.zip')))
+    assert l == [
+        BootCommand(Path('config.txt'), 2, 'kernel', 'vmlinuz', 0),
+        BootCommand(Path('config.txt'), 3, 'device_tree_address', '0x3000000', 0),
+        BootOverlay(Path('config.txt'), 4, 'vc4-fkms-v3d'),
+    ]

@@ -1,9 +1,14 @@
 import hashlib
 import zipfile
+import warnings
 from pathlib import Path
 from collections import defaultdict
 
 from .info import get_board_types, get_board_serial
+
+
+class BootInvalid(Warning):
+    "Raised when an invalid line is encountered"
 
 
 class BootLine:
@@ -18,6 +23,11 @@ class BootLine:
             other.path == self.path and
             other.lineno == self.lineno
         )
+
+    def __repr__(self):
+        return (
+            'BootLine(path={self.path!r}, lineno={self.lineno!r})'.format(
+                self=self))
 
 
 class BootSection(BootLine):
@@ -34,6 +44,11 @@ class BootSection(BootLine):
 
     def __str__(self):
         return '[{self.section}]'.format(self=self)
+
+    def __repr__(self):
+        return (
+            'BootSection(path={self.path!r}, lineno={self.lineno!r}, '
+            'section={self.section!r})'.format(self=self))
 
 
 class BootCommand(BootLine):
@@ -61,6 +76,12 @@ class BootCommand(BootLine):
             template = '{self.command}:{self.hdmi}={self.params}'
         return template.format(self=self)
 
+    def __repr__(self):
+        return (
+            'BootCommand(path={self.path!r}, lineno={self.lineno!r}, '
+            'command={self.command!r}, params={self.params!r}, '
+            'hdmi={self.hdmi!r})'.format(self=self))
+
 
 class BootInclude(BootLine):
     def __init__(self, path, lineno, include):
@@ -78,6 +99,11 @@ class BootInclude(BootLine):
     def __str__(self):
         return 'include {self.include}'.format(self=self)
 
+    def __repr__(self):
+        return (
+            'BootInclude(path={self.path!r}, lineno={self.lineno!r}, '
+            'include={self.include!r})'.format(self=self))
+
 
 class BootOverlay(BootLine):
     def __init__(self, path, lineno, overlay):
@@ -93,6 +119,11 @@ class BootOverlay(BootLine):
 
     def __str__(self):
         return 'dtoverlay={self.overlay}'.format(self=self)
+
+    def __repr__(self):
+        return (
+            'BootOverlay(path={self.path!r}, lineno={self.lineno!r}, '
+            'overlay={self.overlay!r})'.format(self=self))
 
 
 class BootParam(BootLine):
@@ -113,6 +144,12 @@ class BootParam(BootLine):
 
     def __str__(self):
         return 'dtparam={self.param}={self.value}'.format(self=self)
+
+    def __repr__(self):
+        return (
+            'BootParam(path={self.path!r}, lineno={self.lineno!r}, '
+            'overlay={self.overlay!r}, param={self.param!r}, '
+            'value={self.value!r})'.format(self=self))
 
 
 class BootFilter:
@@ -203,8 +240,7 @@ class BootParser:
                     if cmd in {'device_tree_overlay', 'dtoverlay'}:
                         if ':' in value:
                             overlay, params = value.split(':', 1)
-                            yield BootOverlay(
-                                filename, lineno, overlay, prefix, newline)
+                            yield BootOverlay(filename, lineno, overlay)
                             for param, value in self._parse_params(overlay, params):
                                 yield BootParam(
                                     filename, lineno, overlay, param, value)
@@ -236,8 +272,9 @@ class BootParser:
                     yield BootCommand(
                         filename, lineno, command, (initrd, address))
                 else:
-                    # TODO warning?
-                    assert False, repr(line)
+                    warnings.warn(BootInvalid(
+                        "{filename}:{lineno} invalid line".format(
+                            filename=filename, lineno=lineno)))
 
     def _parse_params(self, overlay, params):
         for token in params.split(','):
