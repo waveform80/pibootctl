@@ -389,10 +389,10 @@ class Settings:
 
     def diff(self, other):
         """
-        Returns a mapping of setting names to tuple of (self, other) values for
-        settings that differ between self and other (another :class:`Settings`
-        instance). If a particular setting is missing from either side, the
-        value is :data:`Missing`.
+        Returns a set of (self, other) setting tuples for all settings that
+        differ between *self* and *other* (another :class:`Settings` instance).
+        If a particular setting is missing from either side, its entry will be
+        given as :data:`Missing`.
         """
         return {
             (setting, other[setting.name]

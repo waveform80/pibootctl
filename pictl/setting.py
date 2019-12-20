@@ -614,6 +614,7 @@ class CommandDisplayMode(CommandInt):
             84: '2048x1152 reduced blanking',
             85: '1280x720 @60Hz 720p',
             86: '1366x768 reduced blanking',
+            87: 'User timings',
         }
         doc = dedent(doc).format_map(
             TransMap(
