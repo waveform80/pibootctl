@@ -55,6 +55,7 @@ def get_parser():
             'store_path':   '/boot/pictl',
             'config_read':  'config.txt',
             'config_write': 'config.txt',
+            'backup':       'on',
         },
         default_section='defaults',
         interpolation=None)
@@ -135,6 +136,10 @@ def get_parser():
         description=_(
             "Update one or more boot configuration values."),
         help=_("Change the state of one or more boot settings"))
+    set_cmd.add_argument(
+        "--no-backup", action="store_false", dest="backup",
+        help=_("Don't take an automatic backup of the current boot "
+               "configuration if one doesn't exist"))
     fmt_group = set_cmd.add_mutually_exclusive_group(required=True)
     fmt_group.add_argument(
         "--json", dest="style", action="store_const", const="json",
@@ -148,7 +153,8 @@ def get_parser():
     fmt_group.add_argument(
         "set_vars", nargs="*", metavar="name=value", default=[],
         help=_("Specify one or more settings to change on the command line"))
-    set_cmd.set_defaults(func=do_set, style="user")
+    set_cmd.set_defaults(func=do_set, style="user",
+                         backup=config.getboolean('defaults', 'backup'))
 
     save_cmd = commands.add_parser(
         "save",
@@ -169,7 +175,12 @@ def get_parser():
     load_cmd.add_argument(
         "name",
         help=_("The name of the boot configuration to restore"))
-    load_cmd.set_defaults(func=do_load)
+    load_cmd.add_argument(
+        "--no-backup", action="store_false", dest="backup",
+        help=_("Don't take an automatic backup of the current boot "
+               "configuration if one doesn't exist"))
+    load_cmd.set_defaults(func=do_load,
+                          backup=config.getboolean('defaults', 'backup'))
 
     diff_cmd = commands.add_parser(
         "diff",
@@ -323,7 +334,7 @@ def do_set(args):
         except KeyError:
             raise ValueError(_('unknown setting: {}').format(name))
     updated.validate()
-    # TODO Check current config is saved and auto-backup first if not
+    backup_if_needed(args, parser)
     with io.open(str(args.boot_path / args.config_write),
                  'w', encoding='ascii') as out:
         out.write(updated.output())
@@ -334,22 +345,19 @@ def do_set(args):
 def do_save(args):
     parser = BootParser()
     parser.parse(args.boot_path, args.config_read)
-    zip_path = (args.store_path / args.name).with_suffix('.zip')
-    # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
-    with ZipFile(str(zip_path), 'w', compression=ZIP_DEFLATED) as arc:
-        arc.comment = 'pictl:0:{}'.format(parser.hash.hexdigest()).encode('ascii')
-        for path, lines in parser.content.items():
-            arc.writestr(str(path), b''.join(lines))
+    store_parsed(args, parser, args.name)
 
 
 def do_load(args):
+    parser = BootParser()
+    parser.parse(args.boot_path, args.config_read)
+    backup_if_needed(args, parser)
     zip_path = (args.store_path / args.name).with_suffix('.zip')
     with ZipFile(str(zip_path), 'r') as arc:
         if not arc.comment.startswith(b'pictl:0:'):
             raise ValueError(
                 _("{file} is not a valid pictl boot configuration"
                   ).format(file=zip_path))
-        # TODO Check current config is saved and auto-backup first if not
         for info in arc.infolist():
             arc.extract(info, path=str(args.boot_path))
     reboot_required()
@@ -374,22 +382,43 @@ def do_list(args):
     parser.parse(args.boot_path, args.config_read)
     active_hash = parser.hash.hexdigest().lower()
     table = []
-    for p in args.store_path.glob('*.zip'):
-        with ZipFile(str(p), 'r') as arc:
-            if arc.comment.startswith(b'pictl:0:'):
-                arc_hash = arc.comment[8:48].decode('ascii').lower()
-                table.append((
-                    p.stem,
-                    arc_hash == active_hash,
-                    datetime.fromtimestamp(p.stat().st_mtime),
-                ))
+    for name, arc_hash, timestamp in enumerate_store(args):
+        table.append((name, arc_hash == active_hash, timestamp))
     dump_store(args.style, table, fp=sys.stdout)
 
 
 def do_remove(args):
     zip_path = (args.store_path / args.name).with_suffix('.zip')
-    # TODO Add a --force parameter and prompt before removing
     zip_path.unlink()
+
+
+def enumerate_store(args):
+    for p in args.store_path.glob('*.zip'):
+        with ZipFile(str(p), 'r') as arc:
+            if arc.comment.startswith(b'pictl:0:'):
+                arc_hash = arc.comment[8:48].decode('ascii').lower()
+                yield p.stem, arc_hash, datetime.fromtimestamp(p.stat().st_mtime)
+
+
+def store_parsed(args, parser, name):
+    zip_path = (args.store_path / name).with_suffix('.zip')
+    # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
+    with ZipFile(str(zip_path), 'w', compression=ZIP_DEFLATED) as arc:
+        arc.comment = 'pictl:0:{}'.format(parser.hash.hexdigest()).encode('ascii')
+        for path, lines in parser.content.items():
+            arc.writestr(str(path), b''.join(lines))
+
+
+def backup_if_needed(args, parser):
+    if args.backup:
+        active_hash = parser.hash.hexdigest().lower()
+        for name, arc_hash, timestamp in enumerate_store(args):
+            if arc_hash == active_hash:
+                # There's already an archive of the parsed configuration
+                return
+        name = 'backup-{now:%Y%m%d-%H%M%S}'.format(now=datetime.now())
+        print("Backing up current configuration in {name}".format(name=name))
+        store_parsed(args, parser, name)
 
 
 def reboot_required():
