@@ -125,7 +125,7 @@ class TransMap:
 
         >>> '{foo}{bar}'.format_map(TransMap(foo=1))
         '1{bar}'
-        >>> '{foo:02d}{bar:02d}{baz:02d}'.format(TransMap(foo=1, baz=3))
+        >>> '{foo:02d}{bar:02d}{baz:02d}'.format_map(TransMap(foo=1, baz=3))
         '01{bar:02d}03'
     """
     def __init__(self, **kw):
