@@ -2,16 +2,19 @@ import os
 import sys
 import fcntl
 import struct
+import gettext
 import termios
 import argparse
 import traceback
 from collections import OrderedDict, namedtuple
 
+_ = gettext.gettext
+
 
 def term_color():
     try:
         stdout_fd = sys.stdout.fileno()
-    except IOError:
+    except OSError:
         return False
     else:
         return os.isatty(stdout_fd)
@@ -28,9 +31,9 @@ def term_size():
         "Subroutine for querying terminal size from std handle"
         try:
             buf = fcntl.ioctl(handle, termios.TIOCGWINSZ, '12345678')
-            row, col = struct.unpack(b'hhhh', buf)[0:2]
+            row, col = struct.unpack('hhhh', buf)[0:2]
             return (col, row)
-        except IOError:
+        except OSError:
             return None
 
     stdin, stdout, stderr = 0, 1, 2
@@ -41,11 +44,15 @@ def term_size():
         get_handle_size(stdin)
     )
     if not result:
-        fd = os.open(os.ctermid(), os.O_RDONLY)
         try:
-            result = get_handle_size(fd)
-        finally:
-            os.close(fd)
+            fd = os.open(os.ctermid(), os.O_RDONLY)
+        except OSError:
+            pass
+        else:
+            try:
+                result = get_handle_size(fd)
+            finally:
+                os.close(fd)
     if not result:
         try:
             result = (os.environ['COLUMNS'], os.environ['LINES'])
@@ -100,7 +107,7 @@ class ErrorHandler:
 
     @staticmethod
     def syntax_error(exc_type, exc_value, exc_tb):
-        return [exc_value, 'Try the --help option for more information.']
+        return [exc_value, _('Try the --help option for more information.')]
 
     def __len__(self):
         return len(self._config)

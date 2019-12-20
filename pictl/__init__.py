@@ -323,6 +323,7 @@ def do_set(args):
         except KeyError:
             raise ValueError(_('unknown setting: {}').format(name))
     updated.validate()
+    # TODO Check current config is saved and auto-backup first if not
     with io.open(str(args.boot_path / args.config_write),
                  'w', encoding='ascii') as out:
         out.write(updated.output())
@@ -348,7 +349,7 @@ def do_load(args):
             raise ValueError(
                 _("{file} is not a valid pictl boot configuration"
                   ).format(file=zip_path))
-        # TODO Add a --force parameter and prompt before overwriting
+        # TODO Check current config is saved and auto-backup first if not
         for info in arc.infolist():
             arc.extract(info, path=str(args.boot_path))
     reboot_required()
