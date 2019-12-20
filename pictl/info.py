@@ -38,6 +38,6 @@ def get_board_types():
             0xe: {'pi3', 'pi3+'},
             0x10: {'pi3', 'pi3+'},
             0x11: {'pi4'},
-        }[get_board_revision() >> 4 & 0xffffffff]
+        }[get_board_revision() >> 4 & 0xff]
     except:
         return set()
