@@ -56,7 +56,7 @@ class TableWrapper:
                 # more columns (requiring another loop)
                 reduce_by = min(
                     reduce_by,
-                    ((widths[suffix][0] - widths[suffix - 1][0]) * suffix_len)
+                    (widths[suffix][0] - widths[suffix - 1][0]) * suffix_len
                 )
             # Distribute the reduction evenly across the columns of the suffix
             widths[suffix:] = [
@@ -65,7 +65,7 @@ class TableWrapper:
             ]
             # Subtract the remainder from the left-most columns of the suffix
             for i in range(suffix, suffix + reduce_by % suffix_len):
-                widths[i] -= 1
+                widths[i] = (widths[i][0] - 1, widths[i][1])
             total_width -= reduce_by
         return [w for i, w in sorted((i, w) for w, i in widths)]
 
