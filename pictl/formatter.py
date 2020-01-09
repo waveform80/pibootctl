@@ -37,6 +37,7 @@ class TableWrapper:
             len(self.borders[2]),
             len(self.cell_separator) * (len(widths) - 1)
         ))
+        # Minimum width of each column is 1
         if min_width + len(widths) > self.width:
             raise ValueError('width is too thin to accommodate the table')
         total_width = sum(widths) + min_width
@@ -146,7 +147,7 @@ pretty_table = {
     'internal_line': '-',
     'internal_separator': '-+-',
     'borders': ('| ', '-', ' |', '-'),
-    'corners': ('+-', '-+', "-+", '+-'),
+    'corners': ('+-', '-+', '-+', '+-'),
     'internal_borders': ('|-', '-+-', '-|', '-+-'),
 }
 
@@ -233,6 +234,11 @@ def parse(text):
                 item = [s]
             elif token == 'line':
                 item.append(s)
+            elif token == 'row':
+                items.append(' '.join(item))
+                yield 'list', items
+                state = 'table/row'
+                rows = [s]
             else:
                 items.append(' '.join(item))
                 state = 'list'

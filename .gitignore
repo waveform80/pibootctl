@@ -24,3 +24,4 @@ coverage
 .tox
 .pytest_cache
 .env
+.eggs

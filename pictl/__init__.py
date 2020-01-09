@@ -370,7 +370,7 @@ def do_diff(args):
     if args.left is None:
         left_path = args.boot_path
     else:
-        left_path = (args.store_path / args.name).with_suffix('.zip')
+        left_path = (args.store_path / args.left).with_suffix('.zip')
     left.extract(parser.parse(left_path, args.config_read))
     right_path = (args.store_path / args.right).with_suffix('.zip')
     right.extract(parser.parse(right_path, args.config_read))
