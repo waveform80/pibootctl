@@ -13,9 +13,12 @@ from .setting import (
     CommandDisplayMode,
     CommandDisplayRotate,
     CommandDisplayTimings,
+    CommandDisplayPixelEncoding,
     CommandForceIgnore,
     CommandInt,
     CommandHDMIBoost,
+    CommandEDIDIgnore,
+    CommandEDIDContentType,
 )
 
 _ = gettext.gettext
@@ -74,7 +77,7 @@ _settings = {
             of standby and/or channel-switching when starting the Pi.
             """)),
     Command(
-        'video.cec.osd_name', command='cec_osd_name',
+        'video.cec.name', command='cec_osd_name',
         default='Raspberry Pi', doc=_(
             """
             The name the Pi (as a CEC device) should provide to the connected
@@ -108,13 +111,32 @@ _settings = {
             the running temperature of the Pi. It is not possible to use 60Hz
             rates on both micro-HDMI ports simultaneously.
             """)),
-    CommandInt(
+    CommandEDIDIgnore(
         'video.hdmi.edid.ignore', command='hdmi_ignore_edid', doc=_(
             """
             When on, ignores the display's EDID [1] data; useful when your
             display does not have an accurate EDID.
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
+            """)),
+    CommandBool(
+        'video.hdmi.edid.override', command='hdmi_edid_file', doc=_(
+            """
+            When on, read EDID [1] data from an 'edid.dat' file, located in the
+            boot partition, instead of reading it from the monitor. To generate
+            an 'edid.dat' file use:
+
+            $ sudo tvservice -d edid.dat
+
+            [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
+            """)),
+    CommandEDIDContentType(
+        'video.hdmi.edid.contenttype', command='edid_content_type', doc=_(
+            """
+            Forces the EDID content type to the specified value. Valid values
+            are:
+
+            {valid}
             """)),
     CommandBool(
         'video.hdmi.edid.3d', command='hdmi_force_edid_3d', doc=_(
@@ -221,30 +243,153 @@ _settings = {
 
             [1]: https://en.wikipedia.org/wiki/Colorburst
             """)),
+    CommandBool(
+        'video.dsi.enabled', command='ignore_lcd',
+        default=True, inverted=True, doc=_(
+            """
+            By default, an LCD display attached to the DSI connector is used
+            when it is detected on the I2C bus. If this setting is disabled,
+            this detection phase will be skipped and the LCD display will not
+            be used.
+            """)),
+    CommandBool(
+        'video.dsi.default', command='display_default_lcd',
+        default=True, doc=_(
+            """
+            If an LCD display is detected on the DSI connector, it will be used
+            as the default display and will show the framebuffer. If this
+            setting is disabled, then (usually) the HDMI output will be the
+            default. The LCD can still be used by choosing its display number
+            from supported applications, e.g. omxplayer.
+            """)),
+    CommandInt(
+        'video.dsi.framerate', command='lcd_framerate', default=60, doc=_(
+            """
+            Specifies the framerate of an LCD display connected to the DSI
+            port. Defaults to 60Hz.
+            """)),
+    CommandBool(
+        'video.dsi.touch.enabled', command='disable_touchscreen',
+        default=True, inverted=True, doc=_(
+            """
+            Enables or disables the touchscreen of the official Raspberry Pi
+            LCD display.
+            """)),
+    CommandDisplayRotate(
+        'video.dsi.rotate', command='display_hdmi_rotate', lcd=True, doc=_(
+            """
+            Controls the rotation of an LCD display connected to the DSI port.
+            Valid values are 0 (the default), 90, 180, or 270.
+            """)),
+    CommandDisplayFlip(
+        'video.dsi.flip', command='display_hdmi_rotate', valid={
+            0: 'none',
+            1: 'horizontal',
+            2: 'vertical',
+            3: 'both',
+        },
+        doc=_(
+            """
+            Controls the reflection (flipping) of an LCD display connected to
+            the DSI port. Valid values are:
+
+            {valid}
+            """)),
+    CommandBool(
+        'video.dpi.enabled', command='enable_dpi_lcd', doc=_(
+            """
+            Enables LCD displays attached to the DPI GPIOs. This is to allow
+            the use of third-party LCD displays using the parallel display
+            interface [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDisplayGroup(
+        'video.dpi.group', command='dpi_group', doc=_(
+            """
+            Defines which list of modes should be consulted for DPI LCD
+            output. The possible values are:
+
+            {valid}
+
+            CEA (Consumer Electronics Association) modes are typically used by
+            TVs, hence overscan applies to these modes when enabled. DMT
+            (Display Monitor Timings) modes are typically used by monitors,
+            hence overscan is implicitly 0 with these modes. The video.dpi.mode
+            setting must be set when this is non-zero.
+            """)),
+    CommandDisplayMode(
+        'video.dpi.mode', command='dpi_mode', doc=_(
+            """
+            Defines which mode will be used for DPI LCD output. This defaults
+            to 0 which indicates it should be automatically determined from the
+            EDID sent by the connected display. If video.dpi.group is set to 1
+            (CEA), this must be one of the following values:
+
+            {valid_cea}
+
+            In the table above, "wide" indicates a 16:9 wide-screen variant of
+            a mode which usually has a 4:3 aspect ratio. "2x" and "4x" indicate
+            a higher clock rate with pixel doubling or quadrupling
+            respectively.
+
+            The following values are valid if video.hdmi.group is set to 2
+            (DMT):
+
+            {valid_dmt}
+
+            Note that there is a pixel clock limit [2]. The highest supported
+            mode is 1920x1200 at 60Hz which reduced blanking.
+
+            [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
+            [2]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
+            """)),
+            # XXX Numbered lists...
+    CommandDisplayTimings(
+        'video.dpi.timings', command='dpi_timings', doc=_(
+            """
+            An advanced setting that permits the raw timing values to be
+            specified directly for DPI group 2, mode 87. Please refer to the
+            "dpi_timings" section in [1] for full details.
+
+            [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
+            """)),
 }
 
-_settings |= {s for i in (0, 1) for s in (
+_settings |= {setting for hdmi in (0, 1) for setting in (
     CommandForceIgnore(
-        'video.hdmi{}.enabled'.format(i), index=i, force='hdmi_force_hotplug',
-        ignore='hdmi_ignore_hotplug', doc=_(
+        'video.hdmi{}.enabled'.format(hdmi), index=hdmi,
+        force='hdmi_force_hotplug', ignore='hdmi_ignore_hotplug', doc=_(
             """
             Switch on to force HDMI output to be used even if no HDMI monitor
             is attached (forces the HDMI hotplug signal to be asserted). Switch
             off to force composite TV output even if an HDMI display is
             detected (ignores the HDMI hotplug signal).
             """)),
+    CommandForceIgnore(
+        'video.hdmi{}.audio'.format(hdmi), index=hdmi,
+        force='hdmi_force_edid_audio', ignore='hdmi_ignore_edid_audio', doc=_(
+            """
+            Switch on to force the HDMI output to assume that all audio formats
+            are supported by the display. Switch off to assume that no audio
+            formats are supported by the display (ignoring the EDID [1] data
+            given by the attached display).
+
+            [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
+            """)),
     Command(
-        'video.hdmi{}.edid.filename'.format(i), index=i,
-        command='hdmi_edid_filename', doc=_(
+        'video.hdmi{}.edid.filename'.format(hdmi), index=hdmi,
+        default='edid.dat', command='hdmi_edid_filename', doc=_(
             """
             On the Raspberry Pi 4B, you can manually specify the file to read
-            for alternate EDID [1] data.
+            for alternate EDID [1] data. Note that this still requires
+            video.hdmi.edid.override to be set.
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
     CommandHDMIBoost(
-        'video.hdmi{}.boost'.format(i), index=i, command='config_hdmi_boost',
-        default=5, doc=_(
+        'video.hdmi{}.boost'.format(hdmi), index=hdmi,
+        command='config_hdmi_boost', default=5, doc=_(
             """
             Configures the signal strength of the HDMI interface. Must be a
             value between 0 and 11. The default value is 5. Raise this value to
@@ -255,7 +400,7 @@ _settings |= {s for i in (0, 1) for s in (
             This option is ignored on the Raspberry Pi 4.
             """)),
     CommandDisplayGroup(
-        'video.hdmi{}.group'.format(i), index=i, command='hdmi_group',
+        'video.hdmi{}.group'.format(hdmi), index=hdmi, command='hdmi_group',
         doc=_(
             """
             Defines which list of modes should be consulted for the HDMI
@@ -270,7 +415,7 @@ _settings |= {s for i in (0, 1) for s in (
             video.hdmi{index}.mode setting must be set when this is non-zero.
             """)),
     CommandDisplayMode(
-        'video.hdmi{}.mode'.format(i), index=i, command='hdmi_mode',
+        'video.hdmi{}.mode'.format(hdmi), index=hdmi, command='hdmi_mode',
         doc=_(
             """
             Defines which mode will be used on the HDMI output. This defaults
@@ -297,15 +442,25 @@ _settings |= {s for i in (0, 1) for s in (
             [2]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
             """)),
             # XXX Numbered lists...
+    CommandDisplayPixelEncoding(
+        'video.hdmi{}.encoding'.format(hdmi), index=hdmi, command='hdmi_pixel_encoding',
+        doc=_(
+            """
+            Defines the pixel encoding mode. By default, it will use the mode
+            requested from the EDID, so you shouldn't need to change it. Valid
+            values are:
+
+            {valid}
+            """)),
     CommandDisplayRotate(
-        'video.hdmi{}.rotate'.format(i), index=i,
+        'video.hdmi{}.rotate'.format(hdmi), index=hdmi,
         command='display_hdmi_rotate', doc=_(
             """
             Controls the rotation of the HDMI output. Valid values are 0 (the
             default), 90, 180, or 270.
             """)),
     CommandDisplayFlip(
-        'video.hdmi{}.flip'.format(i), index=i, command='display_hdmi_rotate',
+        'video.hdmi{}.flip'.format(hdmi), index=hdmi, command='display_hdmi_rotate',
         valid={
             0: 'none',
             1: 'horizontal',
@@ -320,7 +475,7 @@ _settings |= {s for i in (0, 1) for s in (
             {valid}
             """)),
     CommandBool(
-        'video.hdmi{}.mode.force'.format(i), index=i,
+        'video.hdmi{}.mode.force'.format(hdmi), index=hdmi,
         command='hdmi_force_mode', doc=_(
             """
             Switching this on forces the mode specified by video.hdmi.group and
@@ -329,7 +484,7 @@ _settings |= {s for i in (0, 1) for s in (
             ignoring these settings.
             """)),
     CommandDisplayTimings(
-        'video.hdmi{}.timings'.format(i), index=i, command='hdmi_timings',
+        'video.hdmi{}.timings'.format(hdmi), index=hdmi, command='hdmi_timings',
         doc=_(
             """
             An advanced setting that permits the raw HDMI timing values to be
@@ -339,7 +494,7 @@ _settings |= {s for i in (0, 1) for s in (
             [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
             """)),
     CommandInt(
-        'video.hdmi{}.drive'.format(i), index=i, command='hdmi_drive',
+        'video.hdmi{}.drive'.format(hdmi), index=hdmi, command='hdmi_drive',
         valid={
             0: 'auto',
             1: 'dvi',

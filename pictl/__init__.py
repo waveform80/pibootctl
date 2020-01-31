@@ -1,6 +1,7 @@
 import io
 import os
 import sys
+import locale
 import gettext
 import argparse
 import configparser
@@ -12,7 +13,6 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from .term import ErrorHandler
 from .parser import BootParser
 from .settings import Settings
-from .formatter import render, unicode_table
 from .output import (
     format_value,
     dump_store,
@@ -22,12 +22,13 @@ from .output import (
     load_settings,
 )
 
-_ = gettext.gettext
-
 try:
     import argcomplete
 except ImportError:
     argcomplete = None
+
+
+_ = gettext.gettext
 
 
 def main(args=None):
@@ -35,6 +36,7 @@ def main(args=None):
     sys.excepthook[PermissionError] = (permission_error, 1)
     if not int(os.environ.get('DEBUG', '0')):
         sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
+    locale.setlocale(locale.LC_ALL, '')
     parser = get_parser()
     args = parser.parse_args(args)
     args.func(args)

@@ -1,13 +1,14 @@
 import io
 import json
 import shlex
+import locale
 import gettext
 from operator import attrgetter
 
 import yaml
 
 from .settings import Missing
-from .formatter import TableWrapper, unicode_table, render
+from .formatter import TableWrapper, unicode_table, pretty_table, render
 from .term import term_size
 
 _ = gettext.gettext
@@ -15,7 +16,11 @@ _ = gettext.gettext
 
 def print_table(table, fp):
     width = min(120, term_size()[0])
-    renderer = TableWrapper(width=width, **unicode_table)
+    if locale.nl_langinfo(locale.CODESET) == 'UTF-8':
+        style = unicode_table
+    else:
+        style = pretty_table
+    renderer = TableWrapper(width=width, **style)
     for line in renderer.wrap(table):
         fp.write(line)
         fp.write('\n')
@@ -30,6 +35,10 @@ def dump_store(style, store, fp):
     }[style](store, fp)
 
 def dump_store_user(store, fp):
+    if locale.nl_langinfo(locale.CODESET) == 'UTF-8':
+        check = '✓'
+    else:
+        check = 'x'
     if not store:
         fp.write(_("No stored boot configurations found"))
         fp.write("\n")
@@ -37,7 +46,8 @@ def dump_store_user(store, fp):
         print_table([
             (_('Name'), _('Active'), _('Timestamp'))
         ] + [
-            (name, '✓' if active else '', timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+            (name, check if active else '',
+             timestamp.strftime('%Y-%m-%d %H:%M:%S'))
             for name, active, timestamp in store
         ], fp)
 

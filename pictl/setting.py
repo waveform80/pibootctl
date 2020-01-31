@@ -273,15 +273,16 @@ class Command(Setting):
 
     def from_file(self, value):
         """
-        Translates the configuration file representation of *value* into an
-        actual value of the setting.
+        Translates the configuration file representation of *value* (a
+        :class:`str`) into an actual value of the setting.
         """
         return value
 
     def to_file(self, value):
         """
         Translates an actual *value* of the setting into the corresponding
-        representation in the configuration file.
+        representation in the configuration file. This method must return
+        a :class:`str`.
         """
         return str(value)
 
@@ -290,9 +291,11 @@ class Command(Setting):
         Translates a *value* given by the user into an actual value of the
         setting. By default this is the same as the translation performed by
         :meth:`from_file` when *value* is a :class:`str` (as it will be when
-        specified on the command line). However, *value* can be any other type
-        (as provided by the other formats such as YAML or JSON) in which case
-        it will be passed through verbatim.
+        specified on the command line).
+
+        However, *value* can be any other type (as provided by the other
+        formats such as YAML or JSON) in which case it will be passed through
+        verbatim by default.
         """
         if isinstance(value, str):
             return self.from_file(value)
@@ -320,7 +323,8 @@ class CommandInt(Command):
 
     def from_file(self, value):
         try:
-            return int(value)
+            # XXX Do we need base=0 here?
+            return int(value.strip(), base=0)
         except ValueError:
             raise ValueError(_(
                 '{self.name} must be an integer number, not {value}'
@@ -358,7 +362,7 @@ class CommandBool(Command):
         return self._inverted
 
     def from_file(self, value):
-        return bool(int(value) ^ self.inverted)
+        return bool(int(value.strip()) ^ self.inverted)
 
     def from_user(self, value):
         if isinstance(value, str):
@@ -445,6 +449,21 @@ class CommandForceIgnore(Setting):
                     False: self.ignore,
                 }[self.value],
             )
+
+
+class CommandDisplayPixelEncoding(CommandInt):
+    """
+    Represents settings that control the pixel encoding of an HDMI output, e.g.
+    ``hdmi_pixel_encoding``.
+    """
+    def __init__(self, name, command, default=0, doc='', index=0):
+        super().__init__(name, command, default, doc, index, valid={
+            0: 'default; 1 for CEA, 2 for DMT',
+            1: 'RGB limited; 16-235',
+            2: 'RGB full; 0-255',
+            3: 'YCbCr limited; 16-235',
+            4: 'YCbCr full; 0-255',
+        })
 
 
 class CommandDisplayGroup(CommandInt):
@@ -700,7 +719,14 @@ class CommandDisplayRotate(CommandInt):
 
     Also handles the deprecated ``display_rotate`` command.
     """
+    def __init__(self, name, command, default=0, doc='', index=0, lcd=False):
+        super().__init__(name, command, default, doc, index)
+        self._lcd = lcd
+
     def extract(self, config):
+        commands = (self.command, 'display_rotate')
+        if self._lcd:
+            commands += ('lcd_rotate',)
         for item in config:
             if (
                     isinstance(item, BootCommand) and
@@ -724,10 +750,20 @@ class CommandDisplayRotate(CommandInt):
             (0x20000 if flip.value in {3, 2} else 0)
         )
         if value != self.default:
-            if self.index:
-                template = '{self.command}:{self.index}={value:#x}'
+            if not self._lcd:
+                # For the DSI LCD display, prefer lcd_rotate as it uses the
+                # display's electronics to handle rotation rather than the GPU.
+                # However, if a flip is required, just use the GPU (because we
+                # have to anyway).
+                if value > 0b11:
+                    template = '{self.command}={value:#x}'
+                else:
+                    template = 'lcd_rotate={value}'
             else:
-                template = '{self.command}={value:#x}'
+                if self.index:
+                    template = '{self.command}:{self.index}={value:#x}'
+                else:
+                    template = '{self.command}={value:#x}'
             yield template.format(self=self, value=value)
 
     def from_file(self, value):
@@ -783,3 +819,33 @@ class CommandHDMIBoost(CommandInt):
             raise ValueError(_(
                 '{self.name} must be between 0 and 11 (default 5)'
             ).format(self=self))
+
+
+class CommandEDIDIgnore(CommandBool):
+    # See hdmi_edid_file in
+    # https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
+    def __init__(self, name, command, default=False, doc='', index=0):
+        super().__init__(name, command, default, doc=doc, index=index)
+
+    def from_file(self, value):
+        return int(value.strip(), base=0) == 0xa5000080
+
+    def from_user(self, value):
+        if isinstance(value, str):
+            return bool(int(value.strip()))
+        else:
+            return value
+
+    def to_file(self, value):
+        return '0xa5000080' if value else '0'
+
+
+class CommandEDIDContentType(CommandInt):
+    def __init__(self, name, command, default=0, doc='', index=0):
+        super().__init__(name, command, default, doc, index, valid={
+            0: 'default',
+            1: 'graphics',
+            2: 'photo',
+            3: 'cinema',
+            4: 'game',
+        })
