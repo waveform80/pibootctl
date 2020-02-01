@@ -131,6 +131,22 @@ _settings = {
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
+    CommandBool(
+        'video.hdmi.edid.parse', command='disable_fw_kms_setup', default=True,
+        inverted=True, doc=_(
+            """
+            By default, the firmware parses the EDID of any HDMI attached
+            display, picks an appropriate video mode, then passes the
+            resolution and frame rate of the mode, along with overscan
+            parameters, to the Linux kernel via settings on the kernel command
+            line. In rare circumstances, this can have the effect of choosing a
+            mode that is not in the EDID, and may be incompatible with the
+            device.
+
+            You can disable this option to prevent passing these parameters and
+            avoid this problem. The Linux video mode system (KMS) will then
+            parse the EDID itself and pick an appropriate mode.
+            """)),
     CommandInt(
         'video.hdmi.edid.contenttype', command='edid_content_type', valid={
             0: 'default',
@@ -200,6 +216,74 @@ _settings = {
             the GPU. Disabling overscan on the display itself is the
             recommended option to avoid images being scaled twice (by the GPU
             and the display).
+            """)),
+    CommandInt(
+        'video.framebuffer.depth', command='framebuffer_depth', default=16,
+        valid={
+            8:  '8-bit framebuffer; default RGB palette is unreadable',
+            16: '16-bit framebuffer',
+            24: '24-bit framebuffer; may result in corrupted display',
+            32: '32-bit framebuffer; may require video.framebuffer.alpha '
+                'to be disabled',
+        }, doc=_(
+            """
+            Specifies the number of bits-per-pixel (bpp) used by the console
+            framebuffer. The default value is 16, but other valid values are:
+
+            {valid}
+            """)),
+    CommandBool(
+        'video.framebuffer.alpha', command='framebuffer_ignore_alpha',
+        default=True, inverted=True, doc=_(
+            """
+            Specifies whether the console framebuffer has an alpha channel.
+            It may be necessary to switch this off when video.framebuffer.depth
+            is set to 32 bpp.
+            """)),
+    CommandInt(
+        'video.framebuffer.priority', command='framebuffer_priority',
+        default=0, valid={
+            0: 'Main LCD',
+            1: 'Secondary LCD',
+            2: 'HDMI 0',
+            3: 'Composite/TV',
+            7: 'HDMI 1',
+        }, doc=_(
+            """
+            On a system with multiple displays, using the legacy (pre-KMS)
+            graphics driver, this forces a specific internal display device to
+            be the first Linux framebuffer (i.e. /dev/fb0). The values that can
+            be specified are:
+
+            {valid}
+            """)),
+    CommandInt(
+        'video.framebuffer.width', command='framebuffer_width', default=0,
+        doc=_(
+            """
+            Specifies the width of the console framebuffer in pixels. The
+            default is the display width minus the total horizontal overscan.
+            """)),
+    CommandInt(
+        'video.framebuffer.width.max', command='max_framebuffer_width',
+        default=0, doc=_(
+            """
+            Specifies the maximum width of the console framebuffer in pixels.
+            The default is not to limit the size of the framebuffer.
+            """)),
+    CommandInt(
+        'video.framebuffer.height', command='framebuffer_height', default=0,
+        doc=_(
+            """
+            Specifies the height of the console framebuffer in pixels. The
+            default is the display height minus the total vertical overscan.
+            """)),
+    CommandInt(
+        'video.framebuffer.height.max', command='max_framebuffer_height',
+        default=0, doc=_(
+            """
+            Specifies the maximum height of the console framebuffer in pixels.
+            The default is not to limit the size of the framebuffer.
             """)),
     CommandBool(
         'video.tv.enabled', command='enable_tvout', doc=_(
@@ -577,6 +661,23 @@ _settings = {
             For more information on DPI configuration, please refer to [1].
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandBool(
+        'video.dispmanx.offline', command='dispmanx_offline', default=False,
+        doc=_(
+            """
+            Forces dispmanx composition to be done offline in two offscreen
+            framebuffers. This can allow more dispmanx elements to be
+            composited, but is slower and may limit screen framerate to
+            typically 30fps.
+            """)),
+    CommandBool(
+        'test.enabled', command='test_mode', default=False, doc=_(
+            """
+            When activated, display a test image and sound during boot (over
+            the composite video and analog audio outputs only) for a given
+            number of seconds, before continuing to boot the OS as normal. This
+            is used as a manufacturing test; the default is off.
             """)),
 }
 
