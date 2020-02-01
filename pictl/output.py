@@ -13,14 +13,17 @@ from .term import term_size
 
 _ = gettext.gettext
 
+if locale.nl_langinfo(locale.CODESET) == 'UTF-8':
+    table_style = unicode_table
+    check_mark = '✓'
+else:
+    table_style = pretty_table
+    check_mark = 'x'
+
 
 def print_table(table, fp):
     width = min(120, term_size()[0])
-    if locale.nl_langinfo(locale.CODESET) == 'UTF-8':
-        style = unicode_table
-    else:
-        style = pretty_table
-    renderer = TableWrapper(width=width, **style)
+    renderer = TableWrapper(width=width, **table_style)
     for line in renderer.wrap(table):
         fp.write(line)
         fp.write('\n')
@@ -35,10 +38,6 @@ def dump_store(style, store, fp):
     }[style](store, fp)
 
 def dump_store_user(store, fp):
-    if locale.nl_langinfo(locale.CODESET) == 'UTF-8':
-        check = '✓'
-    else:
-        check = 'x'
     if not store:
         fp.write(_("No stored boot configurations found"))
         fp.write("\n")
@@ -46,7 +45,7 @@ def dump_store_user(store, fp):
         print_table([
             (_('Name'), _('Active'), _('Timestamp'))
         ] + [
-            (name, check if active else '',
+            (name, check_mark if active else '',
              timestamp.strftime('%Y-%m-%d %H:%M:%S'))
             for name, active, timestamp in store
         ], fp)
@@ -128,39 +127,41 @@ def dump_diff_shell(left, right, diff, fp):
         fp.write('\n')
 
 
-def dump_settings(style, settings, fp):
+def dump_settings(style, settings, fp, all=False):
     {
         'user':  dump_settings_user,
         'shell': dump_settings_shell,
         'json':  dump_settings_json,
         'yaml':  dump_settings_yaml,
-    }[style](settings, fp)
+    }[style](settings, fp, all)
 
-def dump_settings_json(settings, fp):
+def dump_settings_json(settings, fp, all=False):
     json.dump({setting.name: setting.value for setting in settings}, fp)
 
-def dump_settings_yaml(settings, fp):
+def dump_settings_yaml(settings, fp, all=False):
     yaml.dump({setting.name: setting.value for setting in settings}, fp)
 
-def dump_settings_shell(settings, fp):
+def dump_settings_shell(settings, fp, all=False):
     for setting in settings:
         fp.write('{}\n'.format(format_setting_shell(setting)))
 
-def dump_settings_user(settings, fp):
+def dump_settings_user(settings, fp, all=False):
     if not settings:
         fp.write(_("No settings matching the pattern found"))
         fp.write("\n")
     else:
         data = [
-            (_('Name'), _('Mod'), _('Value'))
+            (_('Name'), _('Modified'), _('Value'))
         ] + [
             (
                 setting.name,
-                '✓' if setting.value != setting.default else '',
+                check_mark if setting.value != setting.default else '',
                 format_setting_user(setting),
             )
             for setting in sorted(settings, key=attrgetter('name'))
         ]
+        if not all:
+            data = [(name, value) for (name, modified, value) in data]
         print_table(data, fp)
 
 

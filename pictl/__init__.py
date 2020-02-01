@@ -110,13 +110,14 @@ def get_parser():
     dump_cmd = commands.add_parser(
         "status", aliases=["dump"],
         description=_(
-            "Output the current value of the boot time settings that match "
-            "the specified pattern (or all if no pattern is provided)"),
+            "Output the current value of modified boot time settings that "
+            "match the specified pattern (or all if no pattern is provided)"),
         help=_("Output the current boot time configuration"))
     dump_cmd.add_argument("vars", nargs="?", metavar="pattern")
     dump_cmd.add_argument(
-        "--modified", action="store_true",
-        help=_("Only include modified settings in the output"))
+        "-a", "--all", action="store_true",
+        help=_(
+            "Include all settings, regardless of modification, in the output"))
     add_format_args(dump_cmd)
     dump_cmd.set_defaults(func=do_dump, style="user")
 
@@ -212,8 +213,8 @@ def get_parser():
         help=_("The name of the boot configuration to display"))
     show_cmd.add_argument("vars", nargs="?", metavar="pattern")
     show_cmd.add_argument(
-        "--modified", action="store_true",
-        help=_("Only include modified settings in the output"))
+        "-a", "--all", action="store_true",
+        help=_("Include all settings, not just those modified, in the output"))
     add_format_args(show_cmd)
     show_cmd.set_defaults(func=do_show, style="user")
 
@@ -286,13 +287,13 @@ def do_dump_or_show(args, path):
             for setting in settings
             if fnmatch(setting.name, args.vars)
         }
-    if args.modified:
+    if not args.all:
         settings = {
             setting
             for setting in settings
             if setting.value is not setting.default
         }
-    dump_settings(args.style, settings, fp=sys.stdout)
+    dump_settings(args.style, settings, fp=sys.stdout, all=args.all)
 
 
 def do_get(args):
