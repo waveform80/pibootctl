@@ -1,5 +1,7 @@
 import gettext
 from textwrap import dedent
+from operator import or_
+from functools import reduce
 
 from .formatter import FormatDict
 from .parser import BootParam, BootCommand
@@ -49,7 +51,7 @@ class Setting:
     * :meth:`validate` called with the set of all settings
     * :meth:`output` called to generate new configuration lines
     """
-    def __init__(self, name, default=None, doc=''):
+    def __init__(self, name, *, default=None, doc=''):
         self._settings = None
         self._name = name
         self._default = default
@@ -159,8 +161,8 @@ class BaseOverlayInt(Setting):
     The *param* is the name of the base device-tree overlay parameter that this
     setting represents.
     """
-    def __init__(self, name, param, default=0, doc=''):
-        super().__init__(name, default, doc)
+    def __init__(self, name, *, param, default=0, doc=''):
+        super().__init__(name, default=default, doc=doc)
         self._param = param
 
     @property
@@ -198,8 +200,8 @@ class BaseOverlayBool(BaseOverlayInt):
     The *param* is the name of the base device-tree overlay parameter that this
     setting represents.
     """
-    def __init__(self, name, param, default=False, doc=''):
-        super().__init__(name, param, default, doc)
+    def __init__(self, name, *, param, default=False, doc=''):
+        super().__init__(name, param=param, default=default, doc=doc)
 
     def extract(self, config):
         for item in config:
@@ -225,9 +227,9 @@ class Command(Setting):
     This is also the base class for most simple-valued configuration commands
     (integer, boolean, etc).
     """
-    def __init__(self, name, command, default='', doc='', index=0):
+    def __init__(self, name, *, command, default='', doc='', index=0):
         doc = dedent(doc).format_map(TransMap(index=index))
-        super().__init__(name, default, doc)
+        super().__init__(name, default=default, doc=doc)
         self._command = command
         self._index = index
 
@@ -311,14 +313,15 @@ class CommandInt(Command):
     integer values for the command to string explanations, to be provided by
     the basic :meth:`explain` implementation.
     """
-    def __init__(self, name, command, default=0, doc='', index=0,
+    def __init__(self, name, *, command, default=0, doc='', index=0,
                  valid=None):
         if valid is None:
             valid = {}
         doc = dedent(doc).format_map(
             TransMap(valid=FormatDict(
                 valid, key_title=_('Value'), value_title=_('Meaning'))))
-        super().__init__(name, command, default, doc, index)
+        super().__init__(name, command=command, default=default, doc=doc,
+                         index=index)
         self._valid = valid
 
     def from_file(self, value):
@@ -349,9 +352,10 @@ class CommandBool(Command):
     represents the ``disable_overscan`` setting and therefore its value is
     always the opposite of the actual written value.
     """
-    def __init__(self, name, command, default=False, inverted=False,
+    def __init__(self, name, *, command, default=False, inverted=False,
                  doc='', index=0):
-        super().__init__(name, command, default, doc, index)
+        super().__init__(name, command=command, default=default, doc=doc,
+                         index=index)
         self._inverted = inverted
 
     @property
@@ -386,8 +390,8 @@ class CommandForceIgnore(Setting):
     :data:`False`. When both are "1" (a non-sensical setting) the final
     setting encountered takes precedence.
     """
-    def __init__(self, name, force, ignore, default=None, doc='', index=0):
-        super().__init__(name, default, doc)
+    def __init__(self, name, *, force, ignore, default=None, doc='', index=0):
+        super().__init__(name, default=default, doc=doc)
         self._force = force
         self._ignore = ignore
         self._index = index
@@ -451,32 +455,18 @@ class CommandForceIgnore(Setting):
             )
 
 
-class CommandDisplayPixelEncoding(CommandInt):
-    """
-    Represents settings that control the pixel encoding of an HDMI output, e.g.
-    ``hdmi_pixel_encoding``.
-    """
-    def __init__(self, name, command, default=0, doc='', index=0):
-        super().__init__(name, command, default, doc, index, valid={
-            0: 'default; 1 for CEA, 2 for DMT',
-            1: 'RGB limited; 16-235',
-            2: 'RGB full; 0-255',
-            3: 'YCbCr limited; 16-235',
-            4: 'YCbCr full; 0-255',
-        })
-
-
 class CommandDisplayGroup(CommandInt):
     """
     Represents settings that control the group of display modes used for the
     configuration of a video output, e.g. ``hdmi_group`` or ``dpi_group``.
     """
-    def __init__(self, name, command, default=0, doc='', index=0):
-        super().__init__(name, command, default, doc, index, valid={
-            0: 'auto from EDID',
-            1: 'CEA',
-            2: 'DMT',
-        })
+    def __init__(self, name, *, command, default=0, doc='', index=0):
+        super().__init__(name, command=command, default=default, doc=doc,
+                         index=index, valid={
+                             0: 'auto from EDID',
+                             1: 'CEA',
+                             2: 'DMT',
+                         })
 
 
 class CommandDisplayMode(CommandInt):
@@ -484,7 +474,7 @@ class CommandDisplayMode(CommandInt):
     Represents settings that control the mode of a video output, e.g.
     ``hdmi_mode`` or ``dpi_mode``.
     """
-    def __init__(self, name, command, default=0, doc='', index=0):
+    def __init__(self, name, *, command, default=0, doc='', index=0):
         self._valid_cea = {
             1:  'VGA (640x480)',
             2:  '480p @60Hz',
@@ -642,7 +632,8 @@ class CommandDisplayMode(CommandInt):
                 valid_dmt=FormatDict(
                     self._valid_dmt, key_title=_('Mode'), value_title=_('Meaning'))
             ))
-        super().__init__(name, command, default, doc, index)
+        super().__init__(name, command=command, default=default, doc=doc,
+                         index=index)
 
     def validate(self):
         group = self.sibling('group')
@@ -671,10 +662,11 @@ class CommandDisplayTimings(Command):
     Represents settings that manually specify the timings of a video output,
     e.g. ``hdmi_timings`` or ``dpi_timings``.
     """
-    def __init__(self, name, command, default=None, doc='', index=0):
+    def __init__(self, name, *, command, default=None, doc='', index=0):
         if default is None:
             default = []
-        super().__init__(name, command, default, doc, index)
+        super().__init__(name, command=command, default=default, doc=doc,
+                         index=index)
 
     def from_file(self, value):
         value = value.strip()
@@ -717,10 +709,12 @@ class CommandDisplayRotate(CommandInt):
     (both rotate and flip are usually conflated into a single command, e.g.
     ``display_hdmi_rotate`` or ``display_lcd_rotate``).
 
-    Also handles the deprecated ``display_rotate`` command.
+    Also handles the deprecated ``display_rotate`` command, and the extra
+    ``lcd_rotate`` command (via the *lcd* argument).
     """
-    def __init__(self, name, command, default=0, doc='', index=0, lcd=False):
-        super().__init__(name, command, default, doc, index)
+    def __init__(self, name, *, command, default=0, doc='', index=0, lcd=False):
+        super().__init__(name, command=command, default=default, doc=doc,
+                         index=index)
         self._lcd = lcd
 
     def extract(self, config):
@@ -730,7 +724,7 @@ class CommandDisplayRotate(CommandInt):
         for item in config:
             if (
                     isinstance(item, BootCommand) and
-                    item.command in (self.command, 'display_rotate') and
+                    item.command in commands and
                     item.hdmi == self.index):
                 self._value = self.from_file(item.params)
                 # NOTE: No break here because later settings override
@@ -813,6 +807,80 @@ class CommandDisplayFlip(CommandInt):
         return int(value)
 
 
+class CommandDPIOutput(CommandInt):
+    """
+    Represents the setting for the format and output of the DPI pins. This
+    works in concert with :class:`CommandDPIDummy` settings which break out
+    bits of the bit-mask but do not produce output themselves.
+    """
+    def __init__(self, name, *, command, mask, default=0, doc='', index=0,
+                 valid=None):
+        super().__init__(name, command=command, default=default, doc=doc,
+                         index=index, valid=valid)
+        assert mask
+        self._mask = mask
+        self._shift = (mask & -mask).bit_length() - 1  # ffs(3)
+
+    @property
+    def mask(self):
+        return self._mask
+
+    @property
+    def shift(self):
+        return self._shift
+
+    def output(self):
+        settings = (
+            self,
+            self.sibling('rgb'),
+            self.sibling('clock'),
+            self.sibling('hsync.disabled'),
+            self.sibling('hsync.polarity'),
+            self.sibling('hsync.phase'),
+            self.sibling('vsync.disabled'),
+            self.sibling('vsync.polarity'),
+            self.sibling('vsync.phase'),
+            self.sibling('output.mode'),
+            self.sibling('output.disabled'),
+            self.sibling('output.polarity'),
+            self.sibling('output.phase'),
+        )
+        value = reduce(or_, (
+            setting.value << setting.shift
+            for setting in settings
+        ))
+        if self.sibling('enabled').value:
+            # For the DPI LCD display, always output dpi_output_format when
+            # enable_dpi_lcd is set (and conversely, don't output it when not
+            # set)
+            template = '{self.command}={value:#x}'
+            yield template.format(self=self, value=value)
+
+    def from_file(self, value):
+        if isinstance(value, str) and value.lower().startswith('0x'):
+            value = int(value, base=16)
+        else:
+            value = int(value)
+        return (value & self._mask) >> self._shift
+
+    def from_user(self, value):
+        return int(value)
+
+
+class CommandDPIDummy(CommandDPIOutput):
+    def output(self):
+        # See CommandDPIOutput.output above
+        return ()
+
+
+class CommandDPIBool(CommandDPIDummy):
+    def from_file(self, value):
+        return bool(super().from_file(value))
+
+    def from_user(self, value):
+        return bool(value)
+
+
 class CommandHDMIBoost(CommandInt):
     def validate(self):
         if not (0 <= self.value <= 11):
@@ -825,7 +893,8 @@ class CommandEDIDIgnore(CommandBool):
     # See hdmi_edid_file in
     # https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
     def __init__(self, name, command, default=False, doc='', index=0):
-        super().__init__(name, command, default, doc=doc, index=index)
+        super().__init__(name, command=command, default=default, doc=doc,
+                         index=index)
 
     def from_file(self, value):
         return int(value.strip(), base=0) == 0xa5000080
@@ -838,14 +907,3 @@ class CommandEDIDIgnore(CommandBool):
 
     def to_file(self, value):
         return '0xa5000080' if value else '0'
-
-
-class CommandEDIDContentType(CommandInt):
-    def __init__(self, name, command, default=0, doc='', index=0):
-        super().__init__(name, command, default, doc, index, valid={
-            0: 'default',
-            1: 'graphics',
-            2: 'photo',
-            3: 'cinema',
-            4: 'game',
-        })

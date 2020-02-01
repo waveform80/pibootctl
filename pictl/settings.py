@@ -13,12 +13,13 @@ from .setting import (
     CommandDisplayMode,
     CommandDisplayRotate,
     CommandDisplayTimings,
-    CommandDisplayPixelEncoding,
     CommandForceIgnore,
     CommandInt,
     CommandHDMIBoost,
     CommandEDIDIgnore,
-    CommandEDIDContentType,
+    CommandDPIOutput,
+    CommandDPIDummy,
+    CommandDPIBool,
 )
 
 _ = gettext.gettext
@@ -84,7 +85,7 @@ _settings = {
             display; defaults to "Raspberry Pi".
             """)),
     CommandBool(
-        'video.hdmi.safe', 'hdmi_safe', default=False, doc=_(
+        'video.hdmi.safe', command='hdmi_safe', default=False, doc=_(
             """
             Switch on to attempt "safe mode" settings for maximum HDMI
             compatibility. This is the same as setting:
@@ -130,8 +131,14 @@ _settings = {
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
-    CommandEDIDContentType(
-        'video.hdmi.edid.contenttype', command='edid_content_type', doc=_(
+    CommandInt(
+        'video.hdmi.edid.contenttype', command='edid_content_type', valid={
+            0: 'default',
+            1: 'graphics',
+            2: 'photo',
+            3: 'cinema',
+            4: 'game',
+        }, doc=_(
             """
             Forces the EDID content type to the specified value. Valid values
             are:
@@ -354,6 +361,223 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
             """)),
+    CommandDPIOutput(
+        'video.dpi.format', command='dpi_output_format', default=1,
+        mask=0xf, valid={
+            1: '9-bit RGB666; unsupported',
+            2: '16-bit RGB565; config 1',
+            3: '16-bit RGB565; config 2',
+            4: '16-bit RGB565; config 3',
+            5: '18-bit RGB666; config 1',
+            6: '18-bit RGB666; config 2',
+            7: '24-bit RGB888',
+        }, doc=_(
+            """
+            Configures which GPIO pins will be used for DPI LCD output, and how
+            those pins will be used. Valid values are:
+
+            {valid}
+
+            The various configurations are as follows (in the following table,
+            R-7 means the 7th bit of the Red value, B-2 means the 2nd bit of
+            the Blue value, etc.), when video.dpi.rgb is set to 'RGB' ordering:
+
+            | GPIO | RGB565 (config 1) | RGB565 (config 2) | RGB565 (config 3) | RGB666 (config 1) | RGB666 (config 2) | RGB888 |
+            | 27 | -   | -   | -   | -   | -   | R-7 |
+            | 26 | -   | -   | -   | -   | -   | R-6 |
+            | 25 | -   | -   | R-7 | -   | R-7 | R-5 |
+            | 24 | -   | R-7 | R-6 | -   | R-6 | R-4 |
+            | 23 | -   | R-6 | R-5 | -   | R-5 | R-3 |
+            | 22 | -   | R-5 | R-4 | -   | R-4 | R-2 |
+            | 21 | -   | R-4 | R-3 | R-7 | R-3 | R-1 |
+            | 20 | -   | R-3 | -   | R-6 | R-2 | R-0 |
+            | 19 | R-7 | -   | -   | R-5 | -   | G-7 |
+            | 18 | R-6 | -   | -   | R-4 | -   | G-6 |
+            | 17 | R-5 | G-7 | G-7 | R-3 | G-7 | G-5 |
+            | 16 | R-4 | G-6 | G-6 | R-2 | G-6 | G-4 |
+            | 15 | R-3 | G-5 | G-5 | G-7 | G-5 | G-3 |
+            | 14 | G-7 | G-4 | G-4 | G-6 | G-4 | G-2 |
+            | 13 | G-6 | G-3 | G-3 | G-5 | G-3 | G-1 |
+            | 12 | G-5 | G-2 | G-2 | G-4 | G-2 | G-0 |
+            | 11 | G-4 | -   | -   | G-3 | -   | B-7 |
+            | 10 | G-3 | -   | -   | G-2 | -   | B-6 |
+            | 9  | G-2 | -   | B-7 | B-7 | B-7 | B-5 |
+            | 8  | B-7 | B-7 | B-6 | B-6 | B-6 | B-4 |
+            | 7  | B-6 | B-6 | B-5 | B-5 | B-5 | B-3 |
+            | 6  | B-5 | B-5 | B-4 | B-4 | B-4 | B-2 |
+            | 5  | B-4 | B-4 | B-3 | B-3 | B-3 | B-1 |
+            | 4  | B-3 | B-3 | B-2 | B-2 | B-2 | B-0 |
+
+            If video.dpi.rgb is set to an order other than 'RGB', swap the
+            colors in the table above accordingly. The other GPIOs typically
+            used in such displays are as follows, but please refer to your
+            boards specific documentation as these may vary:
+
+            | GPIO | Function |
+            | 3 | H-Sync |
+            | 2 | V-Sync |
+            | 1 | Output Enable |
+            | 0 | Clock |
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIDummy(
+        'video.dpi.rgb', command='dpi_output_format', default=0,
+        mask=0xf0, valid={
+            0: 'RGB',
+            1: 'RGB',
+            2: 'BGR',
+            3: 'GRB',
+            4: 'BRG',
+        }, doc=_(
+            """
+            Configures the ordering of RGB data sent to the DPI LCD display.
+            Valid values are:
+
+            {valid}
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.output.mode', command='dpi_output_format', default=False,
+        mask=0x100, doc=_(
+            """
+            When off (the default), the DPI LCD's output-enable operates in
+            "data valid" mode. When on, it operates in "combined sync" mode.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.clock', command='dpi_output_format', default=False,
+        mask=0x200, doc=_(
+            """
+            When off (the default), the DPI LCD's RGB data changes on the
+            rising edge, and is stable at the falling edge. Switch this on to
+            indicate that RGB data changes on the falling edge and is stable at
+            the rising edge.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.hsync.disabled', command='dpi_output_format', default=False,
+        mask=0x1000, doc=_(
+            """
+            Switch this on to disable the horizontal sync of the DPI LCD
+            display.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.vsync.disabled', command='dpi_output_format', default=False,
+        mask=0x2000, doc=_(
+            """
+            Switch this on to disable the vertical sync of the DPI LCD display.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.output.disabled', command='dpi_output_format',
+        default=False, mask=0x4000, doc=_(
+            """
+            Switch this on to disable the output-enable of the DPI LCD display.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.hsync.polarity', command='dpi_output_format', default=False,
+        mask=0x10000, doc=_(
+            """
+            Switch this on to invert the polarity of the horizontal sync signal
+            for the DPI LCD display. By default this is off, indicating the
+            polarity of the signal is the same as that given by the HDMI mode
+            driving the display.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.vsync.polarity', command='dpi_output_format', default=False,
+        mask=0x20000, doc=_(
+            """
+            Switch this on to invert the polarity of the vertical sync signal
+            for the DPI LCD display. By default this is off, indicating the
+            polarity of the signal is the same as that given by the HDMI mode
+            driving the display.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.output.polarity', command='dpi_output_format',
+        default=False, mask=0x40000, doc=_(
+            """
+            Switch this on to invert the polarity of the output-enable signal
+            for the DPI LCD display. By default this is off, indicating the
+            polarity of the signal is the same as that given by the HDMI mode
+            driving the display.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.hsync.phase', command='dpi_output_format', default=False,
+        mask=0x100000, doc=_(
+            """
+            Switch this on to invert the phase of the horizontal sync signal
+            for the DPI LCD display. By default this is off, indicating the
+            signal switches on the "positive" edge (where positive is dictated
+            by the polarity of the signal). When on, the signal switches on the
+            "negative" edge.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.vsync.phase', command='dpi_output_format', default=False,
+        mask=0x200000, doc=_(
+            """
+            Switch this on to invert the phase of the vertical sync signal
+            for the DPI LCD display. By default this is off, indicating the
+            signal switches on the "positive" edge (where positive is dictated
+            by the polarity of the signal). When on, the signal switches on the
+            "negative" edge.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
+    CommandDPIBool(
+        'video.dpi.output.phase', command='dpi_output_format', default=False,
+        mask=0x400000, doc=_(
+            """
+            Switch this on to invert the phase of the output-enable signal for
+            the DPI LCD display. By default this is off, indicating the signal
+            switches on the "positive" edge (where positive is dictated by the
+            polarity of the signal). When on, the signal switches on the
+            "negative" edge.
+
+            For more information on DPI configuration, please refer to [1].
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+            """)),
 }
 
 _settings |= {setting for hdmi in (0, 1) for setting in (
@@ -442,9 +666,15 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
             [2]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
             """)),
             # XXX Numbered lists...
-    CommandDisplayPixelEncoding(
-        'video.hdmi{}.encoding'.format(hdmi), index=hdmi, command='hdmi_pixel_encoding',
-        doc=_(
+    CommandInt(
+        'video.hdmi{}.encoding'.format(hdmi), index=hdmi,
+        command='hdmi_pixel_encoding', valid={
+            0: 'default; 1 for CEA, 2 for DMT',
+            1: 'RGB limited; 16-235',
+            2: 'RGB full; 0-255',
+            3: 'YCbCr limited; 16-235',
+            4: 'YCbCr full; 0-255',
+        }, doc=_(
             """
             Defines the pixel encoding mode. By default, it will use the mode
             requested from the EDID, so you shouldn't need to change it. Valid
