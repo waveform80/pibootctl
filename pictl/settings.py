@@ -20,6 +20,9 @@ from .setting import (
     CommandDPIOutput,
     CommandDPIDummy,
     CommandDPIBool,
+    CommandKernelAddress,
+    CommandKernel64,
+    CommandKernelFilename,
 )
 
 _ = gettext.gettext
@@ -678,6 +681,34 @@ _settings = {
             the composite video and analog audio outputs only) for a given
             number of seconds, before continuing to boot the OS as normal. This
             is used as a manufacturing test; the default is off.
+            """)),
+    CommandKernelAddress(
+        'boot.kernel.address', command='kernel_address', default=None, doc=_(
+            """
+            Specifies the address at which the bootloader should place the
+            kernel (typically Linux). Defaults to 0x80000 when boot.arm.64bit
+            is enabled, or 0x8000 otherwise.
+            """)),
+    CommandKernel64(
+        'boot.kernel.64bit', command='arm_64bit', doc=_(
+            """
+            Controls whether the bootloader assumes that a 64-bit kernel is to
+            be loaded. Defaults to off. Note that this setting affects the
+            defaults for boot.kernel.filename and boot.kernel.address.
+            """)),
+    CommandKernelFilename(
+        'boot.kernel.filename', command='kernel', doc=_(
+            """
+            Specifies the kernel that the bootloader should load and execute.
+            The defaults for the various Pi models are:
+
+            | Models | Default |
+            | Pi 1, Pi Zero, Compute Module | kernel.img |
+            | Pi 2, Pi 3, Pi 3+, Compute Module 3+ | kernel7.img |
+            | Pi 4 | kernel7l.img |
+
+            However, if boot.kernel.64bit is on (only valid on the Pi 2 rev 1.2
+            and above), the default is 'kernel8.img'.
             """)),
 }
 

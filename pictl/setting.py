@@ -6,6 +6,7 @@ from functools import reduce
 from .formatter import FormatDict
 from .parser import BootParam, BootCommand
 from .tools import to_bool, to_tri_bool, int_ranges, TransMap
+from .info import get_board_types
 
 _ = gettext.gettext
 
@@ -25,6 +26,28 @@ _ = gettext.gettext
 #    'uart1':            False,
 #    'watchdog':         False,
 #}
+
+
+class ExtractError(ValueError):
+    """
+    Exception raised when an invalid setting is encountered while extracting
+    setting values from a configuration. The *line* parameter is the
+    :class:`BootLine` instance that caused the original *exc*.
+    """
+    def __init__(self, line, exc):
+        super().__init__(
+            _('Invalid setting on line {line.lineno} of {line.path}: {exc}').
+            format(line=line, exc=exc))
+        self._line = line
+        self._exc = exc
+
+    @property
+    def line(self):
+        return self._line
+
+    @property
+    def exc(self):
+        return self._exc
 
 
 class Setting:
@@ -55,7 +78,7 @@ class Setting:
         self._settings = None
         self._name = name
         self._default = default
-        self._value = default
+        self._value = None
         self._doc = dedent(doc).format(name=name, default=default)
 
     @property
@@ -63,6 +86,7 @@ class Setting:
         """
         The overall settings that this setting belongs to.
         """
+        assert self._settings
         # This is set to a weakref.ref by the Settings initializer (and copy);
         # hence why we call it to return the actual reference.
         return self._settings()
@@ -89,7 +113,18 @@ class Setting:
         The current value of this setting, as derived from a parsed
         configuration via :meth:`extract`.
         """
-        return self._value
+        if self.modified:
+            return self._value
+        else:
+            return self.default
+
+    @property
+    def modified(self):
+        """
+        Returns :data:`True` if this setting has been changed in a
+        configuration file.
+        """
+        return self._value is not None
 
     @property
     def doc(self):
@@ -227,7 +262,7 @@ class Command(Setting):
     This is also the base class for most simple-valued configuration commands
     (integer, boolean, etc).
     """
-    def __init__(self, name, *, command, default='', doc='', index=0):
+    def __init__(self, name, *, command, default=None, doc='', index=0):
         doc = dedent(doc).format_map(TransMap(index=index))
         super().__init__(name, default=default, doc=doc)
         self._command = command
@@ -258,7 +293,12 @@ class Command(Setting):
                     isinstance(item, BootCommand) and
                     item.command == self.command and
                     item.hdmi == self.index):
-                self._value = self.from_file(item.params)
+                try:
+                    self._value = self.from_file(item.params)
+                except ExtractError as e:
+                    raise e  # don't re-wrap ExtractError
+                except ValueError as e:
+                    raise ExtractError(item, e)
                 # NOTE: No break here because later settings override
                 # earlier ones
 
@@ -325,13 +365,9 @@ class CommandInt(Command):
         self._valid = valid
 
     def from_file(self, value):
-        try:
-            # XXX Do we need base=0 here?
-            return int(value.strip(), base=0)
-        except ValueError:
-            raise ValueError(_(
-                '{self.name} must be an integer number, not {value}'
-            ).format(self=self, value=value))
+        # XXX Do we need base=0 here?
+        # XXX Should we retry int(value.strip()) here?
+        return int(value.strip(), base=0)
 
     def validate(self):
         if self._valid and self.value not in self._valid:
@@ -387,7 +423,7 @@ class CommandForceIgnore(Setting):
     have the value :data:`None` (which in most cases means "determine
     automatically"). When the *force* command is "1", the setting is
     :data:`True` and thus when the *ignore* command is "1", the setting is
-    :data:`False`. When both are "1" (a non-sensical setting) the final
+    :data:`False`. When both are "1" (a contradictory setting) the final
     setting encountered takes precedence.
     """
     def __init__(self, name, *, force, ignore, default=None, doc='', index=0):
@@ -627,10 +663,10 @@ class CommandDisplayMode(CommandInt):
         }
         doc = dedent(doc).format_map(
             TransMap(
-                valid_cea=FormatDict(
-                    self._valid_cea, key_title=_('Mode'), value_title=_('Meaning')),
-                valid_dmt=FormatDict(
-                    self._valid_dmt, key_title=_('Mode'), value_title=_('Meaning'))
+                valid_cea=FormatDict(self._valid_cea, key_title=_('Mode'),
+                                     value_title=_('Meaning')),
+                valid_dmt=FormatDict(self._valid_dmt, key_title=_('Mode'),
+                                     value_title=_('Meaning'))
             ))
         super().__init__(name, command=command, default=default, doc=doc,
                          index=index)
@@ -738,13 +774,9 @@ class CommandDisplayRotate(CommandInt):
 
     def output(self):
         flip = self.sibling('flip')
-        value = (
-            (self.value // 90) |
-            (0x10000 if flip.value in {3, 1} else 0) |
-            (0x20000 if flip.value in {3, 2} else 0)
-        )
+        value = (self.value // 90) | (flip.value << 16)
         if value != self.default:
-            if not self._lcd:
+            if self._lcd:
                 # For the DSI LCD display, prefer lcd_rotate as it uses the
                 # display's electronics to handle rotation rather than the GPU.
                 # However, if a flip is required, just use the GPU (because we
@@ -761,10 +793,7 @@ class CommandDisplayRotate(CommandInt):
             yield template.format(self=self, value=value)
 
     def from_file(self, value):
-        if isinstance(value, str) and value.lower().startswith('0x'):
-            value = int(value, base=16)
-        else:
-            value = int(value)
+        value = int(value, base=0)
         return (value & 0x3) * 90
 
     def from_user(self, value):
@@ -907,3 +936,57 @@ class CommandEDIDIgnore(CommandBool):
 
     def to_file(self, value):
         return '0xa5000080' if value else '0'
+
+
+class CommandKernelAddress(CommandInt):
+    @property
+    def default(self):
+        if self.sibling('64bit').value:
+            return 0x80000
+        else:
+            return 0x8000
+
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootCommand):
+                if item.command == self.command:
+                    self._value = self.from_file(item.params)
+                elif item.command == 'kernel_old':
+                    if self.from_file(item.params):
+                        self._value = 0
+                # NOTE: No break here because later settings override
+                # earlier ones
+
+    def to_file(self, value):
+        return '{:#x}'.format(value)
+
+    def explain(self):
+        return self.to_file(self.default if self.value is None else self.value)
+
+
+class CommandKernel64(CommandBool):
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootCommand):
+                if item.command == self.command:
+                    self._value = self.from_file(item.params)
+                elif item.command == 'arm_control':
+                    ctrl = int(item.params, base=0)
+                    self._value = bool(ctrl & 0x200)
+                # NOTE: No break here because later settings override
+                # earlier ones
+
+
+class CommandKernelFilename(Command):
+    @property
+    def default(self):
+        if self.sibling('64bit').value:
+            return 'kernel8.img'
+        else:
+            board_types = get_board_types()
+            if 'pi4' in board_types:
+                return 'kernel7l.img'
+            elif {'pi2', 'pi3'} ^ board_types:
+                return 'kernel7.img'
+            else:
+                return 'kernel.img'

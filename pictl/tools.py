@@ -53,7 +53,7 @@ def int_ranges(values):
     of all values in the set. For example:
 
         >>> int_ranges({1, 2})
-        '1,2'
+        '1, 2'
         >>> int_ranges({1, 2, 3})
         '1-3'
         >>> int_ranges({1, 2, 3, 4, 8})
@@ -89,8 +89,8 @@ def int_ranges(values):
 
 class TransTemplate(str):
     """
-    Used by :class:`TransFormat` to transparently pass unknown format
-    templates through for later substitution. When this value is used in a
+    Used by :class:`TransMap` to transparently pass unknown format templates
+    through for later substitution. When this value is used in a
     :meth:`str.format` substitution, it renders itself with the format
     specification as {self!conv:spec}, passing the template through verbatim.
 

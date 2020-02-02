@@ -32,9 +32,9 @@ _ = gettext.gettext
 
 
 def main(args=None):
-    sys.excepthook = ErrorHandler()
-    sys.excepthook[PermissionError] = (permission_error, 1)
     if not int(os.environ.get('DEBUG', '0')):
+        sys.excepthook = ErrorHandler()
+        sys.excepthook[PermissionError] = (permission_error, 1)
         sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
     locale.setlocale(locale.LC_ALL, '')
     parser = get_parser()
@@ -291,7 +291,7 @@ def do_dump_or_show(args, path):
         settings = {
             setting
             for setting in settings
-            if setting.value is not setting.default
+            if setting.modified
         }
     dump_settings(args.style, settings, fp=sys.stdout, all=args.all)
 
