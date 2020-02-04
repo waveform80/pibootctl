@@ -318,8 +318,7 @@ def do_get(args):
 
 def do_set(args):
     parser = BootParser()
-    default = Settings()
-    current = default.copy()
+    current = Settings()
     current.extract(parser.parse(args.boot_path, args.config_read))
     updated = current.copy()
     if args.style == 'user':
@@ -404,6 +403,7 @@ def enumerate_store(args):
 
 
 def store_parsed(args, parser, name):
+    args.store_path.mkdir(parents=True, exist_ok=True)
     zip_path = (args.store_path / name).with_suffix('.zip')
     # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
     with ZipFile(str(zip_path), 'w', compression=ZIP_DEFLATED) as arc:
