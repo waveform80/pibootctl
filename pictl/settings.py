@@ -498,7 +498,7 @@ _settings = {
             If video.dpi.rgb is set to an order other than 'RGB', swap the
             colors in the table above accordingly. The other GPIOs typically
             used in such displays are as follows, but please refer to your
-            boards specific documentation as these may vary:
+            board's specific documentation as these may vary:
 
             | GPIO | Function |
             | 3 | H-Sync |
@@ -801,7 +801,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
     CommandInt(
         'video.hdmi{}.encoding'.format(hdmi), index=hdmi,
         command='hdmi_pixel_encoding', valid={
-            0: 'default; 1 for CEA, 2 for DMT',
+            0: 'auto; 1 for CEA, 2 for DMT',
             1: 'RGB limited; 16-235',
             2: 'RGB full; 0-255',
             3: 'YCbCr limited; 16-235',
@@ -877,6 +877,10 @@ Missing = object()
 
 class Settings:
     def __init__(self):
+        # NOTE: This is hacky, but there's also no need to expose the ability
+        # to set the owning "settings" on a setting object; it should only
+        # ever be set by construction of a set of settings, or by copying an
+        # existing set of settings
         self._settings = {
             setting.name: setting
             for setting in copy.deepcopy(_settings)

@@ -341,7 +341,7 @@ def do_set(args):
                  'w', encoding='ascii') as out:
         out.write(updated.output())
     reboot_required()
-    # TODO Check for efficacy (overriden values)
+    # TODO Check for efficacy (overridden values)
 
 
 def do_save(args):

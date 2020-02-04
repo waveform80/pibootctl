@@ -54,7 +54,7 @@ class Setting:
     """
     Represents a single configuration setting.
 
-    Each setting belongs to a group of *settings*, has a *name* which uniquely
+    Each setting belongs to a group of settings, has a *name* which uniquely
     identifies it, a *default* value, and an optional *doc* string.
 
     The currently configured :attr:`value` can be set by calling
@@ -75,6 +75,7 @@ class Setting:
     * :meth:`output` called to generate new configuration lines
     """
     def __init__(self, name, *, default=None, doc=''):
+        # NOTE: self._settings is set in Settings.__init__ and Settings.copy
         self._settings = None
         self._name = name
         self._default = default
@@ -94,16 +95,16 @@ class Setting:
     @property
     def name(self):
         """
-        The name of the setting. This is a dot-delimited list of valid
-        Python identifiers.
+        The name of the setting. This is a dot-delimited list of strings; note
+        that the individual components do not have to be valid identifiers. For
+        example, "boot.kernel.64bit".
         """
         return self._name
 
     @property
     def default(self):
         """
-        The default value of this setting. This is typically used to determine
-        whether to output anything for the setting's :attr:`value`.
+        The default value of this setting.
         """
         return self._default
 
@@ -116,13 +117,16 @@ class Setting:
         if self.modified:
             return self._value
         else:
+            # NOTE: Must be self.default, not self._default; sub-ordinate
+            # classes may override the property for complex cases (e.g.
+            # platform specific defaults)
             return self.default
 
     @property
     def modified(self):
         """
         Returns :data:`True` if this setting has been changed in a
-        configuration file.
+        configuration.
         """
         return self._value is not None
 
@@ -144,22 +148,23 @@ class Setting:
     def extract(self, config):
         """
         Sets :attr:`value` from *config* which must be an iterable of
-        :class:`Line` items (e.g. as obtained by calling
+        :class:`BootLine` items (e.g. as obtained by calling
         :meth:`BootParser.parse`).
         """
         raise NotImplementedError
 
     def update(self, value):
         """
-        Stores a new :attr:`value`; typically this is in response to a user
-        request to update the configuration.
+        Stores a new *value*; typically this is in response to a user request
+        to update the configuration.
         """
         self._value = value
 
     def validate(self):
         """
         Validates the :attr:`value` within the context of :attr:`settings`, the
-        overall configuration.
+        overall configuration. Raises :exc:`ValueError` in the event that the
+        current value is invalid.
         """
         pass
 
@@ -177,7 +182,7 @@ class Setting:
         current values.
 
         Returns :data:`None` if no explanation is available or necessary.
-        Otherwise, must return a string.
+        Otherwise, must return a :class:`str`.
         """
         return None
 
@@ -897,12 +902,21 @@ class CommandDPIOutput(CommandInt):
 
 
 class CommandDPIDummy(CommandDPIOutput):
+    """
+    Represents portions of the ``dpi_output_format`` bit-mask which do not
+    themselves produce output. The :class:`CommandDPIOutput` setting collates
+    all values from :class:`CommandDPIDummy` settings.
+    """
     def output(self):
         # See CommandDPIOutput.output above
         return ()
 
 
 class CommandDPIBool(CommandDPIDummy):
+    """
+    Derivative of :class:`CommandDPIDummy` which represents single-bit
+    components of the ``dpi_output_format`` bit-mask.
+    """
     def from_file(self, value):
         return bool(super().from_file(value))
 
@@ -911,6 +925,10 @@ class CommandDPIBool(CommandDPIDummy):
 
 
 class CommandHDMIBoost(CommandInt):
+    """
+    Represents the ``config_hdmi_boost`` setting with its custom range of
+    valid values.
+    """
     def validate(self):
         if not (0 <= self.value <= 11):
             raise ValueError(_(
@@ -919,6 +937,10 @@ class CommandHDMIBoost(CommandInt):
 
 
 class CommandEDIDIgnore(CommandBool):
+    """
+    Represents the ``hdmi_ignore_edid`` "boolean" setting with its bizarre
+    "true" value.
+    """
     # See hdmi_edid_file in
     # https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
     def __init__(self, name, command, default=False, doc='', index=0):
@@ -939,6 +961,11 @@ class CommandEDIDIgnore(CommandBool):
 
 
 class CommandKernelAddress(CommandInt):
+    """
+    Represents the ``kernel_address`` setting, and implements its
+    context-sensitive default values. Also handles the deprecated
+    ``kernel_old`` configuration parameter.
+    """
     @property
     def default(self):
         if self.sibling('64bit').value:
@@ -965,6 +992,10 @@ class CommandKernelAddress(CommandInt):
 
 
 class CommandKernel64(CommandBool):
+    """
+    Handles the ``arm_64bit`` configuration setting, and the deprecated
+    ``arm_control`` setting it replaced.
+    """
     def extract(self, config):
         for item in config:
             if isinstance(item, BootCommand):
@@ -978,6 +1009,9 @@ class CommandKernel64(CommandBool):
 
 
 class CommandKernelFilename(Command):
+    """
+    Handles the ``kernel`` setting and its platform-dependant defaults.
+    """
     @property
     def default(self):
         if self.sibling('64bit').value:
