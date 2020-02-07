@@ -12,6 +12,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 from .term import ErrorHandler
 from .parser import BootParser
+from .setting import UserStr
 from .settings import Settings
 from .output import (
     format_value,
@@ -327,7 +328,7 @@ def do_set(args):
             if not '=' in var:
                 raise ValueError(_('expected "=" in {}').format(var))
             name, value = var.split('=', 1)
-            settings[name] = value
+            settings[name] = UserStr(value)
     else:
         settings = load_settings(args.style)
     for name, value in settings.items():

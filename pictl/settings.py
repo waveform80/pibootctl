@@ -65,24 +65,24 @@ _settings = {
             Enables the hardware watchdog.
             """)),
     CommandBool(
-        'video.cec.enabled', command='hdmi_ignore_cec',
-        default=True, inverted=True, doc=_(
+        'video.cec.enabled', command='hdmi_ignore_cec', default=True,
+        inverted=True, doc=_(
             """
             Enables CEC (control signals) over the HDMI interface, if supported
             by the connected display. Switch off to pretend CEC is not
             supported at all.
             """)),
     CommandBool(
-        'video.cec.init', command='hdmi_ignore_cec_init',
-        default=True, inverted=True, doc=_(
+        'video.cec.init', command='hdmi_ignore_cec_init', default=True,
+        inverted=True, doc=_(
             """
             When off, prevents the initial "active source" message being sent
             during bootup. This prevents CEC-enabled displays from coming out
             of standby and/or channel-switching when starting the Pi.
             """)),
     Command(
-        'video.cec.name', command='cec_osd_name',
-        default='Raspberry Pi', doc=_(
+        'video.cec.name', command='cec_osd_name', default='Raspberry Pi',
+        doc=_(
             """
             The name the Pi (as a CEC device) should provide to the connected
             display; defaults to "Raspberry Pi".
@@ -370,18 +370,16 @@ _settings = {
             LCD display.
             """)),
     CommandDisplayRotate(
-        'video.dsi.rotate', command='display_hdmi_rotate', lcd=True, doc=_(
+        'video.dsi.rotate',
+        commands=('display_lcd_rotate', 'display_rotate', 'lcd_rotate'),
+        doc=_(
             """
             Controls the rotation of an LCD display connected to the DSI port.
             Valid values are 0 (the default), 90, 180, or 270.
             """)),
     CommandDisplayFlip(
-        'video.dsi.flip', command='display_hdmi_rotate', valid={
-            0: 'none',
-            1: 'horizontal',
-            2: 'vertical',
-            3: 'both',
-        },
+        'video.dsi.flip',
+        commands=('display_lcd_rotate', 'display_rotate', 'lcd_rotate'),
         doc=_(
             """
             Controls the reflection (flipping) of an LCD display connected to
@@ -683,14 +681,15 @@ _settings = {
             is used as a manufacturing test; the default is off.
             """)),
     CommandKernelAddress(
-        'boot.kernel.address', command='kernel_address', default=None, doc=_(
+        'boot.kernel.address', commands=('kernel_address', 'kernel_old'),
+        default=None, doc=_(
             """
             Specifies the address at which the bootloader should place the
             kernel (typically Linux). Defaults to 0x80000 when boot.arm.64bit
             is enabled, or 0x8000 otherwise.
             """)),
     CommandKernel64(
-        'boot.kernel.64bit', command='arm_64bit', doc=_(
+        'boot.kernel.64bit', commands=('arm_64bit', 'arm_control'), doc=_(
             """
             Controls whether the bootloader assumes that a 64-bit kernel is to
             be loaded. Defaults to off. Note that this setting affects the
@@ -816,20 +815,14 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
             """)),
     CommandDisplayRotate(
         'video.hdmi{}.rotate'.format(hdmi), index=hdmi,
-        command='display_hdmi_rotate', doc=_(
+        commands=('display_hdmi_rotate', 'display_rotate'), doc=_(
             """
             Controls the rotation of the HDMI output. Valid values are 0 (the
             default), 90, 180, or 270.
             """)),
     CommandDisplayFlip(
-        'video.hdmi{}.flip'.format(hdmi), index=hdmi, command='display_hdmi_rotate',
-        valid={
-            0: 'none',
-            1: 'horizontal',
-            2: 'vertical',
-            3: 'both',
-        },
-        doc=_(
+        'video.hdmi{}.flip'.format(hdmi), index=hdmi,
+        commands=('display_hdmi_rotate', 'display_rotate'), doc=_(
             """
             Controls the reflection (flipping) of the HDMI output. Valid values
             are:

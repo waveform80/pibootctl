@@ -4,43 +4,6 @@ from itertools import tee
 _ = gettext.gettext
 
 
-def to_bool(s):
-    """
-    Converts the :class:`str` *s* to a :class:`bool`. Various "typical" string
-    representations of true and false are accepted including "true", "yes",
-    and "on", along with their counter-parts "false", "no", and "off".
-    """
-    try:
-        return {
-            'true':  True,
-            'yes':   True,
-            'on':    True,
-            '1':     True,
-            'y':     True,
-            'false': False,
-            'no':    False,
-            'off':   False,
-            '0':     False,
-            'n':     False,
-        }[s.strip().lower()]
-    except KeyError:
-        raise ValueError(_('{value} is not a valid bool').format(value=s))
-
-
-def to_tri_bool(s):
-    """
-    Converts the :class:`str` *s* to a :class:`bool` (like :func:`to_bool`) or
-    to :data:`None` if *s* is the blank string, or "auto".
-    """
-    try:
-        return {
-            '':     None,
-            'auto': None,
-        }[s.strip().lower()]
-    except KeyError:
-        return to_bool(s)
-
-
 def pairwise(it):
     a, b = tee(it)
     next(b, None)

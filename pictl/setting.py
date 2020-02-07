@@ -5,7 +5,8 @@ from functools import reduce
 
 from .formatter import FormatDict
 from .parser import BootParam, BootCommand
-from .tools import to_bool, to_tri_bool, int_ranges, TransMap
+from .tools import int_ranges, TransMap
+from .userstr import UserStr, to_bool, to_int, to_str
 from .info import get_board_types
 
 _ = gettext.gettext
@@ -158,7 +159,7 @@ class Setting:
         Stores a new *value*; typically this is in response to a user request
         to update the configuration.
         """
-        self._value = value
+        self._value = self._from_user(value)
 
     def validate(self):
         """
@@ -193,6 +194,44 @@ class Setting:
         """
         return self.settings['.'.join(self.name.split('.')[:-1] + [suffix])]
 
+    def _from_user(self, value):
+        """
+        Internal method for converting values given by the user into the native
+        type of the setting (typically :class:`bool`, :class:`int`, etc.).
+
+        The *value* may be a regular type (:class:`str`, :class:`int`,
+        :data:`None`, etc.) as deserialized from one of the input formats (JSON
+        or YAML). Alternatively, it may be a :class:`UserStr`, indicating that
+        the value is a string given by the user on the command line and should
+        be interpreted by the setting accordingly.
+
+        By default, this conversion defers to the :meth:`_from_file` method.
+        """
+        return self._from_file(value)
+
+    def _from_file(self, value):
+        """
+        Internal method for converting values read from the boot configuration
+        file into the native type of the setting.
+
+        The *value* will be a :class:`str`, and the method must return whatever
+        type is native for the setting or :data:`None` to indicate that the
+        setting is to be reset to its default state.
+        """
+        return str(value)
+
+    def _to_file(self, value):
+        """
+        Internal method for converting values to the format expected in the
+        boot configuration file.
+
+        The *value* will be of the type native to the setting (typically
+        :class:`int` or :class:`bool`), and the method must return a
+        :class:`str`.
+        """
+        # XXX Can *value* ever be None?
+        return str(value)
+
 
 class BaseOverlayInt(Setting):
     """
@@ -204,6 +243,13 @@ class BaseOverlayInt(Setting):
     def __init__(self, name, *, param, default=0, doc=''):
         super().__init__(name, default=default, doc=doc)
         self._param = param
+
+    @property
+    def overlay(self):
+        """
+        The name of the overlay this parameter affects.
+        """
+        return 'base'
 
     @property
     def param(self):
@@ -221,16 +267,20 @@ class BaseOverlayInt(Setting):
         for item in config:
             if isinstance(item, BootParam):
                 if item.overlay == 'base' and item.param == self.param:
-                    self._value = int(item.value)
+                    self._value = self._from_file(item.value)
                     # NOTE: No break here because later settings override
                     # earlier ones
 
     def update(self, value):
-        self._value = int(value)
+        self._value = to_int(value)
 
     def output(self):
         if self.value != self.default:
-            yield 'dtparam={self.param}={self.value}'.format(self=self)
+            yield 'dtparam={self.param}={value}'.format(
+                self=self, value=self._to_file(self.value))
+
+    def _from_file(self, value):
+        return int(value)
 
 
 class BaseOverlayBool(BaseOverlayInt):
@@ -243,42 +293,44 @@ class BaseOverlayBool(BaseOverlayInt):
     def __init__(self, name, *, param, default=False, doc=''):
         super().__init__(name, param=param, default=default, doc=doc)
 
-    def extract(self, config):
-        for item in config:
-            if isinstance(item, BootParam):
-                if item.overlay == 'base' and item.param == self.param:
-                    self._value = item.value == 'on'
-                    # NOTE: No break here because later settings override
-                    # earlier ones
+    def _from_user(self, value):
+        return to_bool(value)
 
-    def update(self, value):
-        self._value = to_bool(value)
+    def _from_file(self, value):
+        return value == 'on'
 
-    def output(self):
-        if self.value != self.default:
-            yield 'dtparam={self.param}={on_off}'.format(
-                self=self, on_off='on' if self.value else 'off')
+    def _to_file(self, value):
+        return 'on' if value else 'off'
 
 
 class Command(Setting):
     """
-    Represents a string-valued configuration *command*.
+    Represents a string-valued configuration *command* or *commmands* (one
+    of these must be specified, but not both). If multiple *commands* are
+    represented, the first will be the "primary" command, and all the rest
+    are considered deprecated variants.
 
     This is also the base class for most simple-valued configuration commands
     (integer, boolean, etc).
     """
-    def __init__(self, name, *, command, default=None, doc='', index=0):
+    def __init__(self, name, *, command=None, commands=None, default=None,
+                 doc='', index=0):
+        assert (command is None) ^ (commands is None), \
+            'command or commands must be given, not both'
         doc = dedent(doc).format_map(TransMap(index=index))
         super().__init__(name, default=default, doc=doc)
-        self._command = command
+        if command is None:
+            self._commands = tuple(commands)
+        else:
+            self._commands = (command,)
         self._index = index
 
     @property
-    def command(self):
+    def commands(self):
         """
-        The configuration command that this setting represents.
+        The configuration commands that this setting represents.
         """
-        return self._command
+        return self._commands
 
     @property
     def index(self):
@@ -296,10 +348,10 @@ class Command(Setting):
         for item in config:
             if (
                     isinstance(item, BootCommand) and
-                    item.command == self.command and
+                    item.command in self.commands and
                     item.hdmi == self.index):
                 try:
-                    self._value = self.from_file(item.params)
+                    self._value = self._from_file(item.params)
                 except ExtractError as e:
                     raise e  # don't re-wrap ExtractError
                 except ValueError as e:
@@ -307,72 +359,36 @@ class Command(Setting):
                 # NOTE: No break here because later settings override
                 # earlier ones
 
-    def update(self, value):
-        self._value = self.from_user(value)
-
     def output(self):
         if self.value != self.default:
             if self.index:
-                template = '{self.command}:{self.index}={value}'
+                template = '{self.commands[0]}:{self.index}={value}'
             else:
-                template = '{self.command}={value}'
-            yield template.format(self=self, value=self.to_file(self.value))
-
-    def from_file(self, value):
-        """
-        Translates the configuration file representation of *value* (a
-        :class:`str`) into an actual value of the setting.
-        """
-        return value
-
-    def to_file(self, value):
-        """
-        Translates an actual *value* of the setting into the corresponding
-        representation in the configuration file. This method must return
-        a :class:`str`.
-        """
-        return str(value)
-
-    def from_user(self, value):
-        """
-        Translates a *value* given by the user into an actual value of the
-        setting. By default this is the same as the translation performed by
-        :meth:`from_file` when *value* is a :class:`str` (as it will be when
-        specified on the command line).
-
-        However, *value* can be any other type (as provided by the other
-        formats such as YAML or JSON) in which case it will be passed through
-        verbatim by default.
-        """
-        if isinstance(value, str):
-            return self.from_file(value)
-        else:
-            return value
+                template = '{self.commands[0]}={value}'
+            yield template.format(self=self, value=self._to_file(self.value))
 
 
 class CommandInt(Command):
     """
-    Represents an integer-valued configuration *command*.
+    Represents an integer-valued configuration *command* or *commands*.
 
     The *valid* parameter may optionally provide a dictionary mapping valid
     integer values for the command to string explanations, to be provided by
     the basic :meth:`explain` implementation.
     """
-    def __init__(self, name, *, command, default=0, doc='', index=0,
-                 valid=None):
+    def __init__(self, name, *, command=None, commands=None, default=0, doc='',
+                 index=0, valid=None):
         if valid is None:
             valid = {}
         doc = dedent(doc).format_map(
             TransMap(valid=FormatDict(
                 valid, key_title=_('Value'), value_title=_('Meaning'))))
-        super().__init__(name, command=command, default=default, doc=doc,
-                         index=index)
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index)
         self._valid = valid
 
-    def from_file(self, value):
-        # XXX Do we need base=0 here?
-        # XXX Should we retry int(value.strip()) here?
-        return int(value.strip(), base=0)
+    def _from_file(self, value):
+        return to_int(value)
 
     def validate(self):
         if self._valid and self.value not in self._valid:
@@ -386,17 +402,17 @@ class CommandInt(Command):
 
 class CommandBool(Command):
     """
-    Represents a boolean-valued configuration *command*.
+    Represents a boolean-valued configuration *command* or *commands*.
 
     The *inverted* parameter indicates that the configuration command
     represented by the setting has inverted logic, e.g. video.overscan.enabled
     represents the ``disable_overscan`` setting and therefore its value is
     always the opposite of the actual written value.
     """
-    def __init__(self, name, *, command, default=False, inverted=False,
-                 doc='', index=0):
-        super().__init__(name, command=command, default=default, doc=doc,
-                         index=index)
+    def __init__(self, name, *, command=None, commands=None, default=False,
+                 inverted=False, doc='', index=0):
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index)
         self._inverted = inverted
 
     @property
@@ -406,20 +422,17 @@ class CommandBool(Command):
         """
         return self._inverted
 
-    def from_file(self, value):
-        return bool(int(value.strip()) ^ self.inverted)
+    def _from_file(self, value):
+        return bool(int(value) ^ self.inverted)
 
-    def from_user(self, value):
-        if isinstance(value, str):
-            return bool(to_bool(value) ^ self.inverted)
-        else:
-            return bool(value ^ self.inverted)
+    def _from_user(self, value):
+        return bool(to_bool(value) ^ self.inverted)
 
-    def to_file(self, value):
+    def _to_file(self, value):
         return str(int(value ^ self.inverted))
 
 
-class CommandForceIgnore(Setting):
+class CommandForceIgnore(CommandBool):
     """
     Represents the tri-valued configuration values with *force* and *ignore*
     commands, e.g. ``hdmi_force_hotplug`` and ``hdmi_ignore_hotplug``.
@@ -431,8 +444,8 @@ class CommandForceIgnore(Setting):
     :data:`False`. When both are "1" (a contradictory setting) the final
     setting encountered takes precedence.
     """
-    def __init__(self, name, *, force, ignore, default=None, doc='', index=0):
-        super().__init__(name, default=default, doc=doc)
+    def __init__(self, name, *, force, ignore, doc='', index=0):
+        super().__init__(name, commands=(force, ignore), default=None, doc=doc)
         self._force = force
         self._ignore = ignore
         self._index = index
@@ -451,45 +464,26 @@ class CommandForceIgnore(Setting):
         """
         return self._ignore
 
-    @property
-    def index(self):
-        """
-        The index of this setting for multi-valued settings (e.g. settings
-        which apply to all HDMI outputs).
-        """
-        return self._index
-
-    @property
-    def key(self):
-        return ('commands', self.name)
-
     def extract(self, config):
         for item in config:
             if (
                     isinstance(item, BootCommand) and
-                    item.command in (self.force, self.ignore) and
+                    item.command in self.commands and
                     int(item.params)):
                 self._value = item.command == self.force
                 # NOTE: No break here because later settings override
                 # earlier ones
 
-    def update(self, value):
-        if isinstance(value, str):
-            self._value = to_tri_bool(value)
-        else:
-            self._value = value
-
     def output(self):
-        if self.value is not self.default:
+        if self.value is not None:
             if self.index:
                 template = '{command}:{self.index}={value}'
             else:
                 template = '{command}={value}'
             yield template.format(
                 self=self,
-                value=int(self.value is not None),
+                value=1,
                 command={
-                    None:  self.force,
                     True:  self.force,
                     False: self.ignore,
                 }[self.value],
@@ -501,9 +495,10 @@ class CommandDisplayGroup(CommandInt):
     Represents settings that control the group of display modes used for the
     configuration of a video output, e.g. ``hdmi_group`` or ``dpi_group``.
     """
-    def __init__(self, name, *, command, default=0, doc='', index=0):
-        super().__init__(name, command=command, default=default, doc=doc,
-                         index=index, valid={
+    def __init__(self, name, *, command=None, commands=None, default=0, doc='',
+                 index=0):
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index, valid={
                              0: 'auto from EDID',
                              1: 'CEA',
                              2: 'DMT',
@@ -515,7 +510,8 @@ class CommandDisplayMode(CommandInt):
     Represents settings that control the mode of a video output, e.g.
     ``hdmi_mode`` or ``dpi_mode``.
     """
-    def __init__(self, name, *, command, default=0, doc='', index=0):
+    def __init__(self, name, *, command=None, commands=None, default=0, doc='',
+                 index=0):
         self._valid_cea = {
             1:  'VGA (640x480)',
             2:  '480p @60Hz',
@@ -673,8 +669,8 @@ class CommandDisplayMode(CommandInt):
                 valid_dmt=FormatDict(self._valid_dmt, key_title=_('Mode'),
                                      value_title=_('Meaning'))
             ))
-        super().__init__(name, command=command, default=default, doc=doc,
-                         index=index)
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index)
 
     def validate(self):
         group = self.sibling('group')
@@ -703,13 +699,28 @@ class CommandDisplayTimings(Command):
     Represents settings that manually specify the timings of a video output,
     e.g. ``hdmi_timings`` or ``dpi_timings``.
     """
-    def __init__(self, name, *, command, default=None, doc='', index=0):
+    def __init__(self, name, *, command=None, commands=None, default=None,
+                 doc='', index=0):
         if default is None:
             default = []
-        super().__init__(name, command=command, default=default, doc=doc,
-                         index=index)
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index)
 
-    def from_file(self, value):
+    def _from_user(self, value):
+        if isinstance(value, UserStr):
+            value = value.strip()
+            if value:
+                value = [int(elem) for elem in value.split(',')]
+                if len(value) != 17:
+                    raise ValueError(_(
+                        '{self.name} takes 17 comma-separated integers'
+                    ).format(self=self))
+                return value
+            return None
+        else:
+            return value
+
+    def _from_file(self, value):
         value = value.strip()
         if value:
             value = [int(elem) for elem in value.split()]
@@ -720,27 +731,8 @@ class CommandDisplayTimings(Command):
             return value
         return ()
 
-    def from_user(self, value):
-        if isinstance(value, str):
-            value = value.strip()
-            if value:
-                value = [int(elem) for elem in value.split(',')]
-                if len(value) != 17:
-                    raise ValueError(_(
-                        '{self.name} takes 17 comma-separated integers'
-                    ).format(self=self))
-                return value
-            return ()
-        else:
-            return value
-
-    def to_file(self, value):
+    def _to_file(self, value):
         return ' '.join(str(i) for i in value)
-
-    def output(self):
-        if self.value:
-            yield '{self.command}={value}'.format(
-                self=self, value=' '.join(str(elem) for elem in self.value))
 
 
 class CommandDisplayRotate(CommandInt):
@@ -751,25 +743,12 @@ class CommandDisplayRotate(CommandInt):
     ``display_hdmi_rotate`` or ``display_lcd_rotate``).
 
     Also handles the deprecated ``display_rotate`` command, and the extra
-    ``lcd_rotate`` command (via the *lcd* argument).
+    ``lcd_rotate`` command.
     """
-    def __init__(self, name, *, command, default=0, doc='', index=0, lcd=False):
-        super().__init__(name, command=command, default=default, doc=doc,
-                         index=index)
-        self._lcd = lcd
-
-    def extract(self, config):
-        commands = (self.command, 'display_rotate')
-        if self._lcd:
-            commands += ('lcd_rotate',)
-        for item in config:
-            if (
-                    isinstance(item, BootCommand) and
-                    item.command in commands and
-                    item.hdmi == self.index):
-                self._value = self.from_file(item.params)
-                # NOTE: No break here because later settings override
-                # earlier ones
+    def __init__(self, name, *, command=None, commands=None, default=0, doc='',
+                 index=0):
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index)
 
     def validate(self):
         if self.value not in (0, 90, 180, 270):
@@ -781,28 +760,27 @@ class CommandDisplayRotate(CommandInt):
         flip = self.sibling('flip')
         value = (self.value // 90) | (flip.value << 16)
         if value != self.default:
-            if self._lcd:
+            if 'lcd_rotate' in self.commands:
                 # For the DSI LCD display, prefer lcd_rotate as it uses the
                 # display's electronics to handle rotation rather than the GPU.
                 # However, if a flip is required, just use the GPU (because we
                 # have to anyway).
                 if value > 0b11:
-                    template = '{self.command}={value:#x}'
+                    template = '{self.commands[0]}={value:#x}'
                 else:
                     template = 'lcd_rotate={value}'
             else:
                 if self.index:
-                    template = '{self.command}:{self.index}={value:#x}'
+                    template = '{self.commands[0]}:{self.index}={value:#x}'
                 else:
-                    template = '{self.command}={value:#x}'
+                    template = '{self.commands[0]}={value:#x}'
             yield template.format(self=self, value=value)
 
-    def from_file(self, value):
-        value = int(value, base=0)
-        return (value & 0x3) * 90
+    def _from_user(self, value):
+        return to_int(value)
 
-    def from_user(self, value):
-        return int(value)
+    def _from_file(self, value):
+        return (super()._from_file(value) & 0x3) * 90
 
 
 class CommandDisplayFlip(CommandInt):
@@ -810,35 +788,24 @@ class CommandDisplayFlip(CommandInt):
     Represents settings that control reflection (flipping) of a video output.
     See :class:`CommandDisplayRotate` for further information.
     """
-    def extract(self, config):
-        for item in config:
-            if (
-                    isinstance(item, BootCommand) and
-                    item.command in (self.command, 'display_rotate') and
-                    item.hdmi == self.index):
-                self._value = self.from_file(item.params)
-                # NOTE: No break here because later settings override
-                # earlier ones
-
-    def validate(self):
-        if not (0 <= self.value <= 3):
-            raise ValueError(_(
-                '{self.name} must be between 0 and 3'
-            ).format(self=self))
+    def __init__(self, name, *, command=None, commands=None, default=0, doc='',
+                 index=0):
+        super().__init__(name, command=command, commands=commands,
+                         default=default, index=index, doc=doc, valid={
+                             0: 'none',
+                             1: 'horizontal',
+                             2: 'vertical',
+                             3: 'both', })
 
     def output(self):
         # See CommandDisplayRotate.output above
         return ()
 
-    def from_file(self, value):
-        if isinstance(value, str) and value.lower().startswith('0x'):
-            value = int(value, base=16)
-        else:
-            value = int(value)
-        return (value >> 16) & 0x3
+    def _from_user(self, value):
+        return to_int(value)
 
-    def from_user(self, value):
-        return int(value)
+    def _from_file(self, value):
+        return (super()._from_file(value) >> 16) & 0x3
 
 
 class CommandDPIOutput(CommandInt):
@@ -847,10 +814,10 @@ class CommandDPIOutput(CommandInt):
     works in concert with :class:`CommandDPIDummy` settings which break out
     bits of the bit-mask but do not produce output themselves.
     """
-    def __init__(self, name, *, command, mask, default=0, doc='', index=0,
-                 valid=None):
-        super().__init__(name, command=command, default=default, doc=doc,
-                         index=index, valid=valid)
+    def __init__(self, name, *, mask, command=None, commands=None, default=0,
+                 doc='', index=0, valid=None):
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index, valid=valid)
         assert mask
         self._mask = mask
         self._shift = (mask & -mask).bit_length() - 1  # ffs(3)
@@ -887,18 +854,14 @@ class CommandDPIOutput(CommandInt):
             # For the DPI LCD display, always output dpi_output_format when
             # enable_dpi_lcd is set (and conversely, don't output it when not
             # set)
-            template = '{self.command}={value:#x}'
+            template = '{self.commands[0]}={value:#x}'
             yield template.format(self=self, value=value)
 
-    def from_file(self, value):
-        if isinstance(value, str) and value.lower().startswith('0x'):
-            value = int(value, base=16)
-        else:
-            value = int(value)
-        return (value & self._mask) >> self._shift
+    def _from_user(self, value):
+        return to_int(value)
 
-    def from_user(self, value):
-        return int(value)
+    def _from_file(self, value):
+        return (super()._from_file(value) & self._mask) >> self._shift
 
 
 class CommandDPIDummy(CommandDPIOutput):
@@ -917,11 +880,11 @@ class CommandDPIBool(CommandDPIDummy):
     Derivative of :class:`CommandDPIDummy` which represents single-bit
     components of the ``dpi_output_format`` bit-mask.
     """
-    def from_file(self, value):
-        return bool(super().from_file(value))
+    def _from_user(self, value):
+        return to_bool(value)
 
-    def from_user(self, value):
-        return bool(value)
+    def _from_file(self, value):
+        return bool(super()._from_file(value))
 
 
 class CommandHDMIBoost(CommandInt):
@@ -943,20 +906,18 @@ class CommandEDIDIgnore(CommandBool):
     """
     # See hdmi_edid_file in
     # https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
-    def __init__(self, name, command, default=False, doc='', index=0):
-        super().__init__(name, command=command, default=default, doc=doc,
-                         index=index)
+    def __init__(self, name, *, command=None, commands=None, default=False,
+                 doc='', index=0):
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index)
 
-    def from_file(self, value):
-        return int(value.strip(), base=0) == 0xa5000080
+    def _from_user(self, value):
+        return to_bool(value)
 
-    def from_user(self, value):
-        if isinstance(value, str):
-            return bool(int(value.strip()))
-        else:
-            return value
+    def _from_file(self, value):
+        return to_int(value) == 0xa5000080
 
-    def to_file(self, value):
+    def _to_file(self, value):
         return '0xa5000080' if value else '0'
 
 
@@ -976,7 +937,7 @@ class CommandKernelAddress(CommandInt):
     def extract(self, config):
         for item in config:
             if isinstance(item, BootCommand):
-                if item.command == self.command:
+                if item.command == self.commands[0]:
                     self._value = self.from_file(item.params)
                 elif item.command == 'kernel_old':
                     if self.from_file(item.params):
@@ -984,11 +945,11 @@ class CommandKernelAddress(CommandInt):
                 # NOTE: No break here because later settings override
                 # earlier ones
 
-    def to_file(self, value):
-        return '{:#x}'.format(value)
-
     def explain(self):
-        return self.to_file(self.default if self.value is None else self.value)
+        return self._to_file(self.value)
+
+    def _to_file(self, value):
+        return '{:#x}'.format(value)
 
 
 class CommandKernel64(CommandBool):
@@ -999,7 +960,7 @@ class CommandKernel64(CommandBool):
     def extract(self, config):
         for item in config:
             if isinstance(item, BootCommand):
-                if item.command == self.command:
+                if item.command == self.commands[0]:
                     self._value = self.from_file(item.params)
                 elif item.command == 'arm_control':
                     ctrl = int(item.params, base=0)
