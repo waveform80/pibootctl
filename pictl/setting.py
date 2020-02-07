@@ -233,7 +233,32 @@ class Setting:
         return str(value)
 
 
-class BaseOverlayInt(Setting):
+class OverlayParam(Setting):
+    """
+    Represents a parameter to a device-tree overlay. Like :class:`Setting`,
+    this is effectively an abstract base class to be derived from.
+    """
+    def __init__(self, name, *, param, default=None, doc=''):
+        super().__init__(name, default=default, doc=doc)
+        self._param = param
+
+    @property
+    def overlay(self):
+        """
+        The name of the overlay this parameter affects.
+        """
+        return 'base'
+
+    @property
+    def param(self):
+        """
+        The name of the parameter within the base overlay that this setting
+        represents.
+        """
+        return self._param
+
+
+class BaseOverlayInt(OverlayParam):
     """
     Represents an integer parameter to the base device-tree overlay.
 
@@ -241,8 +266,7 @@ class BaseOverlayInt(Setting):
     setting represents.
     """
     def __init__(self, name, *, param, default=0, doc=''):
-        super().__init__(name, default=default, doc=doc)
-        self._param = param
+        super().__init__(name, param=param, default=default, doc=doc)
 
     @property
     def overlay(self):

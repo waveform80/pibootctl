@@ -4,9 +4,11 @@ import shlex
 import locale
 import gettext
 from operator import attrgetter
+from collections import OrderedDict
 
 import yaml
 
+from .setting import Command
 from .settings import Missing
 from .formatter import TableWrapper, unicode_table, pretty_table, render
 from .term import term_size
@@ -185,13 +187,29 @@ def load_settings_shell(fp):
 
 def dump_setting_user(setting, fp):
     width = min(120, term_size()[0])
-    print(_("""\
-   Name: {name}
-Default: {default}
+    fields = [
+        (_('Name'), setting.name),
+        (_('Default'), format_setting_user(setting)),
+    ]
+    if isinstance(setting, Command):
+        fields += [
+            (_('Command(s)'), ', '.join(setting.commands))
+        ]
+    elif isinstance(setting, OverlayParam):
+        fields += [
+            (_('Overlay'), setting.overlay),
+            (_('Parameter'), setting.param),
+        ]
+    max_field_width = max(len(name) for name, value in fields)
+    print("""\
+{fields}
 
-{doc}""").format(
-        name=setting.name,
-        default=format_setting_user(setting),
+{doc}""".format(
+        fields='\n'.join(
+            '{name:>{width}}: {value}'.format(
+                name=name, width=max_field_width, value=value)
+            for name, value in fields
+        ),
         doc=render(setting.doc, width=width, table_style=unicode_table),
     ))
 
