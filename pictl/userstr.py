@@ -61,13 +61,14 @@ def to_int(s):
     """
     if s is None:
         return None
-    elif isinstance(s, UserStr):
-        if not s:
-            return None
-    try:
-        return int(s)
-    except ValueError:
-        return int(s, base=16)
+    elif isinstance(s, str):
+        if isinstance(s, UserStr):
+            if not s:
+                return None
+        s = s.strip().lower()
+        if s[:2] == '0x':
+            return int(s, base=16)
+    return int(s)
 
 
 def to_str(s):

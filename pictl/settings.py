@@ -866,7 +866,11 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
 )}
 
 
-Missing = object()
+class Missing:
+    def __repr__(self):
+        return 'Missing'
+Missing = Missing()
+
 
 class Settings:
     def __init__(self):

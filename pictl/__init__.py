@@ -14,14 +14,7 @@ from .term import ErrorHandler
 from .parser import BootParser
 from .setting import UserStr
 from .settings import Settings
-from .output import (
-    format_value,
-    dump_store,
-    dump_diff,
-    dump_setting_user,
-    dump_settings,
-    load_settings,
-)
+from .output import Namespace
 
 try:
     import argcomplete
@@ -39,7 +32,7 @@ def main(args=None):
         sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
     locale.setlocale(locale.LC_ALL, '')
     parser = get_parser()
-    args = parser.parse_args(args)
+    args = parser.parse_args(args, namespace=Namespace())
     args.func(args)
 
 
@@ -119,8 +112,8 @@ def get_parser():
         "-a", "--all", action="store_true",
         help=_(
             "Include all settings, regardless of modification, in the output"))
-    add_format_args(dump_cmd)
-    dump_cmd.set_defaults(func=do_dump, style="user")
+    Namespace.add_style_arg(dump_cmd)
+    dump_cmd.set_defaults(func=do_dump)
 
     get_cmd = commands.add_parser(
         "get",
@@ -132,8 +125,8 @@ def get_parser():
             "vars is output."),
         help=_("Query the state of one or more boot settings"))
     get_cmd.add_argument("get_vars", nargs="+", metavar="setting")
-    add_format_args(get_cmd)
-    get_cmd.set_defaults(func=do_get, style="user")
+    Namespace.add_style_arg(get_cmd)
+    get_cmd.set_defaults(func=do_get)
 
     set_cmd = commands.add_parser(
         "set",
@@ -144,20 +137,11 @@ def get_parser():
         "--no-backup", action="store_false", dest="backup",
         help=_("Don't take an automatic backup of the current boot "
                "configuration if one doesn't exist"))
-    fmt_group = set_cmd.add_mutually_exclusive_group(required=True)
-    fmt_group.add_argument(
-        "--json", dest="style", action="store_const", const="json",
-        help=_("Read JSON from stdin"))
-    fmt_group.add_argument(
-        "--yaml", dest="style", action="store_const", const="yaml",
-        help=_("Read YAML from stdin"))
-    fmt_group.add_argument(
-        "--shell", dest="style", action="store_const", const="shell",
-        help=_("Read shell-style var=value lines from stdin"))
-    fmt_group.add_argument(
+    group = Namespace.add_style_arg(set_cmd, required=True)
+    group.add_argument(
         "set_vars", nargs="*", metavar="name=value", default=[],
         help=_("Specify one or more settings to change on the command line"))
-    set_cmd.set_defaults(func=do_set, style="user",
+    set_cmd.set_defaults(func=do_set,
                          backup=config.getboolean('defaults', 'backup'))
 
     save_cmd = commands.add_parser(
@@ -200,8 +184,8 @@ def get_parser():
     diff_cmd.add_argument(
         "right",
         help=_("The boot configuration to compare against"))
-    add_format_args(diff_cmd)
-    diff_cmd.set_defaults(func=do_diff, style="user")
+    Namespace.add_style_arg(diff_cmd)
+    diff_cmd.set_defaults(func=do_diff)
 
     show_cmd = commands.add_parser(
         "show", aliases=["cat"],
@@ -216,16 +200,16 @@ def get_parser():
     show_cmd.add_argument(
         "-a", "--all", action="store_true",
         help=_("Include all settings, not just those modified, in the output"))
-    add_format_args(show_cmd)
-    show_cmd.set_defaults(func=do_show, style="user")
+    Namespace.add_style_arg(show_cmd)
+    show_cmd.set_defaults(func=do_show)
 
     ls_cmd = commands.add_parser(
         "list", aliases=["ls"],
         description=_(
             "List all stored boot configurations."),
         help=_("List the stored boot configurations"))
-    add_format_args(ls_cmd)
-    ls_cmd.set_defaults(func=do_list, style="user")
+    Namespace.add_style_arg(ls_cmd)
+    ls_cmd.set_defaults(func=do_list)
 
     rm_cmd = commands.add_parser(
         "remove", aliases=["rm"],
@@ -239,23 +223,10 @@ def get_parser():
     return parser
 
 
-def add_format_args(parser):
-    fmt_group = parser.add_mutually_exclusive_group()
-    fmt_group.add_argument(
-        "--json", dest="style", action="store_const", const="json",
-        help=_("Use JSON as the output format"))
-    fmt_group.add_argument(
-        "--yaml", dest="style", action="store_const", const="yaml",
-        help=_("Use YAML as the output format"))
-    fmt_group.add_argument(
-        "--shell", dest="style", action="store_const", const="shell",
-        help=_("Use a var=value format suitable for the shell"))
-
-
 def do_help(args):
     default = Settings()
     if 'cmd' in args and args.cmd in default:
-        dump_setting_user(default[args.cmd], fp=sys.stdout)
+        args.dump_setting(default[args.cmd], fp=sys.stdout)
     else:
         parser = get_parser()
         if 'cmd' not in args or args.cmd is None:
@@ -294,7 +265,7 @@ def do_dump_or_show(args, path):
             for setting in settings
             if setting.modified
         }
-    dump_settings(args.style, settings, fp=sys.stdout, all=args.all)
+    args.dump_settings(settings, fp=sys.stdout, mod=args.all)
 
 
 def do_get(args):
@@ -304,7 +275,7 @@ def do_get(args):
     current.extract(parser.parse(args.boot_path, args.config_read))
     if len(args.get_vars) == 1:
         try:
-            print(format_value(args.style, current[args.get_vars[0]].value))
+            print(args.format_value(current[args.get_vars[0]].value))
         except KeyError:
             raise ValueError(_('unknown setting: {}').format(args.get_vars[0]))
     else:
@@ -314,7 +285,7 @@ def do_get(args):
                 settings.add(current[var])
             except KeyError:
                 raise ValueError(_('unknown setting: {}').format(var))
-        dump_settings(args.style, settings, fp=sys.stdout)
+        args.dump_settings(settings, fp=sys.stdout)
 
 
 def do_set(args):
@@ -330,7 +301,7 @@ def do_set(args):
             name, value = var.split('=', 1)
             settings[name] = UserStr(value)
     else:
-        settings = load_settings(args.style)
+        settings = args.load_settings()
     for name, value in settings.items():
         try:
             updated[name].update(value)
@@ -377,7 +348,7 @@ def do_diff(args):
     left.extract(parser.parse(left_path, args.config_read))
     right_path = (args.store_path / args.right).with_suffix('.zip')
     right.extract(parser.parse(right_path, args.config_read))
-    dump_diff(args.style, args.left, args.right, left.diff(right), fp=sys.stdout)
+    args.dump_diff(args.left, args.right, left.diff(right), fp=sys.stdout)
 
 
 def do_list(args):
@@ -387,7 +358,7 @@ def do_list(args):
     table = []
     for name, arc_hash, timestamp in enumerate_store(args):
         table.append((name, arc_hash == active_hash, timestamp))
-    dump_store(args.style, table, fp=sys.stdout)
+    args.dump_store(table, fp=sys.stdout)
 
 
 def do_remove(args):
@@ -421,7 +392,7 @@ def backup_if_needed(args, parser):
                 # There's already an archive of the parsed configuration
                 return
         name = 'backup-{now:%Y%m%d-%H%M%S}'.format(now=datetime.now())
-        print("Backing up current configuration in {name}".format(name=name))
+        print(_("Backing up current configuration in {name}").format(name=name))
         store_parsed(args, parser, name)
 
 

@@ -85,8 +85,8 @@ class ErrorHandler:
     when it's just a missing file. Other exceptions, however, are logged with
     the usual full stack trace.
 
-    The configuration can be augmented with other exception classes that
-    should be handled specially by treated the instance as a dictionary mapping
+    The configuration can be augmented with other exception classes that should
+    be handled specially by treating the instance as a dictionary mapping
     exception classes to :class:`ErrorAction` tuples.
     """
     def __init__(self):

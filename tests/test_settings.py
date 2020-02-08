@@ -4,6 +4,10 @@ from pictl.parser import *
 from pictl.settings import *
 
 
+def test_missing():
+    assert repr(Missing) == 'Missing'
+
+
 def test_settings_container():
     settings = Settings()
     assert len([s for s in settings]) == len(settings)
