@@ -1,3 +1,8 @@
+import gettext
+
+_ = gettext.gettext
+
+
 class UserStr(str):
     """
     Type used to represent a value expressed as a string on the command line.

@@ -3,9 +3,8 @@ from textwrap import dedent
 from operator import or_
 from functools import reduce
 
-from .formatter import FormatDict
+from .formatter import FormatDict, TransMap, int_ranges
 from .parser import BootParam, BootCommand
-from .tools import int_ranges, TransMap
 from .userstr import UserStr, to_bool, to_int, to_str
 from .info import get_board_types
 
