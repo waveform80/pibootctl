@@ -987,7 +987,7 @@ class CommandKernel64(CommandBool):
                 if item.command == self.commands[0]:
                     self._value = self.from_file(item.params)
                 elif item.command == 'arm_control':
-                    ctrl = int(item.params, base=0)
+                    ctrl = to_int(item.params)
                     self._value = bool(ctrl & 0x200)
                 # NOTE: No break here because later settings override
                 # earlier ones
@@ -1005,7 +1005,7 @@ class CommandKernelFilename(Command):
             board_types = get_board_types()
             if 'pi4' in board_types:
                 return 'kernel7l.img'
-            elif {'pi2', 'pi3'} ^ board_types:
+            elif {'pi2', 'pi3'} & board_types:
                 return 'kernel7.img'
             else:
                 return 'kernel.img'
