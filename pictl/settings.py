@@ -8,24 +8,33 @@ from .setting import (
     BaseOverlayInt,
     Command,
     CommandBool,
+    CommandBoolInv,
+    CommandBootDelay2,
+    CommandCPUFreqMax,
+    CommandCPUFreqMin,
+    CommandDeviceTree,
     CommandDisplayFlip,
     CommandDisplayGroup,
     CommandDisplayMode,
     CommandDisplayRotate,
     CommandDisplayTimings,
-    CommandForceIgnore,
-    CommandInt,
-    CommandHDMIBoost,
-    CommandEDIDIgnore,
-    CommandDPIOutput,
-    CommandDPIDummy,
     CommandDPIBool,
-    CommandKernelAddress,
+    CommandDPIDummy,
+    CommandDPIOutput,
+    CommandEDIDIgnore,
+    CommandForceIgnore,
+    CommandHDMIBoost,
+    CommandInt,
+    CommandIntHex,
     CommandKernel64,
-    CommandKernelFilename,
+    CommandKernelAddress,
     CommandKernelCmdline,
+    CommandKernelFilename,
     CommandRamFSAddress,
     CommandRamFSFilename,
+    CommandSerialEnabled,
+    OverlayBluetoothEnabled,
+    OverlaySerialUART,
 )
 
 _ = gettext.gettext
@@ -67,17 +76,15 @@ _settings = {
             """
             Enables the hardware watchdog.
             """)),
-    CommandBool(
-        'video.cec.enabled', command='hdmi_ignore_cec', default=True,
-        inverted=True, doc=_(
+    CommandBoolInv(
+        'video.cec.enabled', command='hdmi_ignore_cec', default=True, doc=_(
             """
             Enables CEC (control signals) over the HDMI interface, if supported
             by the connected display. Switch off to pretend CEC is not
             supported at all.
             """)),
-    CommandBool(
-        'video.cec.init', command='hdmi_ignore_cec_init', default=True,
-        inverted=True, doc=_(
+    CommandBoolInv(
+        'video.cec.init', command='hdmi_ignore_cec_init', default=True, doc=_(
             """
             When off, prevents the initial "active source" message being sent
             during bootup. This prevents CEC-enabled displays from coming out
@@ -137,9 +144,9 @@ _settings = {
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
-    CommandBool(
+    CommandBoolInv(
         'video.hdmi.edid.parse', command='disable_fw_kms_setup', default=True,
-        inverted=True, doc=_(
+        doc=_(
             """
             By default, the firmware parses the EDID of any HDMI attached
             display, picks an appropriate video mode, then passes the
@@ -190,9 +197,9 @@ _settings = {
             Note: this feature has not yet been implemented on the Raspberry Pi
             4.
             """)),
-    CommandBool(
-        'video.overscan.enabled', command='disable_overscan',
-        default=True, inverted=True, doc=_(
+    CommandBoolInv(
+        'video.overscan.enabled', command='disable_overscan', default=True,
+        doc=_(
             """
             When enabled (the default), if a group 1 (CEA) HDMI mode is
             selected (automatically or otherwise), the display output will
@@ -238,9 +245,9 @@ _settings = {
 
             {valid}
             """)),
-    CommandBool(
+    CommandBoolInv(
         'video.framebuffer.alpha', command='framebuffer_ignore_alpha',
-        default=True, inverted=True, doc=_(
+        default=True, doc=_(
             """
             Specifies whether the console framebuffer has an alpha channel.
             It may be necessary to switch this off when video.framebuffer.depth
@@ -330,9 +337,9 @@ _settings = {
 
             {valid}
             """)),
-    CommandBool(
+    CommandBoolInv(
         'video.tv.colorburst', command='sdtv_disable_colourburst',
-        default=True, inverted=True, doc=_(
+        default=True, doc=_(
             """
             Switch off to disable color-burst [1] on the composite TV output.
             The picture will be displayed in monochrome, but may appear
@@ -340,9 +347,8 @@ _settings = {
 
             [1]: https://en.wikipedia.org/wiki/Colorburst
             """)),
-    CommandBool(
-        'video.dsi.enabled', command='ignore_lcd',
-        default=True, inverted=True, doc=_(
+    CommandBoolInv(
+        'video.dsi.enabled', command='ignore_lcd', default=True, doc=_(
             """
             By default, an LCD display attached to the DSI connector is used
             when it is detected on the I2C bus. If this setting is disabled,
@@ -365,9 +371,9 @@ _settings = {
             Specifies the framerate of an LCD display connected to the DSI
             port. Defaults to 60Hz.
             """)),
-    CommandBool(
-        'video.dsi.touch.enabled', command='disable_touchscreen',
-        default=True, inverted=True, doc=_(
+    CommandBoolInv(
+        'video.dsi.touch.enabled', command='disable_touchscreen', default=True,
+        doc=_(
             """
             Enables or disables the touchscreen of the official Raspberry Pi
             LCD display.
@@ -718,19 +724,37 @@ _settings = {
             Specifies the alternative filename on the boot partition from which
             to read the kernel command line string.
             """)),
-    CommandBool(
+    CommandBoolInv(
         'boot.kernel.atags', command='disable_commandline_tags', default=True,
-        inverted=True, doc=_(
+        doc=_(
             """
-            Switch this off to stop "start.elf" (the tertiary bootloader) from
-            filling in ATAGS (memory from 0x100) before launching the kernel.
+            Switch this off to stop the bootloader from filling in ATAGS
+            (memory from 0x100) before launching the kernel.
             """)),
-    CommandBool(
-        'boot.gic.enabled', command='enable_gic', default=True, doc=_(
+    CommandIntHex(
+        'boot.devicetree.address', command='device_tree_address', default=0,
+        doc=_(
             """
-            On the Raspberry Pi 4B, if this setting is switched off then
-            interrupts will be routed to the ARM cores using the legacy
-            interrupt controller, rather than via the GIC-400.
+            Used to override the address where the bootloader loads the device
+            tree (not dt-blob). By default the firmware will choose a suitable
+            place.
+            """)),
+    CommandInt(
+        'boot.devicetree.limit', command='device_tree_end', doc=_(
+            """
+            Sets an (exclusive) limit to the loaded device tree. By default the
+            device tree can grow to the end of usable memory, which is almost
+            certainly what is required.
+            """)),
+    CommandDeviceTree(
+        'boot.devicetree.filename', command='device_tree', default='', doc=_(
+            """
+            Specifies the particular device tree that the bootloader should
+            load and pass to the kernel.
+
+            The default is for the bootloader to automatically select a device
+            tree for the platform that it is running on (it is unusual to
+            require a specific device tree).
             """)),
     CommandRamFSAddress(
         'boot.initramfs.address', commands=('ramfsaddr', 'initramfs'), doc=_(
@@ -740,7 +764,8 @@ _settings = {
             initramfs immediately after the kernel in memory.
             """)),
     CommandRamFSFilename(
-        'boot.initramfs.filename', commands=('ramfsfile', 'initramfs'), doc=_(
+        'boot.initramfs.filename', commands=('ramfsfile', 'initramfs'),
+        default='', doc=_(
             """
             The filename of the (optional) initramfs that the bootloader should
             load and pass to the kernel. By default this is unset and no
@@ -766,8 +791,9 @@ _settings = {
             initial boot, but is correct if you soft-reboot the Pi without
             removing power from the monitor.
             """)),
-    CommandInt(
-        'boot.delay.2', command='boot_delay', default=0, doc=_(
+    CommandBootDelay2(
+        'boot.delay.2', commands=('boot_delay', 'boot_delay_ms'), default=0,
+        doc=_(
             """
             Specifies the number of seconds to delay during "start.elf"
             (actually the third stage bootloader prior to the kernel itself).
@@ -775,26 +801,90 @@ _settings = {
             This can be useful if your SD card needs a while to get ready
             before Linux is able to boot from it.
             """)),
-    CommandBool(
-        'boot.splash.enabled', command='disable_splash', default=True,
-        inverted=True, doc=_(
+    CommandBoolInv(
+        'boot.splash.enabled', command='disable_splash', default=True, doc=_(
             """
             If this is switched off, the rainbow splash screen will not be
             shown on boot.
             """)),
+    CommandSerialEnabled(
+        # TODO: Fix setting refs
+        'serial.enabled', command='enable_uart', doc=_(
+            """
+            Enable the primary/console UART (ttyS0 on a Pi 3, ttyAMA0
+            otherwise, unless swapped with an overlay such as miniuart-bt). If
+            the primary UART is UART0 (the PL011, or ttyAMA0 in Linux) then
+            this setting defaults to on, otherwise it defaults to off.
+
+            This is because, when the primary UART is UART1 (the mini-UART, or
+            ttyS0 in Linux), it is necessary to stop the core VPU frequency
+            from changing which would make the UART unusable. Under these
+            circumstances, activating serial.enabled implies core_freq=250
+            (unless force_turbo=1). In some cases this is a performance hit, so
+            it is off by default.
+
+            More details on UARTs can be found at [1].
+
+            [1]: https://www.raspberrypi.org/documentation/configuration/uart.md
+            """)),
     CommandInt(
         'serial.baud', command='init_uart_baud', default=115200, doc=_(
             """
-            Sets the initial baud rate for the serial UART.
+            Sets the initial baud rate for the primary UART.
             """)),
     CommandInt(
         'serial.clock', command='init_uart_clock', default=48000000, doc=_(
             """
-            Sets the initial UART clock frequency. Note that this clock only
-            applies to UART0 (/dev/ttyAMA0 in Linux), and that the maximum
-            baud-rate for the UART is limited to 1/16th of the clock. The
-            default UART on the Pi 3 and Pi Zero is UART1 (ttyS0 in Linux), and
-            its clock is the core VPU clock - at least 250MHz.
+            Sets the initial UART clock frequency.
+
+            Note that this clock only applies to UART0 (the PL011, or
+            /dev/ttyAMA0 in Linux), and that the maximum baud-rate for the UART
+            is limited to 1/16th of the clock. The default UART on the Pi 3 and
+            Pi Zero is UART1 (the mini-UART, or ttyS0 in Linux), and its clock
+            is the core VPU clock: at least 250MHz.
+            """)),
+    OverlaySerialUART(
+        'serial.uart', doc=_(
+            """
+            Controls whether the primary UART is UART1 (the mini-UART, or ttyS0
+            in Linux) or UART0 (the PL011, ttyAMA0 in Linux).
+
+            By default, on Raspberry Pis equipped with the wireless/Bluetooth
+            module (Raspberry Pi 3 and later, and the Raspberry Pi Zero W),
+            UART0 is connected to the Bluetooth module, while UART1 is used as
+            the primary UART and may have a Linux console on it. On all other
+            models, UART0 is used as the primary UART.
+
+            More details on UARTs can be found at [1].
+
+            [1]: https://www.raspberrypi.org/documentation/configuration/uart.md
+            """)),
+    OverlayBluetoothEnabled(
+        'bluetooth.enabled', doc=_(
+            """
+            Controls whether the Bluetooth module (Raspberry Pi 3 and laster,
+            and the Raspberry Pi Zero W), is enabled (which it is by default).
+
+            Note that disabling the module can affect the default state of
+            serial.enabled and serial.uart.
+            """)),
+    CommandBool(
+        'cpu.gic.enabled', command='enable_gic', default=True, doc=_(
+            """
+            On the Raspberry Pi 4B, if this setting is switched off then
+            interrupts will be routed to the ARM cores using the legacy
+            interrupt controller, rather than via the GIC-400.
+            """)),
+    CommandCPUFreqMax(
+        'cpu.frequency.max', command='arm_freq', doc=_(
+            """
+            The maximum frequency of the ARM CPU in MHz.
+            """)),
+    CommandCPUFreqMin(
+        'cpu.frequency.min', command='arm_freq_min', doc=_(
+            """
+            The minimum value of cpu.frequency.max used for dynamic frequency
+            clocking.
             """)),
 }
 

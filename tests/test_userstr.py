@@ -39,6 +39,23 @@ def test_to_int():
         to_int(UserStr('0o644'))
 
 
+def test_to_float():
+    assert to_float(None) is None
+    assert to_float(1) == 1.0
+    assert to_float(1.5) == 1.5
+    assert to_float('1.5') == 1.5
+    assert to_float('  1e4') == 10000.0
+    assert to_float(UserStr('')) is None
+    assert to_float(UserStr('1.5')) == 1.5
+    assert to_float(UserStr('  1e4 ')) == 10000.0
+    with pytest.raises(ValueError):
+        to_float(UserStr('0x10'))
+    with pytest.raises(ValueError):
+        to_float(UserStr(' foo'))
+    with pytest.raises(ValueError):
+        to_float(UserStr('0o644'))
+
+
 def test_to_str():
     assert to_str(None) is None
     assert to_str('') == ''

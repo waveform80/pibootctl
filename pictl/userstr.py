@@ -35,6 +35,7 @@ def to_bool(s):
         try:
             return {
                 '':      None,
+                'auto':  None,
                 'true':  True,
                 'yes':   True,
                 'on':    True,
@@ -69,6 +70,23 @@ def to_int(s):
         if s[:2] == '0x':
             return int(s, base=16)
     return int(s)
+
+
+def to_float(s):
+    """
+    Converts the :class:`UserStr` (or other type) *s* to a :class:`float`. As
+    with all :class:`UserStr` conversions, blank string inputs are converted to
+    :data:`None`, and literal :data:`None` passes through unchanged. Otherwise,
+    typical floating point values (optionally prefixed with sign, optionally
+    suffixed with an exponent) are accepted.
+    """
+    if s is None:
+        return None
+    elif isinstance(s, str):
+        if isinstance(s, UserStr):
+            if not s:
+                return None
+    return float(s)
 
 
 def to_str(s):

@@ -4,7 +4,7 @@ from operator import or_
 from functools import reduce
 
 from .formatter import FormatDict, TransMap, int_ranges
-from .parser import BootParam, BootCommand
+from .parser import BootOverlay, BootParam, BootCommand
 from .userstr import UserStr, to_bool, to_int, to_str
 from .info import get_board_types
 
@@ -232,6 +232,43 @@ class Setting:
         return str(value)
 
 
+class Overlay(Setting):
+    """
+    Represents a boolean setting that is "on" if the represented overlay is
+    present, and "off" otherwise.
+    """
+    def __init__(self, name, *, overlay, doc=''):
+        super().__init__(name, default=default, doc=doc)
+        self._overlay = overlay
+
+    @property
+    def overlay(self):
+        """
+        The name of the overlay this parameter affects.
+        """
+        return self._overlay
+
+    @property
+    def key(self):
+        return ('overlays', self.overlay)
+
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootParam):
+                if item.overlay == self.overlay:
+                    self._value = True
+                    # NOTE: We can "break" here because there's no way to
+                    # "unload" an overlay in the config
+                    break
+
+    def update(self, value):
+        self._value = to_bool(value)
+
+    def output(self):
+        if self._value is not None:
+            yield 'dtoverlay={self.overlay}'.format(self=self)
+
+
 class OverlayParam(Setting):
     """
     Represents a parameter to a device-tree overlay. Like :class:`Setting`,
@@ -255,6 +292,10 @@ class OverlayParam(Setting):
         represents.
         """
         return self._param
+
+    @property
+    def key(self):
+        return ('overlays', self.overlay, self.param)
 
 
 class BaseOverlayInt(OverlayParam):
@@ -383,7 +424,10 @@ class Command(Setting):
                 # earlier ones
 
     def output(self):
-        if self.value != self.default:
+        # NOTE: This must not simply compare value against default; some
+        # defaults are platform specific and thus a value may be default on
+        # one platform but not another. Simply test whether a value is *set*
+        if self._value is not None:
             if self.index:
                 template = '{self.commands[0]}:{self.index}={value}'
             else:
@@ -423,36 +467,52 @@ class CommandInt(Command):
         return self._valid.get(self.value)
 
 
+class CommandIntHex(CommandInt):
+    """
+    An integer-valued configuration *command* or *commands* that are typically
+    represented in hexi-decimal (like memory addresses).
+    """
+    def explain(self):
+        return self._to_file(self.value)
+
+    def _to_file(self, value):
+        return '{:#x}'.format(value)
+
+
 class CommandBool(Command):
     """
     Represents a boolean-valued configuration *command* or *commands*.
-
-    The *inverted* parameter indicates that the configuration command
-    represented by the setting has inverted logic, e.g. video.overscan.enabled
-    represents the ``disable_overscan`` setting and therefore its value is
-    always the opposite of the actual written value.
     """
     def __init__(self, name, *, command=None, commands=None, default=False,
-                 inverted=False, doc='', index=0):
+                 doc='', index=0):
         super().__init__(name, command=command, commands=commands,
                          default=default, doc=doc, index=index)
-        self._inverted = inverted
-
-    @property
-    def inverted(self):
-        """
-        True if the meaning of the command disables a setting when activated.
-        """
-        return self._inverted
 
     def _from_file(self, value):
-        return bool(int(value) ^ self.inverted)
+        return bool(int(value))
 
     def _from_user(self, value):
-        return bool(to_bool(value) ^ self.inverted)
+        return to_bool(value)
 
     def _to_file(self, value):
-        return str(int(value ^ self.inverted))
+        return str(int(value))
+
+
+class CommandBoolInv(CommandBool):
+    """
+    Represents a boolean-valued configuration *command* or *commands* with
+    inverted logic, e.g. video.overscan.enabled represents the
+    ``disable_overscan`` setting and therefore its value is always the opposite
+    of the actual written value.
+    """
+    def _from_user(self, value):
+        return not super()._from_user(value)
+
+    def _from_file(self, value):
+        return not super()._from_file(value)
+
+    def _to_file(self, value):
+        return super()._to_file(not value)
 
 
 class CommandForceIgnore(CommandBool):
@@ -929,11 +989,6 @@ class CommandEDIDIgnore(CommandBool):
     """
     # See hdmi_edid_file in
     # https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
-    def __init__(self, name, *, command=None, commands=None, default=False,
-                 doc='', index=0):
-        super().__init__(name, command=command, commands=commands,
-                         default=default, doc=doc, index=index)
-
     def _from_user(self, value):
         return to_bool(value)
 
@@ -944,7 +999,50 @@ class CommandEDIDIgnore(CommandBool):
         return '0xa5000080' if value else '0'
 
 
-class CommandKernelAddress(CommandInt):
+class CommandBootDelay2(Command):
+    """
+    Represents the combination of ``boot_delay`` and ``boot_delay_ms``.
+    """
+    def extract(self, config):
+        value = 0.0
+        found = False
+        for item in config:
+            if isinstance(item, BootCommand):
+                if item.command == 'boot_delay':
+                    found = True
+                    value += self._from_file(item.params)
+                elif item.command == 'boot_delay_ms':
+                    found = True
+                    value += self._from_file(to_int(item.params) / 1000)
+                # NOTE: No break here because later settings override
+                # earlier ones
+        if found:
+            self._value = value
+        else:
+            self._value = None
+
+    def output(self):
+        if self._value is not None:
+            whole, frac = divmod(self._value, 1)
+            whole = int(whole)
+            frac = int(frac * 1000)
+            if whole:
+                yield 'boot_delay={value}'.format(value=whole)
+            if frac:
+                yield 'boot_delay_ms={value}'.format(value=frac)
+
+    def validate(self):
+        if self._value is not None:
+            if self._value < 0.0:
+                raise ValueError(_(
+                    '{self.name} cannot be negative'
+                ).format(self=self))
+
+    def _from_user(self, value):
+        return to_float(value)
+
+
+class CommandKernelAddress(CommandIntHex):
     """
     Represents the ``kernel_address`` setting, and implements its
     context-sensitive default values. Also handles the deprecated
@@ -960,19 +1058,13 @@ class CommandKernelAddress(CommandInt):
     def extract(self, config):
         for item in config:
             if isinstance(item, BootCommand):
-                if item.command == self.commands[0]:
+                if item.command == 'kernel_address':
                     self._value = self.from_file(item.params)
                 elif item.command == 'kernel_old':
                     if self.from_file(item.params):
                         self._value = 0
                 # NOTE: No break here because later settings override
                 # earlier ones
-
-    def explain(self):
-        return self._to_file(self.value)
-
-    def _to_file(self, value):
-        return '{:#x}'.format(value)
 
 
 class CommandKernel64(CommandBool):
@@ -983,7 +1075,7 @@ class CommandKernel64(CommandBool):
     def extract(self, config):
         for item in config:
             if isinstance(item, BootCommand):
-                if item.command == self.commands[0]:
+                if item.command == 'arm_64bit':
                     self._value = self.from_file(item.params)
                 elif item.command == 'arm_control':
                     ctrl = to_int(item.params)
@@ -994,7 +1086,7 @@ class CommandKernel64(CommandBool):
 
 class CommandKernelFilename(Command):
     """
-    Handles the ``kernel`` setting and its platform-dependant defaults.
+    Handles the ``kernel`` setting and its platform-dependent defaults.
     """
     # TODO os_prefix integration
     @property
@@ -1016,16 +1108,24 @@ class CommandKernelCmdline(Command):
     Handles the ``cmdline`` setting.
     """
     # TODO os_prefix integration
+    # TODO modification/tracking of external file
 
 
-class CommandRamFSAddress(CommandInt):
+class CommandDeviceTree(Command):
+    """
+    Handles the ``device_tree`` command.
+    """
+    # TODO os_prefix integration
+
+
+class CommandRamFSAddress(CommandIntHex):
     """
     Handles the ``ramfsaddr`` and ``initramfs`` commands.
     """
     def extract(self, config):
         for item in config:
             if isinstance(item, BootCommand):
-                if item.command == self.commands[0]:
+                if item.command == 'ramfsaddr':
                     self._value = self.from_file(item.params)
                 elif item.command == 'initramfs':
                     filename, address = item.params
@@ -1039,16 +1139,21 @@ class CommandRamFSAddress(CommandInt):
     def explain(self):
         if self.value is None or self.value == 0:
             return 'followkernel'
+        else:
+            return super().explain()
 
 
 class CommandRamFSFilename(Command):
     """
-    Handles the ``ramfsfile`` and ``initramfs`` commands.
+    Handles the ``ramfsfile`` and ``initramfs`` commands which can both
+    accept multiple files (to be concatenated).
     """
+    # TODO os_prefix integration
+
     def extract(self, config):
         for item in config:
             if isinstance(item, BootCommand):
-                if item.command == self.commands[0]:
+                if item.command == 'ramfsfile':
                     self._value = self.from_file(item.params)
                 elif item.command == 'initramfs':
                     filename, address = item.params
@@ -1077,3 +1182,120 @@ class CommandRamFSFilename(Command):
             return ','.join(value)
         else:
             return str(value)
+
+
+class CommandSerialEnabled(CommandBool):
+    """
+    Handles the ``enable_uart`` setting and its platform-dependent defaults.
+    """
+    @property
+    def default(self):
+        if {'pi3', 'pi4', 'pi0w'} & get_board_types():
+            return not self.settings['bluetooth.enabled'].value
+        else:
+            return True
+
+
+class OverlaySerialUART(Setting):
+    @property
+    def default(self):
+        if {'pi3', 'pi4', 'pi0w'} & get_board_types():
+            if self.settings['bluetooth.enabled'].value:
+                return 1
+            else:
+                return 0
+        else:
+            return 0
+
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootOverlay):
+                if item.overlay in ('miniuart-bt', 'pi3-miniuart-bt'):
+                    self._value = 0
+
+    def output(self):
+        # Output is handled by bluetooth.enabled setting
+        pass
+
+    def validate(self):
+        if self._value == 1 and not self.settings['bluetooth.enabled'].value:
+            raise ValueError('serial.uart must be 0 when bluetooth is disabled')
+
+    def explain(self):
+        if self.value == 0:
+            return '/dev/ttyAMA0; PL011'
+        else:
+            return '/dev/ttyS0; mini-UART'
+
+    def _from_user(self, value):
+        return from_int(value)
+
+
+class OverlayBluetoothEnabled(Setting):
+    """
+    Represents the ``miniuart-bt`` and ``disable-bt`` overlays (via the
+    ``bluetooth.enabled`` pseudo-command).
+    """
+    @property
+    def default(self):
+        return bool({'pi3', 'pi4', 'pi0w'} & get_board_types())
+
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootOverlay):
+                if item.overlay in ('disable-bt', 'pi3-disable-bt'):
+                    self._value = False
+                elif item.overlay in ('miniuart-bt', 'pi3-miniuart-bt'):
+                    self._value = True
+                # XXX What happens if both overlays are specified?
+
+    def output(self):
+        if self._value is not None:
+            # TODO what about pi3- prefix on systems with deprecated overlays?
+            if self.value and self.settings['serial.uart'].value == 0:
+                yield 'dtoverlay=miniuart-bt'
+            elif not self.value:
+                yield 'dtoverlay=disable-bt'
+
+    def _from_user(self, value):
+        return to_bool(value)
+
+
+class CommandCPUFreqMax(CommandInt):
+    """
+    Handles the ``arm_freq`` command.
+    """
+    @property
+    def default(self):
+        board_types = get_board_types()
+        if 'pi0' in board_types:
+            return 1000
+        if 'pi1' in board_types:
+            return 700
+        elif 'pi2' in board_types:
+            return 900
+        elif 'pi3+' in board_types:
+            # NOTE: pi3+ must come first here as pi3 & pi3+ appear together
+            # in pi3+ specific board-type entries
+            return 1400
+        elif 'pi3' in board_types:
+            return 1200
+        elif 'pi4' in board_types:
+            return 1500
+        else:
+            return 0
+
+
+class CommandCPUFreqMin(CommandInt):
+    """
+    Handles the ``arm_freq_min`` command.
+    """
+    @property
+    def default(self):
+        board_types = get_board_types()
+        if {'pi0', 'pi1'} & board_types:
+            return 700
+        elif {'pi2', 'pi3', 'pi4'} & board_types:
+            return 600
+        else:
+            return 0

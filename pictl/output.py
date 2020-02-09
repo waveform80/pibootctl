@@ -256,7 +256,7 @@ class Namespace(argparse.Namespace):
 
     def _format_value_shell(self, value):
         if value is None:
-            return 'default'
+            return 'auto'
         elif isinstance(value, bool):
             return ('off', 'on')[value]
         elif isinstance(value, list):
@@ -268,7 +268,7 @@ class Namespace(argparse.Namespace):
 
     def _format_value_user(self, value):
         if value is None:
-            return _('default')
+            return _('auto')
         elif isinstance(value, bool):
             return (_('off'), _('on'))[value]
         elif isinstance(value, str):
