@@ -83,4 +83,6 @@ def to_str(s):
     elif isinstance(s, UserStr):
         if not s:
             return None
+        else:
+            return s.strip()
     return str(s)

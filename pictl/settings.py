@@ -23,6 +23,9 @@ from .setting import (
     CommandKernelAddress,
     CommandKernel64,
     CommandKernelFilename,
+    CommandKernelCmdline,
+    CommandRamFSAddress,
+    CommandRamFSFilename,
 )
 
 _ = gettext.gettext
@@ -692,8 +695,8 @@ _settings = {
         'boot.kernel.64bit', commands=('arm_64bit', 'arm_control'), doc=_(
             """
             Controls whether the bootloader assumes that a 64-bit kernel is to
-            be loaded. Defaults to off. Note that this setting affects the
-            defaults for boot.kernel.filename and boot.kernel.address.
+            be loaded. Note that this setting affects the defaults for
+            boot.kernel.filename and boot.kernel.address.
             """)),
     CommandKernelFilename(
         'boot.kernel.filename', command='kernel', doc=_(
@@ -708,6 +711,90 @@ _settings = {
 
             However, if boot.kernel.64bit is on (only valid on the Pi 2 rev 1.2
             and above), the default is 'kernel8.img'.
+            """)),
+    CommandKernelCmdline(
+        'boot.kernel.cmdline', command='cmdline', default='cmdline.txt', doc=_(
+            """
+            Specifies the alternative filename on the boot partition from which
+            to read the kernel command line string.
+            """)),
+    CommandBool(
+        'boot.kernel.atags', command='disable_commandline_tags', default=True,
+        inverted=True, doc=_(
+            """
+            Switch this off to stop "start.elf" (the tertiary bootloader) from
+            filling in ATAGS (memory from 0x100) before launching the kernel.
+            """)),
+    CommandBool(
+        'boot.gic.enabled', command='enable_gic', default=True, doc=_(
+            """
+            On the Raspberry Pi 4B, if this setting is switched off then
+            interrupts will be routed to the ARM cores using the legacy
+            interrupt controller, rather than via the GIC-400.
+            """)),
+    CommandRamFSAddress(
+        'boot.initramfs.address', commands=('ramfsaddr', 'initramfs'), doc=_(
+            """
+            The address at which the bootloader should place the initramfs. By
+            default this is 0, which causes the bootloader to place the
+            initramfs immediately after the kernel in memory.
+            """)),
+    CommandRamFSFilename(
+        'boot.initramfs.filename', commands=('ramfsfile', 'initramfs'), doc=_(
+            """
+            The filename of the (optional) initramfs that the bootloader should
+            load and pass to the kernel. By default this is unset and no
+            initramfs is loaded. Sufficiently new firmwares support the loading
+            of multiple ramfs files; specify a list of filenames in this case.
+            All loaded files are concatenated in memory and treated as a single
+            ramfs blob.
+
+            Note: the bootloader has a strict line-length of 80 characters. If
+            many ramfs files are specified, it's possible to exceed this limit.
+            """)),
+    CommandInt(
+        'boot.delay.1', command='bootcode_delay', default=0, doc=_(
+            """
+            Specifies the number of seconds to delay during "bootcode.bin"
+            (actually the second stage bootloader, despite the setting's name,
+            but the first configurable by the boot configuration).
+
+            This is particularly useful to insert a delay before reading the
+            EDID of the monitor, for example if the Pi and monitor are powered
+            from the same source, but the monitor takes longer to start up than
+            the Pi. Try setting this value if the display detection is wrong on
+            initial boot, but is correct if you soft-reboot the Pi without
+            removing power from the monitor.
+            """)),
+    CommandInt(
+        'boot.delay.2', command='boot_delay', default=0, doc=_(
+            """
+            Specifies the number of seconds to delay during "start.elf"
+            (actually the third stage bootloader prior to the kernel itself).
+
+            This can be useful if your SD card needs a while to get ready
+            before Linux is able to boot from it.
+            """)),
+    CommandBool(
+        'boot.splash.enabled', command='disable_splash', default=True,
+        inverted=True, doc=_(
+            """
+            If this is switched off, the rainbow splash screen will not be
+            shown on boot.
+            """)),
+    CommandInt(
+        'serial.baud', command='init_uart_baud', default=115200, doc=_(
+            """
+            Sets the initial baud rate for the serial UART.
+            """)),
+    CommandInt(
+        'serial.clock', command='init_uart_clock', default=48000000, doc=_(
+            """
+            Sets the initial UART clock frequency. Note that this clock only
+            applies to UART0 (/dev/ttyAMA0 in Linux), and that the maximum
+            baud-rate for the UART is limited to 1/16th of the clock. The
+            default UART on the Pi 3 and Pi Zero is UART1 (ttyS0 in Linux), and
+            its clock is the core VPU clock - at least 250MHz.
             """)),
 }
 

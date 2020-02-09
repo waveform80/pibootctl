@@ -39,12 +39,12 @@ def test_to_int():
         to_int(UserStr('0o644'))
 
 
-
 def test_to_str():
     assert to_str(None) is None
     assert to_str('') == ''
     assert to_str('foo') == 'foo'
+    assert to_str('  foo') == '  foo'
     assert to_str(1) == '1'
     assert to_str(UserStr('')) is None
-    assert to_str(UserStr(' ')) == ' '
-    assert to_str(UserStr('  foo')) == '  foo'
+    assert to_str(UserStr(' ')) == ''
+    assert to_str(UserStr('  foo')) == 'foo'

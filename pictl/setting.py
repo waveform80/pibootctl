@@ -996,6 +996,7 @@ class CommandKernelFilename(Command):
     """
     Handles the ``kernel`` setting and its platform-dependant defaults.
     """
+    # TODO os_prefix integration
     @property
     def default(self):
         if self.sibling('64bit').value:
@@ -1008,3 +1009,71 @@ class CommandKernelFilename(Command):
                 return 'kernel7.img'
             else:
                 return 'kernel.img'
+
+
+class CommandKernelCmdline(Command):
+    """
+    Handles the ``cmdline`` setting.
+    """
+    # TODO os_prefix integration
+
+
+class CommandRamFSAddress(CommandInt):
+    """
+    Handles the ``ramfsaddr`` and ``initramfs`` commands.
+    """
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootCommand):
+                if item.command == self.commands[0]:
+                    self._value = self.from_file(item.params)
+                elif item.command == 'initramfs':
+                    filename, address = item.params
+                    if address == 'followkernel':
+                        self._value = None
+                    else:
+                        self._value = self.from_file(address)
+                # NOTE: No break here because later settings override
+                # earlier ones
+
+    def explain(self):
+        if self.value is None or self.value == 0:
+            return 'followkernel'
+
+
+class CommandRamFSFilename(Command):
+    """
+    Handles the ``ramfsfile`` and ``initramfs`` commands.
+    """
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootCommand):
+                if item.command == self.commands[0]:
+                    self._value = self.from_file(item.params)
+                elif item.command == 'initramfs':
+                    filename, address = item.params
+                    self._value = self.from_file(filename)
+                # NOTE: No break here because later settings override
+                # earlier ones
+
+    def validate(self):
+        s = self._to_file(self.value)
+        if len('ramfsfile=') + len(s) > 80:
+            raise ValueError(_('Excessively long list of initramfs files'))
+
+    def _from_user(self, value):
+        if isinstance(value, UserStr):
+            value = to_str(value)
+            if value is not None and ',' in value:
+                return [elem.strip() for elem in value.split(',')]
+        return value
+
+    def _from_file(self, value):
+        if ',' in value:
+            return [f.strip() for f in value.strip().split(',')]
+
+    def _to_file(self, value):
+        if isinstance(value, list):
+            return ','.join(value)
+        else:
+            return str(value)
