@@ -1,7 +1,13 @@
 import gettext
-from textwrap import dedent
+from copy import deepcopy
+from weakref import ref
 from operator import or_
+from textwrap import dedent
+from fnmatch import fnmatch
 from functools import reduce
+from collections.abc import Mapping
+from contextlib import contextmanager
+from collections import namedtuple, OrderedDict
 
 from .formatter import FormatDict, TransMap, int_ranges
 from .parser import BootOverlay, BootParam, BootCommand
@@ -28,51 +34,176 @@ _ = gettext.gettext
 #}
 
 
-class ExtractError(ValueError):
+class ValueWarning(Warning):
     """
-    Exception raised when an invalid setting is encountered while extracting
-    setting values from a configuration. The *line* parameter is the
-    :class:`BootLine` instance that caused the original *exc*.
+    Warning class used by :meth:`Setting.validate` to warn about dangerous
+    or inappropriate configurations.
     """
-    def __init__(self, line, exc):
-        super().__init__(
-            _('Invalid setting on line {line.lineno} of {line.path}: {exc}').
-            format(line=line, exc=exc))
-        self._line = line
-        self._exc = exc
 
-    @property
-    def line(self):
-        return self._line
 
-    @property
-    def exc(self):
-        return self._exc
+class Settings(Mapping):
+    """
+    Represents a complete configuration; acts like an ordered mapping of
+    names to :class:`Setting` objects.
+    """
+    def __init__(self):
+        # This is deliberately imported upon construction instead of at the
+        # module level, partly to avoid a circular reference but mostly because
+        # the settings module is "expensive" to import and materially affects
+        # start-up time on slower Pis; this matters where it is not required
+        # (e.g. just running --help)
+        from .settings import SETTINGS
+
+        self._items = deepcopy(SETTINGS)
+        for setting in self._items.values():
+            setting._settings = ref(self)
+        self._visible = set(self._items.keys())
+
+    def __len__(self):
+        return len(self._visible)
+
+    def __iter__(self):
+        # This curious ordering is necessary to ensure the sorting order of
+        # _items is preserved
+        for key in self._items:
+            if key in self._visible:
+                yield key
+
+    def __contains__(self, key):
+        return key in self._visible
+
+    def __getitem__(self, key):
+        if key not in self._visible:
+            raise KeyError(key)
+        return self._items[key]
+
+    def copy(self):
+        """
+        Returns a distinct copy of the configuration that can be updated
+        without affecting the original.
+        """
+        new = deepcopy(self)
+        for setting in new._items.values():
+            setting._settings = ref(new)
+        return new
+
+    def modified(self):
+        """
+        Returns a copy of the configuration which only contains modified
+        settings.
+        """
+        # When filtering we mustn't actually remove any members of _items as
+        # Setting instances may need to refer to a "hidden" value to, for
+        # example, determine their default value
+        new_visible = {
+            name for name in self._visible
+            if self[name].modified
+        }
+        copy = self.copy()
+        copy._visible = new_visible
+        return copy
+
+    def filter(self, pattern):
+        """
+        Returns a copy of the configuration which only contains settings with
+        names matching *pattern*, which may contain regular shell globbing
+        patterns.
+        """
+        new_visible = {
+            name for name in self._visible
+            if fnmatch(name, pattern)
+        }
+        copy = self.copy()
+        copy._visible = new_visible
+        return copy
+
+    def diff(self, other):
+        """
+        Returns a set of (self, other) setting tuples for all settings that
+        differ between *self* and *other* (another :class:`Settings` instance).
+        If a particular setting is missing from either side, its entry will be
+        given as :data:`None`.
+        """
+        return {
+            (setting, other[setting.name]
+                      if setting.name in other else
+                      None)
+            for setting in self.values()
+            if setting.name not in other or
+            other[setting.name].value != setting.value
+        } | {
+            (None, setting)
+            for name in other
+            if name not in self
+        }
+
+    def extract(self, config):
+        """
+        Extracts values for the settings from the parsed *config* (which must
+        be a sequence of :class:`BootLine` objects or their descendents).
+        """
+        for setting in self.values():
+            for item, value in setting.extract(config):
+                setting._value = value
+                # TODO track the config items affecting the setting
+
+    def update(self, values):
+        """
+        Given a mapping of setting names to new values, updates the values
+        of the corresponding settings in this collection. If a value is
+        :data:`None`, the setting is reset to its default value.
+        """
+        for name, value in values.items():
+            if name not in self._visible:
+                raise KeyError(name)
+            item = self._items[name]
+            item._value = item.update(value)
+
+    def validate(self):
+        """
+        Checks for errors in the configuration. This ensures that each setting
+        makes sense in the wider context of all other settings.
+        """
+        # NOTE: This ignores the _visible filter; the complete configuration
+        # is always validated
+        for item in self._items.values():
+            item.validate()
+
+    def output(self):
+        """
+        Generate a new boot configuration file which represents the settings
+        stored in this mapping.
+        """
+        output = """\
+# This file is intended to contain system-made configuration changes. User
+# configuration changes should be placed in "usercfg.txt". Please refer to the
+# README file for a description of the various configuration files on the boot
+# partition.
+
+""".splitlines()
+        for name, setting in self._items.items():
+            if name in self._visible:
+                for line in setting.output():
+                    output.append(line)
+        return '\n'.join(output)
 
 
 class Setting:
     """
-    Represents a single configuration setting.
+    Represents a configuration setting.
 
-    Each setting belongs to a group of settings, has a *name* which uniquely
-    identifies it, a *default* value, and an optional *doc* string.
+    Each setting has a *name* which uniquely identifies the setting, a
+    *default* value, and an optional *doc* string. The specification is used
+    to:
 
-    The currently configured :attr:`value` can be set by calling
-    :meth:`extract` with a parsed configuration (otherwise it holds the
-    *default* value). It can be changed by calling :meth:`update` with the
-    desired value. The :meth:`validate` method can be called to check the value
-    in the context of the whole configuration (for co-dependent values).
-    Finally, :meth:`output` is used to generate new lines for the re-written
-    configuration file, and :meth:`explain` is used to provide human readable
-    information about values for the setting.
+    * :meth:`extract` the value of a setting from parsed configuration lines
+    * :meth:`update` the value of a setting from user-provided values
+    * :meth:`validate` a setting in the wider context of a configuration
+    * generate :meth:`output` to represent the setting in a new config.txt
 
-    In other words, the typical life-cycle of a setting is:
+    Optionally:
 
-    * Construction
-    * :meth:`extract` called with parsed configuration lines
-    * :meth:`update` called with a new value (if any)
-    * :meth:`validate` called with the set of all settings
-    * :meth:`output` called to generate new configuration lines
+    * :attr:`hint` may be queried to describe a value in human-readable terms
     """
     def __init__(self, name, *, default=None, doc=''):
         # NOTE: self._settings is set in Settings.__init__ and Settings.copy
@@ -102,35 +233,6 @@ class Setting:
         return self._name
 
     @property
-    def default(self):
-        """
-        The default value of this setting.
-        """
-        return self._default
-
-    @property
-    def value(self):
-        """
-        The current value of this setting, as derived from a parsed
-        configuration via :meth:`extract`.
-        """
-        if self.modified:
-            return self._value
-        else:
-            # NOTE: Must be self.default, not self._default; sub-ordinate
-            # classes may override the property for complex cases (e.g.
-            # platform specific defaults)
-            return self.default
-
-    @property
-    def modified(self):
-        """
-        Returns :data:`True` if this setting has been changed in a
-        configuration.
-        """
-        return self._value is not None
-
-    @property
     def doc(self):
         """
         A description of the setting, used as help-text on the command line.
@@ -145,58 +247,66 @@ class Setting:
         """
         return ()
 
+    @property
+    def modified(self):
+        """
+        Returns :data:`True` when the setting has been modified. Note that it
+        is *not* sufficient to simply compare :attr:`value` to :attr:`default`
+        as some defaults are context- or platform-specific.
+        """
+        return self._value is not None
+
+    @property
+    def default(self):
+        """
+        The default value of this setting. The collection of *settings* is
+        provided for calculation of the default in the case of settings that
+        are context-dependent.
+        """
+        return self._default
+
+    @property
+    def value(self):
+        """
+        Returns the current value of the setting (or the :attr:`default` if the
+        setting has not been :attr:`modified`).
+        """
+        # NOTE: Must use self.default here, not self._default as descendents
+        # may calculate more complex defaults
+        return self.default if self._value is None else self._value
+
+    @property
+    def hint(self):
+        """
+        Provides a human-readable interpretation of the state of the setting.
+        Used by the "dump" and "show" commands to provide translations of
+        default and current values.
+
+        Must return :data:`None` if no explanation is available or necessary.
+        Otherwise, must return a :class:`str`.
+        """
+        return None
+
     def extract(self, config):
         """
-        Sets :attr:`value` from *config* which must be an iterable of
-        :class:`BootLine` items (e.g. as obtained by calling
-        :meth:`BootParser.parse`).
+        Given a *config* which must be an iterable of :class:`BootLine` items
+        (e.g. as obtained by calling :meth:`BootParser.parse`), yields each
+        line that affects the setting's value, and the new value that the
+        line produces (or :data:`None` indicating that the value is now, or
+        is still, the default state).
+
+        .. note::
+
+            Note to implementers: the method must *not* affect :attr:`value`
+            directly; the caller will handle this.
         """
         raise NotImplementedError
 
     def update(self, value):
         """
-        Stores a new *value*; typically this is in response to a user request
-        to update the configuration.
-        """
-        self._value = self._from_user(value)
-
-    def validate(self):
-        """
-        Validates the :attr:`value` within the context of :attr:`settings`, the
-        overall configuration. Raises :exc:`ValueError` in the event that the
-        current value is invalid.
-        """
-        pass
-
-    def output(self):
-        """
-        Yields lines of configuration for output to the system configuration
-        file.
-        """
-        raise NotImplementedError
-
-    def explain(self):
-        """
-        Provides a human-readable interpretation of :attr:`value`. Used by the
-        "dump" and "show" commands to provide translations of default and
-        current values.
-
-        Returns :data:`None` if no explanation is available or necessary.
-        Otherwise, must return a :class:`str`.
-        """
-        return None
-
-    def sibling(self, suffix):
-        """
-        Utility method which returns the setting with the same name as this
-        setting, but for the final part which is replaced with *suffix*.
-        """
-        return self.settings['.'.join(self.name.split('.')[:-1] + [suffix])]
-
-    def _from_user(self, value):
-        """
-        Internal method for converting values given by the user into the native
-        type of the setting (typically :class:`bool`, :class:`int`, etc.).
+        Given a *value*, returns it transformed to the setting's native type
+        (typically an :class:`int` or :class:`bool` but can be whatever type is
+        appropriate).
 
         The *value* may be a regular type (:class:`str`, :class:`int`,
         :data:`None`, etc.) as deserialized from one of the input formats (JSON
@@ -204,40 +314,59 @@ class Setting:
         the value is a string given by the user on the command line and should
         be interpreted by the setting accordingly.
 
-        By default, this conversion defers to the :meth:`_from_file` method.
-        """
-        return self._from_file(value)
+        .. note::
 
-    def _from_file(self, value):
+            Note to implementers: the method must *not* affect :attr:`value`
+            directly; the caller will handle this.
         """
-        Internal method for converting values read from the boot configuration
-        file into the native type of the setting.
+        return value
 
-        The *value* will be a :class:`str`, and the method must return whatever
-        type is native for the setting or :data:`None` to indicate that the
-        setting is to be reset to its default state.
+    def validate(self):
         """
-        return str(value)
+        Validates the setting within the context of the other *settings*.
+        Raises :exc:`ValueError` in the event that the current value is
+        invalid. May optionally use :exc:`ValueWarning` to warn about dangerous
+        or inappropriate configurations.
+        """
+        pass
 
-    def _to_file(self, value):
+    def output(self, settings):
         """
-        Internal method for converting values to the format expected in the
-        boot configuration file.
+        Given the overall *settings* context, yields lines of configuration to
+        represent the state of the setting.
+        """
+        raise NotImplementedError
 
-        The *value* will be of the type native to the setting (typically
-        :class:`int` or :class:`bool`), and the method must return a
-        :class:`str`.
+    @contextmanager
+    def _override(self, value):
         """
-        # XXX Can *value* ever be None?
-        return str(value)
+        Used as a context manager, temporarily overrides the *value* of this
+        setting within *settings* until the contextual block ends. Note that
+        *value* does **not** pass through :meth:`update` via this route.
+        """
+        old_value = self._value
+        self._value = value
+        try:
+            yield
+        finally:
+            self._value = old_value
+
+    def _sibling(self, suffix):
+        """
+        Internal method which returns the name of the setting with the same
+        prefix as this setting, but for the final part which is replaced with
+        *suffix*.
+        """
+        # TODO Enhance this into something like _relative
+        return '.'.join(self.name.split('.')[:-1] + [suffix])
 
 
 class Overlay(Setting):
     """
-    Represents a boolean setting that is "on" if the represented overlay is
+    Represents a boolean setting that is "on" if the represented *overlay* is
     present, and "off" otherwise.
     """
-    def __init__(self, name, *, overlay, doc=''):
+    def __init__(self, name, *, overlay, default=False, doc=''):
         super().__init__(name, default=default, doc=doc)
         self._overlay = overlay
 
@@ -250,42 +379,35 @@ class Overlay(Setting):
 
     @property
     def key(self):
-        return ('overlays', self.overlay)
+        return ('overlays', '' if self.overlay == 'base' else self.overlay)
 
     def extract(self, config):
         for item in config:
-            if isinstance(item, BootParam):
+            if isinstance(item, BootOverlay):
                 if item.overlay == self.overlay:
-                    self._value = True
+                    yield item, True
                     # NOTE: We can "break" here because there's no way to
                     # "unload" an overlay in the config
                     break
 
     def update(self, value):
-        self._value = to_bool(value)
+        return to_bool(value)
 
     def output(self):
-        if self._value is not None:
+        if self.value:
             yield 'dtoverlay={self.overlay}'.format(self=self)
 
 
-class OverlayParam(Setting):
+class OverlayParam(Overlay):
     """
-    Represents a parameter to a device-tree overlay. Like :class:`Setting`,
+    Represents a *param* to a device-tree *overlay*. Like :class:`Setting`,
     this is effectively an abstract base class to be derived from.
     """
-    def __init__(self, name, *, param, default=None, doc=''):
-        super().__init__(name, default=default, doc=doc)
+    def __init__(self, name, *, overlay='base', param, default=None, doc=''):
+        super().__init__(name, overlay=overlay, default=default, doc=doc)
         self._param = param
 
     @property
-    def overlay(self):
-        """
-        The name of the overlay this parameter affects.
-        """
-        return 'base'
-
-    @property
     def param(self):
         """
         The name of the parameter within the base overlay that this setting
@@ -295,76 +417,71 @@ class OverlayParam(Setting):
 
     @property
     def key(self):
-        return ('overlays', self.overlay, self.param)
-
-
-class BaseOverlayInt(OverlayParam):
-    """
-    Represents an integer parameter to the base device-tree overlay.
-
-    The *param* is the name of the base device-tree overlay parameter that this
-    setting represents.
-    """
-    def __init__(self, name, *, param, default=0, doc=''):
-        super().__init__(name, param=param, default=default, doc=doc)
-
-    @property
-    def overlay(self):
-        """
-        The name of the overlay this parameter affects.
-        """
-        return 'base'
-
-    @property
-    def param(self):
-        """
-        The name of the parameter within the base overlay that this setting
-        represents.
-        """
-        return self._param
-
-    @property
-    def key(self):
-        return ('overlays', '', self.param)
+        return (
+            'overlays',
+            '' if self.overlay == 'base' else self.overlay,
+            self.param
+        )
 
     def extract(self, config):
+        value = None
         for item in config:
-            if isinstance(item, BootParam):
-                if item.overlay == 'base' and item.param == self.param:
-                    self._value = self._from_file(item.value)
+            if isinstance(item, BootOverlay):
+                if item.overlay == self.overlay:
+                    yield item, value
+            elif isinstance(item, BootParam):
+                if item.overlay == self.overlay and item.param == self.param:
+                    value = item.value
+                    yield item, value
                     # NOTE: No break here because later settings override
                     # earlier ones
 
     def update(self, value):
-        self._value = to_int(value)
+        return value
 
     def output(self):
-        if self.value != self.default:
-            yield 'dtparam={self.param}={value}'.format(
-                self=self, value=self._to_file(self.value))
+        # NOTE: We don't worry about outputting the dtoverlay; presumably that
+        # is represented by another setting and the key property will order
+        # our output appropriately after the correct dtoverlay output
+        if self.modified:
+            yield 'dtparam={self.param}={self.value}'.format(self=self)
 
-    def _from_file(self, value):
-        return int(value)
+
+class OverlayParamInt(OverlayParam):
+    """
+    Represents an integer parameter to a device-tree overlay.
+    """
+    def __init__(self, name, *, overlay='base', param, default=0, doc=''):
+        super().__init__(name, overlay=overlay, param=param, default=default,
+                         doc=doc)
+
+    def extract(self, config):
+        for item, value in super().extract(config):
+            yield item, None if value is None else int(value)
+
+    def update(self, value):
+        return to_int(super().update(value))
 
 
-class BaseOverlayBool(BaseOverlayInt):
+class OverlayParamBool(OverlayParam):
     """
     Represents a boolean parameter to the base device-tree overlay.
-
-    The *param* is the name of the base device-tree overlay parameter that this
-    setting represents.
     """
-    def __init__(self, name, *, param, default=False, doc=''):
-        super().__init__(name, param=param, default=default, doc=doc)
+    def __init__(self, name, *, overlay='base', param, default=False, doc=''):
+        super().__init__(name, overlay=overlay, param=param, default=default,
+                         doc=doc)
 
-    def _from_user(self, value):
-        return to_bool(value)
+    def extract(self, config):
+        for item, value in super().extract(config):
+            yield item, None if value is None else (value == 'on')
 
-    def _from_file(self, value):
-        return value == 'on'
+    def update(self, value):
+        return to_bool(super().update(value))
 
-    def _to_file(self, value):
-        return 'on' if value else 'off'
+    def output(self):
+        if self.modified:
+            yield 'dtparam={self.param}={value}'.format(
+                self=self, value='on' if self.value else 'off')
 
 
 class Command(Setting):
@@ -414,25 +531,17 @@ class Command(Setting):
                     isinstance(item, BootCommand) and
                     item.command in self.commands and
                     item.hdmi == self.index):
-                try:
-                    self._value = self._from_file(item.params)
-                except ExtractError as e:
-                    raise e  # don't re-wrap ExtractError
-                except ValueError as e:
-                    raise ExtractError(item, e)
+                yield item, item.params
                 # NOTE: No break here because later settings override
                 # earlier ones
 
-    def output(self):
-        # NOTE: This must not simply compare value against default; some
-        # defaults are platform specific and thus a value may be default on
-        # one platform but not another. Simply test whether a value is *set*
-        if self._value is not None:
+    def output(self, fmt=''):
+        if self.modified:
             if self.index:
-                template = '{self.commands[0]}:{self.index}={value}'
+                template = '{self.commands[0]}:{self.index}={self.value:{fmt}}'
             else:
-                template = '{self.commands[0]}={value}'
-            yield template.format(self=self, value=self._to_file(self.value))
+                template = '{self.commands[0]}={self.value:{fmt}}'
+            yield template.format(self=self, fmt=fmt)
 
 
 class CommandInt(Command):
@@ -454,7 +563,15 @@ class CommandInt(Command):
                          default=default, doc=doc, index=index)
         self._valid = valid
 
-    def _from_file(self, value):
+    @property
+    def hint(self):
+        return self._valid.get(self.value)
+
+    def extract(self, config):
+        for item, value in super().extract(config):
+            yield item, to_int(value)
+
+    def update(self, value):
         return to_int(value)
 
     def validate(self):
@@ -463,8 +580,8 @@ class CommandInt(Command):
                 '{self.name} must be in the range {valid}'
             ).format(self=self, valid=int_ranges(self._valid)))
 
-    def explain(self):
-        return self._valid.get(self.value)
+    def output(self, fmt='d'):
+        yield from super().output(fmt)
 
 
 class CommandIntHex(CommandInt):
@@ -472,11 +589,12 @@ class CommandIntHex(CommandInt):
     An integer-valued configuration *command* or *commands* that are typically
     represented in hexi-decimal (like memory addresses).
     """
-    def explain(self):
-        return self._to_file(self.value)
+    @property
+    def hint(self):
+        return '{:#x}'.format(self.value)
 
-    def _to_file(self, value):
-        return '{:#x}'.format(value)
+    def output(self, fmt='#x'):
+        yield from super().output(fmt)
 
 
 class CommandBool(Command):
@@ -488,14 +606,15 @@ class CommandBool(Command):
         super().__init__(name, command=command, commands=commands,
                          default=default, doc=doc, index=index)
 
-    def _from_file(self, value):
-        return bool(int(value))
+    def extract(self, config):
+        for item, value in super().extract(config):
+            yield item, bool(int(value))
 
-    def _from_user(self, value):
+    def update(self, value):
         return to_bool(value)
 
-    def _to_file(self, value):
-        return str(int(value))
+    def output(self, fmt='d'):
+        yield from super().output(fmt)
 
 
 class CommandBoolInv(CommandBool):
@@ -505,14 +624,17 @@ class CommandBoolInv(CommandBool):
     ``disable_overscan`` setting and therefore its value is always the opposite
     of the actual written value.
     """
-    def _from_user(self, value):
-        return not super()._from_user(value)
+    def extract(self, config):
+        for item, value in super().extract(config):
+            yield item, not value
 
-    def _from_file(self, value):
-        return not super()._from_file(value)
+    def update(self, value):
+        return not super().update(value)
 
-    def _to_file(self, value):
-        return super()._to_file(not value)
+    def output(self, fmt='d'):
+        if self.modified:
+            with self._override(not value):
+                yield from super().output(fmt)
 
 
 class CommandForceIgnore(CommandBool):
@@ -553,24 +675,76 @@ class CommandForceIgnore(CommandBool):
                     isinstance(item, BootCommand) and
                     item.command in self.commands and
                     int(item.params)):
-                self._value = item.command == self.force
+                yield item, (item.command == self.force)
                 # NOTE: No break here because later settings override
                 # earlier ones
 
     def output(self):
-        if self.value is not None:
+        if self.modified:
             if self.index:
-                template = '{command}:{self.index}={value}'
+                template = '{command}:{self.index}=1'
             else:
-                template = '{command}={value}'
+                template = '{command}=1'
             yield template.format(
                 self=self,
-                value=1,
                 command={
                     True:  self.force,
                     False: self.ignore,
                 }[self.value],
             )
+
+
+class CommandMaskMaster(CommandInt):
+    """
+    Represents an integer bit-mask setting as several settings. The "master"
+    setting is the only one that produces any output. It defines the suffixes
+    of its *siblings* (instances of :class:`CommandMaskDummy` which parse the
+    same setting but produce no output of their own).
+
+    The *mask* specifies the integer bit-mask to be applied to the underlying
+    value for this setting. The right-shift will be calculated from this.
+    Single-bit masks will be represented as boolean values rather than
+    integers.
+    """
+    def __init__(self, name, *, mask, command=None, commands=None, default=0,
+                 doc='', index=0, valid=None, siblings=()):
+        assert mask
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index, valid=valid)
+        self._mask = mask
+        self._shift = (mask & -mask).bit_length() - 1  # ffs(3)
+        self._bool = (mask >> self._shift) == 1
+        self._names = (self.name,) + tuple(
+            self._sibling(name) for name in siblings)
+
+    def extract(self, config):
+        for item, value in super().extract(config):
+            value = (value & self._mask) >> self._shift
+            yield item, bool(value) if self._bool else value
+
+    def update(self, value):
+        if self._bool:
+            return to_bool(value)
+        else:
+            return super().update(value)
+
+    def output(self):
+        if any(settings[name].modified for name in self._names):
+            value = reduce(or_, (
+                settings[name].value << settings[name]._shift
+                for name in self._names
+            ))
+            template = '{self.commands[0]}={value:#x}'
+            yield template.format(self=self, value=value)
+
+
+class CommandMaskDummy(CommandMaskMaster):
+    """
+    Represents portions of integer bit-masks which are subordinate to a
+    :class:`CommandMaskMaster` setting.
+    """
+    def output(self):
+        return ()
 
 
 class CommandDisplayGroup(CommandInt):
@@ -755,8 +929,16 @@ class CommandDisplayMode(CommandInt):
         super().__init__(name, command=command, commands=commands,
                          default=default, doc=doc, index=index)
 
+    @property
+    def hint(self):
+        return {
+            0: 'auto from EDID',
+            1: self._valid_cea.get(self.value, '?'),
+            2: self._valid_dmt.get(self.value, '?'),
+        }.get(self.settings[self._sibling('group')].value, '?')
+
     def validate(self):
-        group = self.sibling('group')
+        group = self.settings[self._sibling('group')]
         min_, max_ = {
             0: (0, 0),
             1: (1, 59),
@@ -767,14 +949,6 @@ class CommandDisplayMode(CommandInt):
                 '{self.name} must be between {min} and {max} when '
                 '{group.name} is {group.value}'
             ).format(self=self, min=min_, max=max_, group=group))
-
-    def explain(self):
-        group = self.sibling('group')
-        return {
-            0: 'auto from EDID',
-            1: self._valid_cea.get(self.value, '?'),
-            2: self._valid_dmt.get(self.value, '?'),
-        }.get(group.value, '?')
 
 
 class CommandDisplayTimings(Command):
@@ -789,33 +963,35 @@ class CommandDisplayTimings(Command):
         super().__init__(name, command=command, commands=commands,
                          default=default, doc=doc, index=index)
 
-    def _from_user(self, value):
+    def extract(self, config):
+        for item, value in super().extract(config):
+            value = value.strip()
+            if value:
+                value = [int(elem) for elem in value.split()]
+                yield item, value
+            else:
+                yield item, []
+
+    def update(self, value):
         if isinstance(value, UserStr):
             value = value.strip()
             if value:
-                value = [int(elem) for elem in value.split(',')]
-                if len(value) != 17:
-                    raise ValueError(_(
-                        '{self.name} takes 17 comma-separated integers'
-                    ).format(self=self))
-                return value
+                return [int(elem) for elem in value.split(',')]
             return None
         else:
             return value
 
-    def _from_file(self, value):
-        value = value.strip()
-        if value:
-            value = [int(elem) for elem in value.split()]
-            if len(value) != 17:
-                raise ValueError(_(
-                    '{self.name} takes 17 space-separated integers'
-                ).format(self=self))
-            return value
-        return ()
+    def validate(self):
+        if self.modified and len(self.value) not in (0, 17):
+            raise ValueError(
+                _('{self.name} takes 17 comma-separated integers')
+                .format(self=self))
 
-    def _to_file(self, value):
-        return ' '.join(str(i) for i in value)
+    def output(self):
+        if self.modified:
+            joined_value = ' '.join(str(i) for i in self.value)
+            with self._override(joined_value):
+                yield from super().output()
 
 
 class CommandDisplayRotate(CommandInt):
@@ -833,6 +1009,10 @@ class CommandDisplayRotate(CommandInt):
         super().__init__(name, command=command, commands=commands,
                          default=default, doc=doc, index=index)
 
+    def extract(self, config):
+        for item, value in super().extract(config):
+            yield item, ((value & 0x3) * 90)
+
     def validate(self):
         if self.value not in (0, 90, 180, 270):
             raise ValueError(_(
@@ -840,9 +1020,9 @@ class CommandDisplayRotate(CommandInt):
             ).format(self=self))
 
     def output(self):
-        flip = self.sibling('flip')
-        value = (self.value // 90) | (flip.value << 16)
-        if value != self.default:
+        flip = self.settings[self._sibling('flip')]
+        if self.modified or flip.modified:
+            value = (self.value // 90) | (flip.value << 16)
             if 'lcd_rotate' in self.commands:
                 # For the DSI LCD display, prefer lcd_rotate as it uses the
                 # display's electronics to handle rotation rather than the GPU.
@@ -859,12 +1039,6 @@ class CommandDisplayRotate(CommandInt):
                     template = '{self.commands[0]}={value:#x}'
             yield template.format(self=self, value=value)
 
-    def _from_user(self, value):
-        return to_int(value)
-
-    def _from_file(self, value):
-        return (super()._from_file(value) & 0x3) * 90
-
 
 class CommandDisplayFlip(CommandInt):
     """
@@ -880,94 +1054,32 @@ class CommandDisplayFlip(CommandInt):
                              2: 'vertical',
                              3: 'both', })
 
+    def extract(self, config):
+        for item, value in super().extract(config):
+            yield item, ((value >> 16) & 0x3)
+
     def output(self):
         # See CommandDisplayRotate.output above
         return ()
 
-    def _from_user(self, value):
-        return to_int(value)
 
-    def _from_file(self, value):
-        return (super()._from_file(value) >> 16) & 0x3
-
-
-class CommandDPIOutput(CommandInt):
+class CommandDPIOutput(CommandMaskMaster):
     """
-    Represents the setting for the format and output of the DPI pins. This
-    works in concert with :class:`CommandDPIDummy` settings which break out
-    bits of the bit-mask but do not produce output themselves.
+    Represents the format portion of ``dpi_output_format``.
     """
-    def __init__(self, name, *, mask, command=None, commands=None, default=0,
-                 doc='', index=0, valid=None):
-        super().__init__(name, command=command, commands=commands,
-                         default=default, doc=doc, index=index, valid=valid)
-        assert mask
-        self._mask = mask
-        self._shift = (mask & -mask).bit_length() - 1  # ffs(3)
-
-    @property
-    def mask(self):
-        return self._mask
-
-    @property
-    def shift(self):
-        return self._shift
-
     def output(self):
-        settings = (
-            self,
-            self.sibling('rgb'),
-            self.sibling('clock'),
-            self.sibling('hsync.disabled'),
-            self.sibling('hsync.polarity'),
-            self.sibling('hsync.phase'),
-            self.sibling('vsync.disabled'),
-            self.sibling('vsync.polarity'),
-            self.sibling('vsync.phase'),
-            self.sibling('output.mode'),
-            self.sibling('output.disabled'),
-            self.sibling('output.polarity'),
-            self.sibling('output.phase'),
-        )
-        value = reduce(or_, (
-            setting.value << setting.shift
-            for setting in settings
-        ))
-        if self.sibling('enabled').value:
+        if self.settings[self._sibling('enabled')].value:
             # For the DPI LCD display, always output dpi_output_format when
             # enable_dpi_lcd is set (and conversely, don't output it when not
             # set)
-            template = '{self.commands[0]}={value:#x}'
-            yield template.format(self=self, value=value)
-
-    def _from_user(self, value):
-        return to_int(value)
-
-    def _from_file(self, value):
-        return (super()._from_file(value) & self._mask) >> self._shift
+            yield from super().output(settings)
 
 
-class CommandDPIDummy(CommandDPIOutput):
+class CommandDPIDummy(CommandMaskDummy):
     """
-    Represents portions of the ``dpi_output_format`` bit-mask which do not
-    themselves produce output. The :class:`CommandDPIOutput` setting collates
-    all values from :class:`CommandDPIDummy` settings.
+    Represents the non-format portions of ``dpi_output_format``.
     """
-    def output(self):
-        # See CommandDPIOutput.output above
-        return ()
-
-
-class CommandDPIBool(CommandDPIDummy):
-    """
-    Derivative of :class:`CommandDPIDummy` which represents single-bit
-    components of the ``dpi_output_format`` bit-mask.
-    """
-    def _from_user(self, value):
-        return to_bool(value)
-
-    def _from_file(self, value):
-        return bool(super()._from_file(value))
+    pass
 
 
 class CommandHDMIBoost(CommandInt):
@@ -982,21 +1094,29 @@ class CommandHDMIBoost(CommandInt):
             ).format(self=self))
 
 
-class CommandEDIDIgnore(CommandBool):
+class CommandEDIDIgnore(CommandIntHex):
     """
     Represents the ``hdmi_ignore_edid`` "boolean" setting with its bizarre
     "true" value.
     """
     # See hdmi_edid_file in
     # https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
-    def _from_user(self, value):
+    @property
+    def hint(self):
+        pass
+
+    def extract(self, config):
+        for item, value in super().extract(config):
+            yield item, value == 0xa5000080
+
+    def update(self, value):
         return to_bool(value)
 
-    def _from_file(self, value):
-        return to_int(value) == 0xa5000080
-
-    def _to_file(self, value):
-        return '0xa5000080' if value else '0'
+    def output(self):
+        if self.modified:
+            new_value = 0xa5000080 if self.value else 0
+            with self._override(new_value):
+                yield from super().output()
 
 
 class CommandBootDelay2(Command):
@@ -1004,26 +1124,19 @@ class CommandBootDelay2(Command):
     Represents the combination of ``boot_delay`` and ``boot_delay_ms``.
     """
     def extract(self, config):
-        value = 0.0
-        found = False
+        boot_delay = boot_delay_ms = 0
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'boot_delay':
-                    found = True
-                    value += self._from_file(item.params)
+                    boot_delay = to_int(item.params)
+                    yield item, boot_delay + (boot_delay_ms / 1000)
                 elif item.command == 'boot_delay_ms':
-                    found = True
-                    value += self._from_file(to_int(item.params) / 1000)
-                # NOTE: No break here because later settings override
-                # earlier ones
-        if found:
-            self._value = value
-        else:
-            self._value = None
+                    boot_delay_ms = to_int(item.params)
+                    yield item, boot_delay + (boot_delay_ms / 1000)
 
     def output(self):
-        if self._value is not None:
-            whole, frac = divmod(self._value, 1)
+        if self.modified:
+            whole, frac = divmod(self.value, 1)
             whole = int(whole)
             frac = int(frac * 1000)
             if whole:
@@ -1031,15 +1144,14 @@ class CommandBootDelay2(Command):
             if frac:
                 yield 'boot_delay_ms={value}'.format(value=frac)
 
-    def validate(self):
-        if self._value is not None:
-            if self._value < 0.0:
-                raise ValueError(_(
-                    '{self.name} cannot be negative'
-                ).format(self=self))
-
-    def _from_user(self, value):
+    def update(self, value):
         return to_float(value)
+
+    def validate(self):
+        if self.value < 0.0:
+            raise ValueError(_(
+                '{self.name} cannot be negative'
+            ).format(self=self))
 
 
 class CommandKernelAddress(CommandIntHex):
@@ -1050,7 +1162,7 @@ class CommandKernelAddress(CommandIntHex):
     """
     @property
     def default(self):
-        if self.sibling('64bit').value:
+        if self.settings[self._sibling('64bit')].value:
             return 0x80000
         else:
             return 0x8000
@@ -1059,12 +1171,10 @@ class CommandKernelAddress(CommandIntHex):
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'kernel_address':
-                    self._value = self.from_file(item.params)
+                    yield item, to_int(item.params)
                 elif item.command == 'kernel_old':
-                    if self.from_file(item.params):
-                        self._value = 0
-                # NOTE: No break here because later settings override
-                # earlier ones
+                    if to_int(item.params):
+                        yield item, 0
 
 
 class CommandKernel64(CommandBool):
@@ -1076,12 +1186,9 @@ class CommandKernel64(CommandBool):
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'arm_64bit':
-                    self._value = self.from_file(item.params)
+                    yield item, to_bool(item.params)
                 elif item.command == 'arm_control':
-                    ctrl = to_int(item.params)
-                    self._value = bool(ctrl & 0x200)
-                # NOTE: No break here because later settings override
-                # earlier ones
+                    yield item, bool(to_int(item.params) & 0x200)
 
 
 class CommandKernelFilename(Command):
@@ -1091,7 +1198,7 @@ class CommandKernelFilename(Command):
     # TODO os_prefix integration
     @property
     def default(self):
-        if self.sibling('64bit').value:
+        if self.settings[self._sibling('64bit')].value:
             return 'kernel8.img'
         else:
             board_types = get_board_types()
@@ -1122,25 +1229,25 @@ class CommandRamFSAddress(CommandIntHex):
     """
     Handles the ``ramfsaddr`` and ``initramfs`` commands.
     """
+    @property
+    def hint(self):
+        if self.value == 0:
+            return 'followkernel'
+        else:
+            # FIXME
+            return super().hint
+
     def extract(self, config):
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'ramfsaddr':
-                    self._value = self.from_file(item.params)
+                    yield item, to_int(item.params)
                 elif item.command == 'initramfs':
                     filename, address = item.params
                     if address == 'followkernel':
-                        self._value = None
+                        yield item, None
                     else:
-                        self._value = self.from_file(address)
-                # NOTE: No break here because later settings override
-                # earlier ones
-
-    def explain(self):
-        if self.value is None or self.value == 0:
-            return 'followkernel'
-        else:
-            return super().explain()
+                        yield item, to_int(address)
 
 
 class CommandRamFSFilename(Command):
@@ -1154,34 +1261,23 @@ class CommandRamFSFilename(Command):
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'ramfsfile':
-                    self._value = self.from_file(item.params)
+                    yield item, to_list(item.params, sep=',')
                 elif item.command == 'initramfs':
                     filename, address = item.params
-                    self._value = self.from_file(filename)
-                # NOTE: No break here because later settings override
-                # earlier ones
+                    yield item, to_list(filename, sep=',')
+
+    def update(self, value):
+        return to_list(value)
 
     def validate(self):
-        s = self._to_file(self.value)
-        if len('ramfsfile=') + len(s) > 80:
+        if self.modified and len(self.name) + len('=') + len(self.value) > 80:
             raise ValueError(_('Excessively long list of initramfs files'))
 
-    def _from_user(self, value):
-        if isinstance(value, UserStr):
-            value = to_str(value)
-            if value is not None and ',' in value:
-                return [elem.strip() for elem in value.split(',')]
-        return value
-
-    def _from_file(self, value):
-        if ',' in value:
-            return [f.strip() for f in value.strip().split(',')]
-
-    def _to_file(self, value):
-        if isinstance(value, list):
-            return ','.join(value)
-        else:
-            return str(value)
+    def output(self):
+        if self.modified:
+            new_value = ','.join(self.value)
+            with self._override(new_value):
+                yield from super().output()
 
 
 class CommandSerialEnabled(CommandBool):
@@ -1207,28 +1303,30 @@ class OverlaySerialUART(Setting):
         else:
             return 0
 
-    def extract(self, config):
-        for item in config:
-            if isinstance(item, BootOverlay):
-                if item.overlay in ('miniuart-bt', 'pi3-miniuart-bt'):
-                    self._value = 0
-
-    def output(self):
-        # Output is handled by bluetooth.enabled setting
-        pass
-
-    def validate(self):
-        if self._value == 1 and not self.settings['bluetooth.enabled'].value:
-            raise ValueError('serial.uart must be 0 when bluetooth is disabled')
-
-    def explain(self):
+    @property
+    def hint(self):
         if self.value == 0:
             return '/dev/ttyAMA0; PL011'
         else:
             return '/dev/ttyS0; mini-UART'
 
-    def _from_user(self, value):
-        return from_int(value)
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootOverlay):
+                if item.overlay in ('miniuart-bt', 'pi3-miniuart-bt'):
+                    yield item, 0
+
+    def update(self, value):
+        return to_int(value)
+
+    def validate(self):
+        if self.value == 1 and not self.settings['bluetooth.enabled'].value:
+            raise ValueError(_(
+                'serial.uart must be 0 when bluetooth.enabled is off'))
+
+    def output(self):
+        # Output is handled by bluetooth.enabled setting
+        return ()
 
 
 class OverlayBluetoothEnabled(Setting):
@@ -1244,21 +1342,21 @@ class OverlayBluetoothEnabled(Setting):
         for item in config:
             if isinstance(item, BootOverlay):
                 if item.overlay in ('disable-bt', 'pi3-disable-bt'):
-                    self._value = False
+                    yield item, False
                 elif item.overlay in ('miniuart-bt', 'pi3-miniuart-bt'):
-                    self._value = True
+                    yield item, True
                 # XXX What happens if both overlays are specified?
 
-    def output(self):
-        if self._value is not None:
-            # TODO what about pi3- prefix on systems with deprecated overlays?
-            if self.value and self.settings['serial.uart'].value == 0:
-                yield 'dtoverlay=miniuart-bt'
-            elif not self.value:
-                yield 'dtoverlay=disable-bt'
-
-    def _from_user(self, value):
+    def update(self, value):
         return to_bool(value)
+
+    def output(self):
+        if self.modified or self.settings['serial.uart'].modified:
+            # TODO what about pi3- prefix on systems with deprecated overlays?
+            if not self.value:
+                yield 'dtoverlay=disable-bt'
+            elif self.settings['serial.uart'].value == 0:
+                yield 'dtoverlay=miniuart-bt'
 
 
 class CommandCPUFreqMax(CommandInt):

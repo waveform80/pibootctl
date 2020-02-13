@@ -6,7 +6,7 @@ from unittest import mock
 import yaml
 import pytest
 
-from pictl.settings import *
+from pictl.setting import *
 from pictl.output import *
 
 
@@ -34,11 +34,10 @@ def store(request):
 def left_right_diff(request):
     left = Settings()
     right = left.copy()
-    right['video.cec.name'].update('Foo')
-    del right._settings['test.enabled']
+    right.update({'video.cec.name': 'Foo', 'test.enabled': None})
     diff = [
         (left['video.cec.name'], right['video.cec.name']),
-        (left['test.enabled'], Missing),
+        (left['test.enabled'], None),
     ]
     return left, right, diff
 
@@ -144,12 +143,9 @@ test.enabled\toff\t-
 
 
 def test_dump_settings_user():
-    default = Settings()
     # Cut down the settings to something manageable for this test
-    for name in [s.name for s in default]:
-        if not name.startswith('video.cec.'):
-            del default._settings[name]
-    default['video.cec.name'].update('Foo')
+    default = Settings().filter('video.cec.*')
+    default.update({'video.cec.name': 'Foo'})
     buf = io.StringIO()
     output = Namespace(use_unicode=False)
     output.dump_settings(default, buf)
@@ -184,7 +180,7 @@ def test_dump_settings_json():
     output = Namespace(default_style='json')
     output.dump_settings(default, buf)
     assert json.loads(buf.getvalue()) == {
-        setting.name: setting.value for setting in default
+        setting.name: setting.value for setting in default.values()
     }
 
 
@@ -194,16 +190,13 @@ def test_dump_settings_yaml():
     output = Namespace(default_style='yaml')
     output.dump_settings(default, buf)
     assert yaml_loads(buf.getvalue()) == {
-        setting.name: setting.value for setting in default
+        setting.name: setting.value for setting in default.values()
     }
 
 
 def test_dump_settings_shell():
-    default = Settings()
     # Cut down the settings to something manageable for this test
-    for name in [s.name for s in default]:
-        if not name.startswith('video.cec.'):
-            del default._settings[name]
+    default = Settings().filter('video.cec.*')
     buf = io.StringIO()
     output = Namespace(default_style='shell')
     output.dump_settings(default, buf)
@@ -266,7 +259,7 @@ video_cec_name='Raspberry Pi'
 def test_format_value_user():
     output = Namespace(use_unicode=False)
     assert output.format_value(1) == '1'
-    assert output.format_value(None) == 'default'
+    assert output.format_value(None) == 'auto'
     assert output.format_value(True) == 'on'
     assert output.format_value(False) == 'off'
     assert output.format_value([1, 2, 3]) == repr([1, 2, 3])
@@ -299,7 +292,7 @@ def test_format_value_yaml():
 def test_format_value_shell():
     output = Namespace(default_style='shell')
     assert output.format_value(1) == '1'
-    assert output.format_value(None) == 'default'
+    assert output.format_value(None) == 'auto'
     assert output.format_value(True) == 'on'
     assert output.format_value(False) == 'off'
     assert output.format_value([1, 2, 3]) == '(1 2 3)'

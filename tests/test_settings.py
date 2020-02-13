@@ -1,11 +1,7 @@
 import pytest
 
 from pictl.parser import *
-from pictl.settings import *
-
-
-def test_missing():
-    assert repr(Missing) == 'Missing'
+from pictl.setting import *
 
 
 def test_settings_container():
@@ -20,8 +16,8 @@ def test_settings_copy():
     copy = settings.copy()
     assert len(settings) == len(copy)
     assert settings is not copy
-    assert set(s.name for s in settings) == set(s.name for s in copy)
-    assert all(s is not copy[s.name] for s in settings)
+    assert set(s for s in settings) == set(s for s in copy)
+    assert all(settings[name] is not copy[name] for name in settings)
 
 
 def test_settings_extract(tmpdir):
@@ -56,7 +52,12 @@ hdmi_mode=4
     settings.extract(parser.parse(str(tmpdir)))
     assert default.diff(settings) == {
         (default[name], settings[name])
-        for name in ('i2c.enabled', 'spi.enabled', 'video.hdmi0.group', 'video.hdmi0.mode')
+        for name in (
+            'i2c.enabled',
+            'spi.enabled',
+            'video.hdmi0.group',
+            'video.hdmi0.mode',
+        )
     }
 
 
@@ -69,7 +70,7 @@ hdmi_mode=4
     settings = Settings()
     settings.extract(parser.parse(str(tmpdir)))
     settings.validate()
-    settings['video.hdmi0.mode'].update(90)
+    settings.update({'video.hdmi0.mode': 90})
     with pytest.raises(ValueError):
         settings.validate()
 

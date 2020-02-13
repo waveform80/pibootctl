@@ -8,7 +8,7 @@ def test_get_board_revision():
         assert get_board_revision() == 0xa020d3
     with mock.patch('io.open') as m:
         m.side_effect = FileNotFoundError
-        assert get_board_revision() == 0
+        assert get_board_revision() == -1
 
 
 def test_get_board_serial():
@@ -18,7 +18,7 @@ def test_get_board_serial():
         assert get_board_serial() == 0x12345678
     with mock.patch('io.open') as m:
         m.side_effect = FileNotFoundError
-        assert get_board_serial() == 0
+        assert get_board_serial() == -1
 
 
 def test_get_board_types():

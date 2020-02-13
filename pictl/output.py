@@ -10,7 +10,6 @@ from collections import OrderedDict
 import yaml
 
 from .setting import Command, OverlayParam
-from .settings import Missing
 from .formatter import TableWrapper, unicode_table, pretty_table, render
 from .term import term_size
 
@@ -19,9 +18,9 @@ _ = gettext.gettext
 
 def values(l, r):
     obj = {}
-    if l is not Missing:
+    if l is not None:
         obj['left'] = l.value
-    if r is not Missing:
+    if r is not None:
         obj['right'] = r.value
     return obj
 
@@ -117,7 +116,7 @@ class Namespace(argparse.Namespace):
     def dump_diff(self, left, right, diff, fp):
         """
         Write the *diff* (a sequence of (l, r) tuples in which l and r are
-        either instances of :class:`Setting` or :class:`Missing`), of *left*
+        either instances of :class:`Setting` or :data:`None`), of *left*
         and *right* (instances of :class:`Settings`) to the file-like object
         *fp*.
         """
@@ -139,39 +138,40 @@ class Namespace(argparse.Namespace):
             self._print_table([
                 (_('Name'), '<{}>'.format(_('Current')) if left is None else left, right)
             ] + sorted([
-                (l.name if l is not Missing else r.name,
-                 '-' if l is Missing else self._format_setting_user(l),
-                 '-' if r is Missing else self._format_setting_user(r),
+                (l.name if l is not None else r.name,
+                 '-' if l is None else self._format_setting_user(l),
+                 '-' if r is None else self._format_setting_user(r),
                  )
                 for (l, r) in diff
             ]), fp)
 
     def _dump_diff_json(self, left, right, diff, fp):
         json.dump({
-            (l.name if l is not Missing else r.name): values(l, r)
+            (l.name if l is not None else r.name): values(l, r)
             for (l, r) in diff
         }, fp)
 
     def _dump_diff_yaml(self, left, right, diff, fp):
         yaml.dump({
-            (l.name if l is not Missing else r.name): values(l, r)
+            (l.name if l is not None else r.name): values(l, r)
             for (l, r) in diff
         }, fp)
 
     def _dump_diff_shell(self, left, right, diff, fp):
         for l, r in diff:
             fp.write('\t'.join(
-                (l.name if l is not Missing else r.name,
-                 '-' if l is Missing else self._format_value_shell(l.value),
-                 '-' if r is Missing else self._format_value_shell(r.value)
+                (l.name if l is not None else r.name,
+                 '-' if l is None else self._format_value_shell(l.value),
+                 '-' if r is None else self._format_value_shell(r.value)
                  )
             ))
             fp.write('\n')
 
     def dump_settings(self, settings, fp, mod=False):
         """
-        Write the content of *settings* (a :class:`Settings` instance) to the
-        file-like object *fp*.
+        Write the content of *settings* (a :class:`Settings` instance or just a
+        mapping of settings names to :class:`Setting` objects) to the file-like
+        object *fp*.
         """
         return {
             'user':  self._dump_settings_user,
@@ -181,13 +181,17 @@ class Namespace(argparse.Namespace):
         }[self.style](settings, fp, mod=mod)
 
     def _dump_settings_json(self, settings, fp, mod=False):
-        json.dump({setting.name: setting.value for setting in settings}, fp)
+        json.dump({
+            name: setting.value for name, setting in settings.items()
+        }, fp)
 
     def _dump_settings_yaml(self, settings, fp, mod=False):
-        yaml.dump({setting.name: setting.value for setting in settings}, fp)
+        yaml.dump({
+            name: setting.value for name, setting in settings.items()
+        }, fp)
 
     def _dump_settings_shell(self, settings, fp, mod=False):
-        for setting in settings:
+        for setting in settings.values():
             fp.write(self._format_setting_shell(setting))
             fp.write("\n")
 
@@ -201,10 +205,11 @@ class Namespace(argparse.Namespace):
             ] + [
                 (
                     setting.name,
-                    self._check_mark if setting.value != setting.default else '',
+                    self._check_mark if setting.modified else '',
                     self._format_setting_user(setting),
                 )
-                for setting in sorted(settings, key=attrgetter('name'))
+                for setting in sorted(
+                    settings.values(), key=attrgetter('name'))
             ]
             if not mod:
                 data = [(name, value) for (name, modified, value) in data]
@@ -321,8 +326,7 @@ class Namespace(argparse.Namespace):
 
     def _format_setting_user(self, setting):
         value = self._format_value_user(setting.value)
-        explanation = setting.explain()
         return (
-            '{value}' if explanation is None else
-            '{value} ({explanation})'
-        ).format(value=value, explanation=explanation)
+            '{value}' if setting.hint is None else
+            '{value} ({setting.hint})'
+        ).format(value=value, setting=setting)

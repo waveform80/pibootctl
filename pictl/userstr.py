@@ -104,3 +104,26 @@ def to_str(s):
         else:
             return s.strip()
     return str(s)
+
+
+def to_list(s, sep=','):
+    """
+    Converts the :class:`UserStr` (or other type) *s* to a :class:`list` based
+    on the separator character *sep* (which defaults to ","). Blank
+    :class:`UserStr` are converted to :data:`None`, and literal :data:`None`
+    passes through unchanged. Everything else is passed to the :class:`list`
+    constructor. This ensures that the result is always a unique reference.
+    """
+    if s is None:
+        return None
+    elif isinstance(s, UserStr):
+        if not s:
+            return None
+        else:
+            s = s.strip()
+    if isinstance(s, str):
+        if sep in s:
+            return [elem.strip() for elem in s.split(sep)]
+        else:
+            return [s]
+    return list(s)

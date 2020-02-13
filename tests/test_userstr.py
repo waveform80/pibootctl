@@ -65,3 +65,15 @@ def test_to_str():
     assert to_str(UserStr('')) is None
     assert to_str(UserStr(' ')) == ''
     assert to_str(UserStr('  foo')) == 'foo'
+
+
+def test_to_list():
+    assert to_list(None) is None
+    assert to_list('') == ['']
+    assert to_list([]) == []
+    assert to_list('foo') == ['foo']
+    assert to_list('foo,bar') == ['foo', 'bar']
+    assert to_list(UserStr('')) is None
+    assert to_list(UserStr(' ')) == ['']
+    assert to_list(UserStr('  foo')) == ['foo']
+    assert to_list(UserStr('foo,bar')) == ['foo', 'bar']

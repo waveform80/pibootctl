@@ -6,14 +6,13 @@ import gettext
 import argparse
 import configparser
 from pathlib import Path
-from fnmatch import fnmatch
 from datetime import datetime
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from .term import ErrorHandler
 from .parser import BootParser
-from .setting import UserStr
-from .settings import Settings
+from .userstr import UserStr
+from .setting import Settings
 from .output import Namespace
 
 try:
@@ -254,17 +253,9 @@ def do_dump_or_show(args, path):
     # is weak
     settings = stored
     if args.vars:
-        settings = {
-            setting
-            for setting in settings
-            if fnmatch(setting.name, args.vars)
-        }
+        settings = settings.filter(args.vars)
     if not args.all:
-        settings = {
-            setting
-            for setting in settings
-            if setting.modified
-        }
+        settings = settings.modified()
     args.dump_settings(settings, fp=sys.stdout, mod=args.all)
 
 

@@ -1,103 +1,70 @@
-import copy
 import gettext
 from operator import attrgetter
-from weakref import ref
+from collections import OrderedDict
 
-from .setting import (
-    BaseOverlayBool,
-    BaseOverlayInt,
-    Command,
-    CommandBool,
-    CommandBoolInv,
-    CommandBootDelay2,
-    CommandCPUFreqMax,
-    CommandCPUFreqMin,
-    CommandDeviceTree,
-    CommandDisplayFlip,
-    CommandDisplayGroup,
-    CommandDisplayMode,
-    CommandDisplayRotate,
-    CommandDisplayTimings,
-    CommandDPIBool,
-    CommandDPIDummy,
-    CommandDPIOutput,
-    CommandEDIDIgnore,
-    CommandForceIgnore,
-    CommandHDMIBoost,
-    CommandInt,
-    CommandIntHex,
-    CommandKernel64,
-    CommandKernelAddress,
-    CommandKernelCmdline,
-    CommandKernelFilename,
-    CommandRamFSAddress,
-    CommandRamFSFilename,
-    CommandSerialEnabled,
-    OverlayBluetoothEnabled,
-    OverlaySerialUART,
-)
+from . import setting
 
 _ = gettext.gettext
 
 
-_settings = {
-    BaseOverlayBool(
+SETTINGS = {
+    setting.OverlayParamBool(
         'i2c.enabled', param='i2c_arm', doc=_(
             """
             Enables the ARM I2C bus on pins 3 (GPIO2) and 5 (GPIO3) of the GPIO
             header (SDA on GPIO2, and SCL on GPIO3).
             """)),
-    BaseOverlayInt(
+    setting.OverlayParamInt(
         'i2c.baud', param='i2c_arm_baudrate', default=100000, doc=_(
             """
             The baud-rate of the ARM I2C bus.
             """)),
-    BaseOverlayBool(
+    setting.OverlayParamBool(
         'spi.enabled', param='spi', doc=_(
             """
             Enables the SPI bus on pins 19 (GPIO10), 21 (GPIO9), 23 (GPIO11),
             24 (GPIO8), and 25 (GPIO7) of the GPIO header (MOSI on GPIO10, MISO
             on GPIO9, SCLK on GPIO11, CE0 on GPIO8, and CE1 on GPIO7).
             """)),
-    BaseOverlayBool(
+    setting.OverlayParamBool(
         'i2s.enabled', param='i2s', doc=_(
             """
             Enables the I2S audio bus on pins 12 (GPIO18), 35 (GPIO19), 38
             (GPIO20), and 40 (GPIO21) on the GPIO header (CLK on GPIO18, FS on
             GPIO19, DIN on GPIO20, and DOUT on GPIO21).
             """)),
-    BaseOverlayBool(
+    setting.OverlayParamBool(
         'audio.enabled', param='audio', doc=_(
             """
             Enables the ALSA audio interface.
             """)),
-    BaseOverlayBool(
+    setting.OverlayParamBool(
         'watchdog.enabled', param='watchdog', doc=_(
             """
             Enables the hardware watchdog.
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'video.cec.enabled', command='hdmi_ignore_cec', default=True, doc=_(
             """
             Enables CEC (control signals) over the HDMI interface, if supported
             by the connected display. Switch off to pretend CEC is not
             supported at all.
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'video.cec.init', command='hdmi_ignore_cec_init', default=True, doc=_(
             """
             When off, prevents the initial "active source" message being sent
             during bootup. This prevents CEC-enabled displays from coming out
             of standby and/or channel-switching when starting the Pi.
             """)),
-    Command(
+    setting.Command(
         'video.cec.name', command='cec_osd_name', default='Raspberry Pi',
         doc=_(
             """
             The name the Pi (as a CEC device) should provide to the connected
             display; defaults to "Raspberry Pi".
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.hdmi.safe', command='hdmi_safe', default=False, doc=_(
             """
             Switch on to attempt "safe mode" settings for maximum HDMI
@@ -114,7 +81,7 @@ _settings = {
             * video.overscan.top = 24
             * video.overscan.bottom = 24
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.hdmi.mode.4kp60', command='hdmi_enable_4kp60', doc=_(
             """
             By default, when connected to a 4K monitor, the Raspberry Pi 4B
@@ -125,7 +92,7 @@ _settings = {
             the running temperature of the Pi. It is not possible to use 60Hz
             rates on both micro-HDMI ports simultaneously.
             """)),
-    CommandEDIDIgnore(
+    setting.CommandEDIDIgnore(
         'video.hdmi.edid.ignore', command='hdmi_ignore_edid', doc=_(
             """
             When on, ignores the display's EDID [1] data; useful when your
@@ -133,7 +100,7 @@ _settings = {
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.hdmi.edid.override', command='hdmi_edid_file', doc=_(
             """
             When on, read EDID [1] data from an 'edid.dat' file, located in the
@@ -144,7 +111,7 @@ _settings = {
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'video.hdmi.edid.parse', command='disable_fw_kms_setup', default=True,
         doc=_(
             """
@@ -160,7 +127,7 @@ _settings = {
             avoid this problem. The Linux video mode system (KMS) will then
             parse the EDID itself and pick an appropriate mode.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.hdmi.edid.contenttype', command='edid_content_type', valid={
             0: 'default',
             1: 'graphics',
@@ -174,7 +141,7 @@ _settings = {
 
             {valid}
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.hdmi.edid.3d', command='hdmi_force_edid_3d', doc=_(
             """
             When on, pretends that all group 1 (CEA) HDMI modes support 3D even
@@ -183,7 +150,7 @@ _settings = {
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.hdmi.powersave', command='hdmi_blanking', doc=_(
             """
             When enabled, if the operating system requests the display enter a
@@ -197,7 +164,7 @@ _settings = {
             Note: this feature has not yet been implemented on the Raspberry Pi
             4.
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'video.overscan.enabled', command='disable_overscan', default=True,
         doc=_(
             """
@@ -206,19 +173,19 @@ _settings = {
             include black borders to align the edges of the output with a
             typical TV display.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.overscan.left', command='overscan_left', doc=_(
             "The width of the left overscan border. Defaults to 0.")),
-    CommandInt(
+    setting.CommandInt(
         'video.overscan.right', command='overscan_right', doc=_(
             "The width of the right overscan border. Defaults to 0.")),
-    CommandInt(
+    setting.CommandInt(
         'video.overscan.top', command='overscan_top', doc=_(
             "The height of the top overscan border. Defaults to 0.")),
-    CommandInt(
+    setting.CommandInt(
         'video.overscan.bottom', command='overscan_bottom', doc=_(
             "The height of the bottom overscan border. Defaults to 0.")),
-    CommandBool(
+    setting.CommandBool(
         'video.overscan.scale', command='overscan_scale', doc=_(
             """
             Switch on to force non-framebuffer layers to conform to the
@@ -230,7 +197,7 @@ _settings = {
             recommended option to avoid images being scaled twice (by the GPU
             and the display).
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.framebuffer.depth', command='framebuffer_depth', default=16,
         valid={
             8:  '8-bit framebuffer; default RGB palette is unreadable',
@@ -245,7 +212,7 @@ _settings = {
 
             {valid}
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'video.framebuffer.alpha', command='framebuffer_ignore_alpha',
         default=True, doc=_(
             """
@@ -253,7 +220,7 @@ _settings = {
             It may be necessary to switch this off when video.framebuffer.depth
             is set to 32 bpp.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.framebuffer.priority', command='framebuffer_priority',
         default=0, valid={
             0: 'Main LCD',
@@ -270,35 +237,35 @@ _settings = {
 
             {valid}
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.framebuffer.width', command='framebuffer_width', default=0,
         doc=_(
             """
             Specifies the width of the console framebuffer in pixels. The
             default is the display width minus the total horizontal overscan.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.framebuffer.width.max', command='max_framebuffer_width',
         default=0, doc=_(
             """
             Specifies the maximum width of the console framebuffer in pixels.
             The default is not to limit the size of the framebuffer.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.framebuffer.height', command='framebuffer_height', default=0,
         doc=_(
             """
             Specifies the height of the console framebuffer in pixels. The
             default is the display height minus the total vertical overscan.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.framebuffer.height.max', command='max_framebuffer_height',
         default=0, doc=_(
             """
             Specifies the maximum height of the console framebuffer in pixels.
             The default is not to limit the size of the framebuffer.
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.tv.enabled', command='enable_tvout', doc=_(
             """
             On the Pi 4, the composite TV output is disabled by default, as
@@ -310,7 +277,7 @@ _settings = {
             models this setting has no effect (composite output is always on
             without performance degradation).
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.tv.mode', command='sdtv_mode', valid={
             0: 'NTSC',
             1: 'NTSC (Japanese)',
@@ -325,7 +292,7 @@ _settings = {
 
             {valid}
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.tv.aspect', command='sdtv_aspect', default=1, valid={
             1: '4:3',
             2: '14:9',
@@ -337,7 +304,7 @@ _settings = {
 
             {valid}
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'video.tv.colorburst', command='sdtv_disable_colourburst',
         default=True, doc=_(
             """
@@ -347,7 +314,7 @@ _settings = {
 
             [1]: https://en.wikipedia.org/wiki/Colorburst
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'video.dsi.enabled', command='ignore_lcd', default=True, doc=_(
             """
             By default, an LCD display attached to the DSI connector is used
@@ -355,7 +322,7 @@ _settings = {
             this detection phase will be skipped and the LCD display will not
             be used.
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.dsi.default', command='display_default_lcd',
         default=True, doc=_(
             """
@@ -365,20 +332,20 @@ _settings = {
             default. The LCD can still be used by choosing its display number
             from supported applications, e.g. omxplayer.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.dsi.framerate', command='lcd_framerate', default=60, doc=_(
             """
             Specifies the framerate of an LCD display connected to the DSI
             port. Defaults to 60Hz.
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'video.dsi.touch.enabled', command='disable_touchscreen', default=True,
         doc=_(
             """
             Enables or disables the touchscreen of the official Raspberry Pi
             LCD display.
             """)),
-    CommandDisplayRotate(
+    setting.CommandDisplayRotate(
         'video.dsi.rotate',
         commands=('display_lcd_rotate', 'display_rotate', 'lcd_rotate'),
         doc=_(
@@ -386,7 +353,7 @@ _settings = {
             Controls the rotation of an LCD display connected to the DSI port.
             Valid values are 0 (the default), 90, 180, or 270.
             """)),
-    CommandDisplayFlip(
+    setting.CommandDisplayFlip(
         'video.dsi.flip',
         commands=('display_lcd_rotate', 'display_rotate', 'lcd_rotate'),
         doc=_(
@@ -396,7 +363,7 @@ _settings = {
 
             {valid}
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.dpi.enabled', command='enable_dpi_lcd', doc=_(
             """
             Enables LCD displays attached to the DPI GPIOs. This is to allow
@@ -405,7 +372,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDisplayGroup(
+    setting.CommandDisplayGroup(
         'video.dpi.group', command='dpi_group', doc=_(
             """
             Defines which list of modes should be consulted for DPI LCD
@@ -419,7 +386,7 @@ _settings = {
             hence overscan is implicitly 0 with these modes. The video.dpi.mode
             setting must be set when this is non-zero.
             """)),
-    CommandDisplayMode(
+    setting.CommandDisplayMode(
         'video.dpi.mode', command='dpi_mode', doc=_(
             """
             Defines which mode will be used for DPI LCD output. This defaults
@@ -446,7 +413,7 @@ _settings = {
             [2]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
             """)),
             # XXX Numbered lists...
-    CommandDisplayTimings(
+    setting.CommandDisplayTimings(
         'video.dpi.timings', command='dpi_timings', doc=_(
             """
             An advanced setting that permits the raw timing values to be
@@ -455,7 +422,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
             """)),
-    CommandDPIOutput(
+    setting.CommandDPIOutput(
         'video.dpi.format', command='dpi_output_format', default=1,
         mask=0xf, valid={
             1: '9-bit RGB666; unsupported',
@@ -465,6 +432,19 @@ _settings = {
             5: '18-bit RGB666; config 1',
             6: '18-bit RGB666; config 2',
             7: '24-bit RGB888',
+        }, siblings={
+            'rgb',
+            'clock',
+            'hsync.disabled',
+            'hsync.polarity',
+            'hsync.phase',
+            'vsync.disabled',
+            'vsync.polarity',
+            'vsync.phase',
+            'output.mode',
+            'output.disabled',
+            'output.polarity',
+            'output.phase',
         }, doc=_(
             """
             Configures which GPIO pins will be used for DPI LCD output, and how
@@ -517,7 +497,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIDummy(
+    setting.CommandDPIDummy(
         'video.dpi.rgb', command='dpi_output_format', default=0,
         mask=0xf0, valid={
             0: 'RGB',
@@ -536,7 +516,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.output.mode', command='dpi_output_format', default=False,
         mask=0x100, doc=_(
             """
@@ -547,7 +527,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.clock', command='dpi_output_format', default=False,
         mask=0x200, doc=_(
             """
@@ -560,7 +540,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.hsync.disabled', command='dpi_output_format', default=False,
         mask=0x1000, doc=_(
             """
@@ -571,7 +551,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.vsync.disabled', command='dpi_output_format', default=False,
         mask=0x2000, doc=_(
             """
@@ -581,7 +561,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.output.disabled', command='dpi_output_format',
         default=False, mask=0x4000, doc=_(
             """
@@ -591,7 +571,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.hsync.polarity', command='dpi_output_format', default=False,
         mask=0x10000, doc=_(
             """
@@ -604,7 +584,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.vsync.polarity', command='dpi_output_format', default=False,
         mask=0x20000, doc=_(
             """
@@ -617,7 +597,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.output.polarity', command='dpi_output_format',
         default=False, mask=0x40000, doc=_(
             """
@@ -630,7 +610,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.hsync.phase', command='dpi_output_format', default=False,
         mask=0x100000, doc=_(
             """
@@ -644,7 +624,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.vsync.phase', command='dpi_output_format', default=False,
         mask=0x200000, doc=_(
             """
@@ -658,7 +638,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandDPIBool(
+    setting.CommandDPIDummy(
         'video.dpi.output.phase', command='dpi_output_format', default=False,
         mask=0x400000, doc=_(
             """
@@ -672,7 +652,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.dispmanx.offline', command='dispmanx_offline', default=False,
         doc=_(
             """
@@ -681,7 +661,7 @@ _settings = {
             composited, but is slower and may limit screen framerate to
             typically 30fps.
             """)),
-    CommandBool(
+    setting.CommandBool(
         'test.enabled', command='test_mode', default=False, doc=_(
             """
             When activated, display a test image and sound during boot (over
@@ -689,7 +669,7 @@ _settings = {
             number of seconds, before continuing to boot the OS as normal. This
             is used as a manufacturing test; the default is off.
             """)),
-    CommandKernelAddress(
+    setting.CommandKernelAddress(
         'boot.kernel.address', commands=('kernel_address', 'kernel_old'),
         default=None, doc=_(
             """
@@ -697,14 +677,14 @@ _settings = {
             kernel (typically Linux). Defaults to 0x80000 when boot.arm.64bit
             is enabled, or 0x8000 otherwise.
             """)),
-    CommandKernel64(
+    setting.CommandKernel64(
         'boot.kernel.64bit', commands=('arm_64bit', 'arm_control'), doc=_(
             """
             Controls whether the bootloader assumes that a 64-bit kernel is to
             be loaded. Note that this setting affects the defaults for
             boot.kernel.filename and boot.kernel.address.
             """)),
-    CommandKernelFilename(
+    setting.CommandKernelFilename(
         'boot.kernel.filename', command='kernel', doc=_(
             """
             Specifies the kernel that the bootloader should load and execute.
@@ -718,20 +698,20 @@ _settings = {
             However, if boot.kernel.64bit is on (only valid on the Pi 2 rev 1.2
             and above), the default is 'kernel8.img'.
             """)),
-    CommandKernelCmdline(
+    setting.CommandKernelCmdline(
         'boot.kernel.cmdline', command='cmdline', default='cmdline.txt', doc=_(
             """
             Specifies the alternative filename on the boot partition from which
             to read the kernel command line string.
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'boot.kernel.atags', command='disable_commandline_tags', default=True,
         doc=_(
             """
             Switch this off to stop the bootloader from filling in ATAGS
             (memory from 0x100) before launching the kernel.
             """)),
-    CommandIntHex(
+    setting.CommandIntHex(
         'boot.devicetree.address', command='device_tree_address', default=0,
         doc=_(
             """
@@ -739,14 +719,14 @@ _settings = {
             tree (not dt-blob). By default the firmware will choose a suitable
             place.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'boot.devicetree.limit', command='device_tree_end', doc=_(
             """
             Sets an (exclusive) limit to the loaded device tree. By default the
             device tree can grow to the end of usable memory, which is almost
             certainly what is required.
             """)),
-    CommandDeviceTree(
+    setting.CommandDeviceTree(
         'boot.devicetree.filename', command='device_tree', default='', doc=_(
             """
             Specifies the particular device tree that the bootloader should
@@ -756,14 +736,14 @@ _settings = {
             tree for the platform that it is running on (it is unusual to
             require a specific device tree).
             """)),
-    CommandRamFSAddress(
+    setting.CommandRamFSAddress(
         'boot.initramfs.address', commands=('ramfsaddr', 'initramfs'), doc=_(
             """
             The address at which the bootloader should place the initramfs. By
             default this is 0, which causes the bootloader to place the
             initramfs immediately after the kernel in memory.
             """)),
-    CommandRamFSFilename(
+    setting.CommandRamFSFilename(
         'boot.initramfs.filename', commands=('ramfsfile', 'initramfs'),
         default='', doc=_(
             """
@@ -777,7 +757,7 @@ _settings = {
             Note: the bootloader has a strict line-length of 80 characters. If
             many ramfs files are specified, it's possible to exceed this limit.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'boot.delay.1', command='bootcode_delay', default=0, doc=_(
             """
             Specifies the number of seconds to delay during "bootcode.bin"
@@ -791,7 +771,7 @@ _settings = {
             initial boot, but is correct if you soft-reboot the Pi without
             removing power from the monitor.
             """)),
-    CommandBootDelay2(
+    setting.CommandBootDelay2(
         'boot.delay.2', commands=('boot_delay', 'boot_delay_ms'), default=0,
         doc=_(
             """
@@ -801,13 +781,13 @@ _settings = {
             This can be useful if your SD card needs a while to get ready
             before Linux is able to boot from it.
             """)),
-    CommandBoolInv(
+    setting.CommandBoolInv(
         'boot.splash.enabled', command='disable_splash', default=True, doc=_(
             """
             If this is switched off, the rainbow splash screen will not be
             shown on boot.
             """)),
-    CommandSerialEnabled(
+    setting.CommandSerialEnabled(
         # TODO: Fix setting refs
         'serial.enabled', command='enable_uart', doc=_(
             """
@@ -827,12 +807,12 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/configuration/uart.md
             """)),
-    CommandInt(
+    setting.CommandInt(
         'serial.baud', command='init_uart_baud', default=115200, doc=_(
             """
             Sets the initial baud rate for the primary UART.
             """)),
-    CommandInt(
+    setting.CommandInt(
         'serial.clock', command='init_uart_clock', default=48000000, doc=_(
             """
             Sets the initial UART clock frequency.
@@ -843,7 +823,7 @@ _settings = {
             Pi Zero is UART1 (the mini-UART, or ttyS0 in Linux), and its clock
             is the core VPU clock: at least 250MHz.
             """)),
-    OverlaySerialUART(
+    setting.OverlaySerialUART(
         'serial.uart', doc=_(
             """
             Controls whether the primary UART is UART1 (the mini-UART, or ttyS0
@@ -859,7 +839,7 @@ _settings = {
 
             [1]: https://www.raspberrypi.org/documentation/configuration/uart.md
             """)),
-    OverlayBluetoothEnabled(
+    setting.OverlayBluetoothEnabled(
         'bluetooth.enabled', doc=_(
             """
             Controls whether the Bluetooth module (Raspberry Pi 3 and laster,
@@ -868,28 +848,43 @@ _settings = {
             Note that disabling the module can affect the default state of
             serial.enabled and serial.uart.
             """)),
-    CommandBool(
+    setting.CommandBool(
         'cpu.gic.enabled', command='enable_gic', default=True, doc=_(
             """
             On the Raspberry Pi 4B, if this setting is switched off then
             interrupts will be routed to the ARM cores using the legacy
             interrupt controller, rather than via the GIC-400.
             """)),
-    CommandCPUFreqMax(
+    setting.CommandCPUFreqMax(
         'cpu.frequency.max', command='arm_freq', doc=_(
             """
             The maximum frequency of the ARM CPU in MHz.
             """)),
-    CommandCPUFreqMin(
+    setting.CommandCPUFreqMin(
         'cpu.frequency.min', command='arm_freq_min', doc=_(
             """
             The minimum value of cpu.frequency.max used for dynamic frequency
             clocking.
             """)),
+    setting.CommandBool(
+        'cpu.turbo.force', command='force_turbo', default=False, doc=_(
+            """
+            Forces turbo mode frequencies even when the ARM cores are not busy.
+            Enabling this may set the warranty bit if certain overvolt.*
+            settings are also set.
+            """)),
+    setting.CommandInt(
+        'cpu.turbo.initial', command='initial_turbo', default=0, doc=_(
+            """
+            Enables turbo mode from boot for the given number of seconds, or
+            until cpufreq sets a frequency. For more information see [1]. The
+            maximum value is 60 seconds.
+
+            [1]: 
 }
 
-_settings |= {setting for hdmi in (0, 1) for setting in (
-    CommandForceIgnore(
+SETTINGS |= {spec for hdmi in (0, 1) for spec in (
+    setting.CommandForceIgnore(
         'video.hdmi{}.enabled'.format(hdmi), index=hdmi,
         force='hdmi_force_hotplug', ignore='hdmi_ignore_hotplug', doc=_(
             """
@@ -898,7 +893,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
             off to force composite TV output even if an HDMI display is
             detected (ignores the HDMI hotplug signal).
             """)),
-    CommandForceIgnore(
+    setting.CommandForceIgnore(
         'video.hdmi{}.audio'.format(hdmi), index=hdmi,
         force='hdmi_force_edid_audio', ignore='hdmi_ignore_edid_audio', doc=_(
             """
@@ -909,7 +904,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
-    Command(
+    setting.Command(
         'video.hdmi{}.edid.filename'.format(hdmi), index=hdmi,
         default='edid.dat', command='hdmi_edid_filename', doc=_(
             """
@@ -919,7 +914,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
-    CommandHDMIBoost(
+    setting.CommandHDMIBoost(
         'video.hdmi{}.boost'.format(hdmi), index=hdmi,
         command='config_hdmi_boost', default=5, doc=_(
             """
@@ -931,7 +926,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
 
             This option is ignored on the Raspberry Pi 4.
             """)),
-    CommandDisplayGroup(
+    setting.CommandDisplayGroup(
         'video.hdmi{}.group'.format(hdmi), index=hdmi, command='hdmi_group',
         doc=_(
             """
@@ -946,7 +941,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
             hence overscan is implicitly 0 with these modes. The
             video.hdmi{index}.mode setting must be set when this is non-zero.
             """)),
-    CommandDisplayMode(
+    setting.CommandDisplayMode(
         'video.hdmi{}.mode'.format(hdmi), index=hdmi, command='hdmi_mode',
         doc=_(
             """
@@ -974,7 +969,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
             [2]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
             """)),
             # XXX Numbered lists...
-    CommandInt(
+    setting.CommandInt(
         'video.hdmi{}.encoding'.format(hdmi), index=hdmi,
         command='hdmi_pixel_encoding', valid={
             0: 'auto; 1 for CEA, 2 for DMT',
@@ -990,14 +985,14 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
 
             {valid}
             """)),
-    CommandDisplayRotate(
+    setting.CommandDisplayRotate(
         'video.hdmi{}.rotate'.format(hdmi), index=hdmi,
         commands=('display_hdmi_rotate', 'display_rotate'), doc=_(
             """
             Controls the rotation of the HDMI output. Valid values are 0 (the
             default), 90, 180, or 270.
             """)),
-    CommandDisplayFlip(
+    setting.CommandDisplayFlip(
         'video.hdmi{}.flip'.format(hdmi), index=hdmi,
         commands=('display_hdmi_rotate', 'display_rotate'), doc=_(
             """
@@ -1006,7 +1001,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
 
             {valid}
             """)),
-    CommandBool(
+    setting.CommandBool(
         'video.hdmi{}.mode.force'.format(hdmi), index=hdmi,
         command='hdmi_force_mode', doc=_(
             """
@@ -1015,7 +1010,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
             enumerated list of modes. This may help if a display seems to be
             ignoring these settings.
             """)),
-    CommandDisplayTimings(
+    setting.CommandDisplayTimings(
         'video.hdmi{}.timings'.format(hdmi), index=hdmi, command='hdmi_timings',
         doc=_(
             """
@@ -1025,7 +1020,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
 
             [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
             """)),
-    CommandInt(
+    setting.CommandInt(
         'video.hdmi{}.drive'.format(hdmi), index=hdmi, command='hdmi_drive',
         valid={
             0: 'auto',
@@ -1042,83 +1037,7 @@ _settings |= {setting for hdmi in (0, 1) for setting in (
         )),
 )}
 
-
-class Missing:
-    def __repr__(self):
-        return 'Missing'
-Missing = Missing()
-
-
-class Settings:
-    def __init__(self):
-        # NOTE: This is hacky, but there's also no need to expose the ability
-        # to set the owning "settings" on a setting object; it should only
-        # ever be set by construction of a set of settings, or by copying an
-        # existing set of settings
-        self._settings = {
-            setting.name: setting
-            for setting in copy.deepcopy(_settings)
-        }
-        for setting in self._settings.values():
-            setting._settings = ref(self)
-
-    def __len__(self):
-        return len(self._settings)
-
-    def __iter__(self):
-        return iter(sorted(
-            self._settings.values(), key=attrgetter('key')
-        ))
-
-    def __contains__(self, key):
-        return key in self._settings
-
-    def __getitem__(self, key):
-        return self._settings[key]
-
-    def copy(self):
-        new = copy.deepcopy(self)
-        for setting in new:
-            setting._settings = ref(new)
-        return new
-
-    def diff(self, other):
-        """
-        Returns a set of (self, other) setting tuples for all settings that
-        differ between *self* and *other* (another :class:`Settings` instance).
-        If a particular setting is missing from either side, its entry will be
-        given as :data:`Missing`.
-        """
-        return {
-            (setting, other[setting.name]
-                      if setting.name in other else
-                      Missing)
-            for setting in self
-            if setting.name not in other or
-            other[setting.name].value != setting.value
-        } | {
-            (Missing, setting)
-            for setting in other
-            if setting.name not in self
-        }
-
-    def extract(self, config):
-        for setting in self:
-            setting.extract(config)
-
-    def validate(self):
-        for setting in self:
-            setting.validate()
-
-    def output(self):
-        output = """\
-# This file is intended to contain system-made configuration changes. User
-# configuration changes should be placed in "usercfg.txt". Please refer to the
-# README file for a description of the various configuration files on the boot
-# partition.
-
-""".splitlines()
-        for setting in self:
-            for line in setting.output():
-                output.append(line)
-        return '\n'.join(output)
+SETTINGS = OrderedDict(
+    (spec.name, spec)
+    for spec in sorted(SETTINGS, key=attrgetter('key'))
+)
