@@ -1397,3 +1397,74 @@ class CommandCPUFreqMin(CommandInt):
             return 600
         else:
             return 0
+
+
+class CommandCoreFreqMax(CommandInt):
+    """
+    Handles the ``core_freq`` command.
+    """
+    @property
+    def default(self):
+        board_types = get_board_types()
+        if {'pi1', 'pi2'} & board_types:
+            return 250
+        elif {'pi0', 'pi3'} & board_types:
+            return 400
+        elif 'pi4' in board_types:
+            return 500
+        else:
+            return 0
+
+    # TODO output gpu_freq when core/h264/isp/v3d_freq are equal
+
+
+class CommandCoreFreqMin(CommandInt):
+    """
+    Handles the ``core_freq_min`` command.
+    """
+    @property
+    def default(self):
+        board_types = get_board_types()
+        if (
+                ('pi4' in board_types) and
+                self._value(settings, 'video.hdmi.mode.4kp60', default=True)):
+            return 275
+        elif board_types:
+            return 250
+        else:
+            return 0
+
+
+class CommandGPUFreqMax(CommandInt):
+    """
+    Handles the ``h264_freq``, ``isp_freq``, and ``v3d_freq`` commands.
+    """
+    @property
+    def default(self):
+        board_types = get_board_types()
+        if {'pi1', 'pi2'} & board_types:
+            return 250
+        elif {'pi0', 'pi3'} & board_types:
+            return 300
+        elif 'pi4' in board_types:
+            return 500
+        else:
+            return 0
+
+    # TODO output nothing when core/h264/isp/v3d_freq are equal
+
+
+class CommandGPUFreqMin(CommandInt):
+    """
+    Handles the ``h264_freq_min``, ``isp_freq_min``, and ``v3d_freq_min``
+    commands.
+    """
+    @property
+    def default(self):
+        board_types = get_board_types()
+        if 'pi4' in board_types:
+            return 500
+        elif board_types:
+            return 250
+        else:
+            return 0

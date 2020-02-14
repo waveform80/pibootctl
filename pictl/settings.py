@@ -855,17 +855,6 @@ SETTINGS = {
             interrupts will be routed to the ARM cores using the legacy
             interrupt controller, rather than via the GIC-400.
             """)),
-    setting.CommandCPUFreqMax(
-        'cpu.frequency.max', command='arm_freq', doc=_(
-            """
-            The maximum frequency of the ARM CPU in MHz.
-            """)),
-    setting.CommandCPUFreqMin(
-        'cpu.frequency.min', command='arm_freq_min', doc=_(
-            """
-            The minimum value of cpu.frequency.max used for dynamic frequency
-            clocking.
-            """)),
     setting.CommandBool(
         'cpu.turbo.force', command='force_turbo', default=False, doc=_(
             """
@@ -880,7 +869,90 @@ SETTINGS = {
             until cpufreq sets a frequency. For more information see [1]. The
             maximum value is 60 seconds.
 
-            [1]: 
+            [1]: https://www.raspberrypi.org/forums/viewtopic.php?f=29&t=6201&start=425#p180099
+            """)),
+    setting.CommandCPUFreqMax(
+        'cpu.frequency.max', command='arm_freq', doc=_(
+            """
+            The maximum frequency of the ARM CPU in MHz.
+
+            The default value is 1000 for Pi Zero and Pi Zero W, 700 for Pi 1,
+            900 for Pi 2, 1200 for Pi 3, 1400 for Pi 3A+/3B+, 1500 for Pi 4B.
+            """)),
+    setting.CommandCPUFreqMin(
+        'cpu.frequency.min', command='arm_freq_min', doc=_(
+            """
+            The minimum value of cpu.frequency.max used for dynamic frequency
+            clocking.
+            """)),
+    setting.CommandCoreFreqMax(
+        'gpu.frequency.core.max', commands=('core_freq', 'gpu_freq'), doc=_(
+            """
+            Frequency of the GPU processor core in MHz. Influences CPU
+            performance because it drives the L2 cache and memory bus.
+
+            The default value is 250 for Pi 1 / Pi 2, and 400 for Pi 3 / Pi
+            Zero / Pi Zero W. For Pi 4B the default value is 500; 600 is the
+            only other accepted value; the L2 cache benefits only Pi Zero / Pi
+            Zero W / Pi 1, there is a small benefit for SDRAM on Pi 2 / Pi 3
+            and Pi 4B.
+            """)),
+    setting.CommandCoreFreqMin(
+        'gpu.frequency.core.min', commands=('core_freq_min', 'gpu_freq_min'),
+        doc=_(
+            """
+            Minimum value of gpu.frequency.core.max used for dynamic frequency
+            clocking. The default value is 250. On Pi 4B the default is 275
+            when video.hdmi.mode.4kp60 is on.
+            """)),
+    setting.CommandGPUFreqMax(
+        'gpu.frequency.h264.max', commands=('h264_freq', 'gpu_freq'), doc=_(
+            """
+            Frequency of the GPU's hardware video block in MHz.
+
+            The default value is 250 for Pi 1 / Pi 2, and 300 for Pi 3 / Pi
+            Zero / Pi Zero W. For Pi 4B the default value is 500; 600 is the
+            only other accepted value.
+            """)),
+    setting.CommandGPUFreqMin(
+        'gpu.frequency.h264.min', commands=('h264_freq_min', 'gpu_freq_min'),
+        doc=_(
+            """
+            Minimum value of gpu.frequency.h264.max used for dynamic frequency
+            clocking. The default value is 250, or 500 on Pi 4B.
+            """)),
+    setting.CommandGPUFreqMax(
+        'gpu.frequency.isp.max', commands=('isp_freq', 'gpu_freq'), doc=_(
+            """
+            Frequency of the GPU's image sensor pipeline block in MHz.
+
+            The default value is 250 for Pi 1 / Pi 2, and 300 for Pi 3 / Pi
+            Zero / Pi Zero W. For Pi 4B the default value is 500; 600 is the
+            only other accepted value.
+            """)),
+    setting.CommandGPUFreqMin(
+        'gpu.frequency.isp.min', commands=('isp_freq_min', 'gpu_freq_min'),
+        doc=_(
+            """
+            Minimum value of gpu.frequency.isp.max used for dynamic frequency
+            clocking. The default value is 250, or 500 on Pi 4B.
+            """)),
+    setting.CommandGPUFreqMax(
+        'gpu.frequency.v3d.max', commands=('v3d_freq', 'gpu_freq'), doc=_(
+            """
+            Frequency of the GPU's 3D block in MHz.
+
+            The default value is 250 for Pi 1 / Pi 2, and 300 for Pi 3 / Pi
+            Zero / Pi Zero W. For Pi 4B the default value is 500; 600 is the
+            only other accepted value.
+            """)),
+    setting.CommandGPUFreqMin(
+        'gpu.frequency.v3d.min', commands=('v3d_freq_min', 'gpu_freq_min'),
+        doc=_(
+            """
+            Minimum value of gpu.frequency.v3d.max used for dynamic frequency
+            clocking. The default value is 250, or 500 on Pi 4B.
+            """)),
 }
 
 SETTINGS |= {spec for hdmi in (0, 1) for spec in (
