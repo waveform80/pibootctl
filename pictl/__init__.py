@@ -293,11 +293,7 @@ def do_set(args):
             settings[name] = UserStr(value)
     else:
         settings = args.load_settings()
-    for name, value in settings.items():
-        try:
-            updated[name].update(value)
-        except KeyError:
-            raise ValueError(_('unknown setting: {}').format(name))
+    updated.update(settings)
     updated.validate()
     backup_if_needed(args, parser)
     with io.open(str(args.boot_path / args.config_write),

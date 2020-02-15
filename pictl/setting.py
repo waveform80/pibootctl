@@ -351,14 +351,36 @@ class Setting:
         finally:
             self._value = old_value
 
-    def _sibling(self, suffix):
+    def _relative(self, path):
         """
-        Internal method which returns the name of the setting with the same
-        prefix as this setting, but for the final part which is replaced with
-        *suffix*.
+        Internal method which returns the name of this setting with a suffix
+        replaced by *path*.
+
+        The number of leading dot-characters in *path* dictate how many
+        dot-separated components of this setting's name are removed before
+        appending the remainder of *path*. For example:
+
+            >>> s.name
+            'foo.bar'
+            >>> s._relative('baz')
+            'foo.bar.baz'
+            >>> s._relative('.baz')
+            'foo.baz'
+            >>> s._relative('.baz.quux')
+            'foo.baz.quux'
+            >>> s._relative('..baz.quux')
+            'baz.quux'
+
+        In other words, a *path* with no dot-prefix returns children of the
+        current setting, a *path* with a single dot-prefix returns siblings of
+        the current setting, and so on.
         """
-        # TODO Enhance this into something like _relative
-        return '.'.join(self.name.split('.')[:-1] + [suffix])
+        parts = self.name.split('.')
+        while path[:1] == '.':
+            del parts[-1]
+            path = path[1:]
+        path = path.split('.')
+        return '.'.join(parts + path)
 
 
 class Overlay(Setting):
@@ -698,7 +720,7 @@ class CommandMaskMaster(CommandInt):
     """
     Represents an integer bit-mask setting as several settings. The "master"
     setting is the only one that produces any output. It defines the suffixes
-    of its *siblings* (instances of :class:`CommandMaskDummy` which parse the
+    of its *dummies* (instances of :class:`CommandMaskDummy` which parse the
     same setting but produce no output of their own).
 
     The *mask* specifies the integer bit-mask to be applied to the underlying
@@ -707,7 +729,7 @@ class CommandMaskMaster(CommandInt):
     integers.
     """
     def __init__(self, name, *, mask, command=None, commands=None, default=0,
-                 doc='', index=0, valid=None, siblings=()):
+                 doc='', index=0, valid=None, dummies=()):
         assert mask
         super().__init__(name, command=command, commands=commands,
                          default=default, doc=doc, index=index, valid=valid)
@@ -715,7 +737,7 @@ class CommandMaskMaster(CommandInt):
         self._shift = (mask & -mask).bit_length() - 1  # ffs(3)
         self._bool = (mask >> self._shift) == 1
         self._names = (self.name,) + tuple(
-            self._sibling(name) for name in siblings)
+            self._relative(name) for name in dummies)
 
     def extract(self, config):
         for item, value in super().extract(config):
@@ -935,10 +957,10 @@ class CommandDisplayMode(CommandInt):
             0: 'auto from EDID',
             1: self._valid_cea.get(self.value, '?'),
             2: self._valid_dmt.get(self.value, '?'),
-        }.get(self.settings[self._sibling('group')].value, '?')
+        }.get(self.settings[self._relative('.group')].value, '?')
 
     def validate(self):
-        group = self.settings[self._sibling('group')]
+        group = self.settings[self._relative('.group')]
         min_, max_ = {
             0: (0, 0),
             1: (1, 59),
@@ -1020,7 +1042,7 @@ class CommandDisplayRotate(CommandInt):
             ).format(self=self))
 
     def output(self):
-        flip = self.settings[self._sibling('flip')]
+        flip = self.settings[self._relative('.flip')]
         if self.modified or flip.modified:
             value = (self.value // 90) | (flip.value << 16)
             if 'lcd_rotate' in self.commands:
@@ -1068,7 +1090,7 @@ class CommandDPIOutput(CommandMaskMaster):
     Represents the format portion of ``dpi_output_format``.
     """
     def output(self):
-        if self.settings[self._sibling('enabled')].value:
+        if self.settings[self._relative('.enabled')].value:
             # For the DPI LCD display, always output dpi_output_format when
             # enable_dpi_lcd is set (and conversely, don't output it when not
             # set)
@@ -1162,7 +1184,7 @@ class CommandKernelAddress(CommandIntHex):
     """
     @property
     def default(self):
-        if self.settings[self._sibling('64bit')].value:
+        if self.settings[self._relative('.64bit')].value:
             return 0x80000
         else:
             return 0x8000
@@ -1198,7 +1220,7 @@ class CommandKernelFilename(Command):
     # TODO os_prefix integration
     @property
     def default(self):
-        if self.settings[self._sibling('64bit')].value:
+        if self.settings[self._relative('.64bit')].value:
             return 'kernel8.img'
         else:
             board_types = get_board_types()
@@ -1415,7 +1437,18 @@ class CommandCoreFreqMax(CommandInt):
         else:
             return 0
 
-    # TODO output gpu_freq when core/h264/isp/v3d_freq are equal
+    def output(self):
+        blocks = [self] + [
+            self.settings[self._relative(
+                '...{block}.frequency.max'.format(block=block)
+            )]
+            for block in ('h264', 'isp', 'v3d')
+        ]
+        if any(block.modified for block in blocks):
+            if all(self.value == block.value for block in blocks):
+                yield 'gpu_freq={value}'.format(value=self.value)
+            else:
+                yield from super().output()
 
 
 class CommandCoreFreqMin(CommandInt):
@@ -1434,6 +1467,19 @@ class CommandCoreFreqMin(CommandInt):
         else:
             return 0
 
+    def output(self):
+        blocks = [self] + [
+            self.settings[self._relative(
+                '...{block}.frequency.max'.format(block=block)
+            )]
+            for block in ('h264', 'isp', 'v3d')
+        ]
+        if any(block.modified for block in blocks):
+            if all(self.value == block.value for block in blocks):
+                yield 'gpu_freq_min={value}'.format(value=self.value)
+            else:
+                yield from super().output()
+
 
 class CommandGPUFreqMax(CommandInt):
     """
@@ -1451,7 +1497,19 @@ class CommandGPUFreqMax(CommandInt):
         else:
             return 0
 
-    # TODO output nothing when core/h264/isp/v3d_freq are equal
+    def output(self):
+        blocks = [self] + [
+            self.settings[self._relative(
+                '...{block}.frequency.max'.format(block=block)
+            )]
+            for block in ('h264', 'isp', 'v3d')
+        ]
+        if any(block.modified for block in blocks):
+            if all(self.value == block.value for block in blocks):
+                # Handled by gpu.core.frequency.max in this case
+                pass
+            else:
+                yield from super().output()
 
 
 class CommandGPUFreqMin(CommandInt):
@@ -1468,3 +1526,17 @@ class CommandGPUFreqMin(CommandInt):
             return 250
         else:
             return 0
+
+    def output(self):
+        blocks = [self] + [
+            self.settings[self._relative(
+                '...{block}.frequency.max'.format(block=block)
+            )]
+            for block in ('h264', 'isp', 'v3d')
+        ]
+        if any(block.modified for block in blocks):
+            if all(self.value == block.value for block in blocks):
+                # Handled by gpu.core.frequency.min in this case
+                pass
+            else:
+                yield from super().output()
