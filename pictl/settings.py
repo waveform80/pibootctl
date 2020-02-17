@@ -662,7 +662,7 @@ SETTINGS = {
             typically 30fps.
             """)),
     setting.CommandBool(
-        'test.enabled', command='test_mode', default=False, doc=_(
+        'boot.test.enabled', command='test_mode', default=False, doc=_(
             """
             When activated, display a test image and sound during boot (over
             the composite video and analog audio outputs only) for a given
@@ -699,6 +699,7 @@ SETTINGS = {
             and above), the default is 'kernel8.img'.
             """)),
     setting.CommandKernelCmdline(
+        # TODO What about cmdline content?
         'boot.kernel.cmdline', command='cmdline', default='cmdline.txt', doc=_(
             """
             Specifies the alternative filename on the boot partition from which
@@ -735,6 +736,67 @@ SETTINGS = {
             The default is for the bootloader to automatically select a device
             tree for the platform that it is running on (it is unusual to
             require a specific device tree).
+            """)),
+    setting.CommandFirmwareCamera(
+        'camera.enabled', commands=('start_x', 'start_file', 'fixup_file'),
+        doc=_(
+            """
+            Enables loading the Pi camera module firmware. This implies that
+            start_x.elf (or start4x.elf) will be loaded as the GPU firmware
+            rather than the default start.elf (and the corresponding fixup
+            file).
+
+            Note: with the camera firmware loaded, gpu.mem must be 64Mb or
+            larger (128Mb is recommended for most purposes; 256Mb may be
+            required for complex processing pipelines).
+            """)),
+    setting.CommandFirmwareDebug(
+        'boot.firmware.debug',
+        commands=('start_debug', 'start_file', 'fixup_file'), doc=_(
+            """
+            Enables loading the debugging firmware. This implies that
+            start_db.elf will be loaded as the GPU firmware rather than the
+            default start.elf. Note that, unlike the camera firmware, there is
+            no special handling for the Pi 4 (i.e. setting this will not
+            implicitly load start4db.elf on the Pi 4). On the Pi 4, you must
+            specify boot.firmware.filename (and boot.firmware.fixup) manually.
+
+            The debugging firmware performs considerably more logging than the
+            default firmware but at a performance cost, ergo it should only be
+            used when required.
+            """)),
+    setting.CommandFirmwareFilename(
+        'boot.firmware.filename',
+        commands=('start_file', 'start_x', 'start_debug'), doc=_(
+            """
+            The filename of the GPU firmware that the bootloader should load
+            The GPU firmware is also the tertiary bootloader which is
+            responsible for launching the kernel (specified by
+            boot.kernel.filename).
+
+            Usually there is no need to modify this setting directly; if you
+            require the camera firmware simply set camera.enabled. However, if
+            you require the specialized debugging (start_db.elf) or lightweight
+            (start_cd.elf) firmwares you may need to specify them manually
+            here, especially on the Pi 4 where there's no special handling of
+            the commands usually used to activate these firmwares.
+
+            Please note that if you manually specify a GPU firmware, you should
+            also manually specify an appropriate boot.firmware.fixup file.
+            """)),
+    setting.CommandFirmwareFixup(
+        'boot.firmware.fixup',
+        commands=('fixup_file', 'start_x', 'start_debug'), doc=_(
+            """
+            The filename of the fixup file for the GPU firmware specified in
+            boot.firmware.filename.
+
+            Usually there is no need to modify this setting directly; if you
+            require the camera firmware simply set camera.enabled. However, if
+            you require the specialized debugging (start_db.elf) or lightweight
+            (start_cd.elf) firmwares you may need to specify them manually
+            here, especially on the Pi 4 where there's no special handling of
+            the commands usually used to activate these firmwares.
             """)),
     setting.CommandRamFSAddress(
         'boot.initramfs.address', commands=('ramfsaddr', 'initramfs'), doc=_(

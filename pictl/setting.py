@@ -1240,6 +1240,166 @@ class CommandKernelCmdline(Command):
     # TODO modification/tracking of external file
 
 
+class CommandFirmwareCamera(CommandBool):
+    """
+    Handles the ``start_x`` setting.
+    """
+    def extract(self, config):
+        if 'pi4' in get_board_types():
+            camera_start_file = 'start4x.elf'
+            camera_fixup_file = 'fixup4x.dat'
+            start_file = 'start4.elf'
+            fixup_file = 'fixup4.dat'
+        else:
+            camera_start_file = 'start_x.elf'
+            camera_fixup_file = 'fixup_x.dat'
+            start_file = 'start.elf'
+            fixup_file = 'fixup.dat'
+        for item in config:
+            if isinstance(item, BootCommand):
+                if item.command == 'start_x':
+                    if to_int(item.params):
+                        start_file = camera_start_file
+                        fixup_file = camera_fixup_file
+                        yield item, True
+                    else:
+                        # XXX What does start_x=0 do?!
+                        yield item, False
+                elif item.command == 'start_file':
+                    start_file = item.params
+                    yield item, (
+                        start_file == camera_start_file and
+                        fixup_file == camera_fixup_file)
+                elif item.command == 'fixup_file':
+                    fixup_file = item.params
+                    yield item, (
+                        start_file == camera_start_file and
+                        fixup_file == camera_fixup_file)
+
+    def validate(self):
+        # TODO validate gpu_mem setting
+        pass
+
+
+class CommandFirmwareDebug(CommandBool):
+    """
+    Handles the ``start_debug`` setting.
+    """
+    def extract(self, config):
+        if 'pi4' in get_board_types():
+            debug_start_file = 'start4db.elf'
+            debug_fixup_file = 'fixup4db.dat'
+            start_file = 'start4.elf'
+            fixup_file = 'fixup4.dat'
+        else:
+            debug_start_file = 'start_db.elf'
+            debug_fixup_file = 'fixup_db.dat'
+            start_file = 'start.elf'
+            fixup_file = 'fixup.dat'
+        for item in config:
+            if isinstance(item, BootCommand):
+                if item.command == 'start_debug':
+                    if to_int(item.params):
+                        # NOTE: According to the docs there is no special
+                        # handling for the pi4, hence the hard-coded names here
+                        start_file = 'start_db.elf'
+                        fixup_file = 'fixup_db.elf'
+                        yield item, True
+                    else:
+                        # XXX What does start_debug=0 do?!
+                        yield item, False
+                elif item.command == 'start_file':
+                    start_file = item.params
+                    yield item, (
+                        start_file == debug_start_file and
+                        fixup_file == debug_fixup_file)
+                elif item.command == 'fixup_file':
+                    fixup_file = item.params
+                    yield item, (
+                        start_file == debug_start_file and
+                        fixup_file == debug_fixup_file)
+
+
+class CommandFirmwareFilename(Command):
+    """
+    Handles the ``start_file`` setting.
+    """
+    # TODO os_prefix integration
+    @property
+    def default(self):
+        return {
+            False: 'start.elf',
+            True:  'start4.elf',
+        }['pi4' in get_board_types()]
+
+    def extract(self, config):
+        value, cam_default = {
+            False: ('start.elf', 'start_x.elf'),
+            True:  ('start4.elf', 'start4x.elf'),
+        }['pi4' in get_board_types()]
+        for item in config:
+            if isinstance(item, BootCommand):
+                if item.command == 'start_x':
+                    if to_int(item.params):
+                        value = cam_default
+                    else:
+                        # XXX What does start_x=0 do?!
+                        pass
+                    yield item, value
+                elif item.command == 'start_debug':
+                    if to_int(item.params):
+                        # NOTE: According to the docs there is no special
+                        # handling for the pi4, hence the hard-coded name here
+                        value = 'start_db.elf'
+                    else:
+                        # XXX What does start_debug=0 do?!
+                        pass
+                    yield item, value
+                elif item.command == 'start_file':
+                    value = item.params
+                    yield item, value
+
+
+class CommandFirmwareFixup(Command):
+    """
+    Handles the ``start_file`` setting.
+    """
+    # TODO os_prefix integration
+    @property
+    def default(self):
+        return {
+            False: 'fixup.dat',
+            True:  'fixup4.dat',
+        }['pi4' in get_board_types()]
+
+    def extract(self, config):
+        value, cam_default = {
+            False: ('fixup.dat', 'fixup_x.dat'),
+            True:  ('fixup4.dat', 'fixup4x.dat'),
+        }['pi4' in get_board_types()]
+        for item in config:
+            if isinstance(item, BootCommand):
+                if item.command == 'start_x':
+                    if to_int(item.params):
+                        value = cam_default
+                    else:
+                        # XXX What does fixup_x=0 do?!
+                        pass
+                    yield item, value
+                elif item.command == 'start_debug':
+                    if to_int(item.params):
+                        # NOTE: According to the docs there is no special
+                        # handling for the pi4, hence the hard-coded name here
+                        value = 'fixup_db.dat'
+                    else:
+                        # XXX What does fixup_debug=0 do?!
+                        pass
+                    yield item, value
+                elif item.command == 'fixup_file':
+                    value = item.params
+                    yield item, value
+
+
 class CommandDeviceTree(Command):
     """
     Handles the ``device_tree`` command.
