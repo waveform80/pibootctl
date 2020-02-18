@@ -46,17 +46,21 @@ def permission_error(exc_type, exc_value, exc_tb):
 def get_parser():
     config = configparser.ConfigParser(
         defaults={
-            'boot_path':    '/boot',
-            'store_path':   '/boot/pictl',
-            'config_read':  'config.txt',
-            'config_write': 'config.txt',
-            'backup':       'on',
+            'boot_path':             '/boot',
+            'store_path':            '/boot/pictl',
+            'config_read':           'config.txt',
+            'config_write':          'config.txt',
+            'backup':                'on',
+            'package_name':          'pictl',
+            'reboot_required':       '/var/run/reboot-required',
+            'reboot_required_pkgs':  '/var/run/reboot-required.pkgs',
         },
         default_section='defaults',
         interpolation=None)
     config.read(
         ['/etc/pictl.conf', os.path.expanduser('~/.config/pictl/pictl.conf')],
         encoding='ascii')
+    section = config['defaults']
 
     parser = argparse.ArgumentParser(
         description=_(
@@ -66,29 +70,33 @@ def get_parser():
         '--version', action='version', version='0.1')
     parser.add_argument(
         '-B', '--boot-path', metavar='DIR', type=Path,
-        default=config.get('defaults', 'boot_path'),
+        default=section['boot_path'],
         help=_(
             "The path on which the boot partition is mounted. Defaults to "
             "%(default)r."))
     parser.add_argument(
         '-r', '--config-read', metavar='FILE',
-        default=config.get('defaults', 'config_read'),
+        default=section['config_read'],
         help=_(
             "The name of the config.txt file read by the bootloader, relative "
             "to --boot-path. Defaults to %(default)r."))
     parser.add_argument(
         '-w', '--config-write', metavar='FILE',
-        default=config.get('defaults', 'config_write'),
+        default=section['config_write'],
         help=_(
             "The name of the config.txt file written by this tool, relative "
             "to --boot-path. Defaults to %(default)r."))
     parser.add_argument(
         '-s', '--store-path', metavar='DIR', type=Path,
-        default=config.get('defaults', 'store_path'),
+        default=section['store_path'],
         help=_(
             "The path in which to store saved boot configurations. Defaults "
             "to %(default)r."))
-    parser.set_defaults(func=do_help)
+    parser.set_defaults(
+        func=do_help,
+        package_name=section['package_name'],
+        reboot_required=section['reboot_required'],
+        reboot_required_pkgs=section['reboot_required_pkgs'])
     commands = parser.add_subparsers(title=_("commands"))
 
     help_cmd = commands.add_parser(
@@ -141,7 +149,7 @@ def get_parser():
         "set_vars", nargs="*", metavar="name=value", default=[],
         help=_("Specify one or more settings to change on the command line"))
     set_cmd.set_defaults(func=do_set,
-                         backup=config.getboolean('defaults', 'backup'))
+                         backup=section.getboolean('backup'))
 
     save_cmd = commands.add_parser(
         "save",
@@ -167,7 +175,7 @@ def get_parser():
         help=_("Don't take an automatic backup of the current boot "
                "configuration if one doesn't exist"))
     load_cmd.set_defaults(func=do_load,
-                          backup=config.getboolean('defaults', 'backup'))
+                          backup=section.getboolean('backup'))
 
     diff_cmd = commands.add_parser(
         "diff",
@@ -299,7 +307,7 @@ def do_set(args):
     with io.open(str(args.boot_path / args.config_write),
                  'w', encoding='ascii') as out:
         out.write(updated.output())
-    reboot_required()
+    reboot_required(args)
     # TODO Check for efficacy (overridden values)
 
 
@@ -316,12 +324,12 @@ def do_load(args):
     zip_path = (args.store_path / args.name).with_suffix('.zip')
     with ZipFile(str(zip_path), 'r') as arc:
         if not arc.comment.startswith(b'pictl:0:'):
-            raise ValueError(
-                _("{file} is not a valid pictl boot configuration"
-                  ).format(file=zip_path))
+            raise ValueError(_(
+                '{file} is not a valid pictl boot configuration'
+            ).format(file=zip_path))
         for info in arc.infolist():
             arc.extract(info, path=str(args.boot_path))
-    reboot_required()
+    reboot_required(args)
 
 
 def do_diff(args):
@@ -379,16 +387,17 @@ def backup_if_needed(args, parser):
                 # There's already an archive of the parsed configuration
                 return
         name = 'backup-{now:%Y%m%d-%H%M%S}'.format(now=datetime.now())
-        print(_("Backing up current configuration in {name}").format(name=name))
+        print(_('Backing up current configuration in {name}').format(name=name))
         store_parsed(args, parser, name)
 
 
-def reboot_required():
-    # TODO: activate me
-    #with io.open('/var/run/reboot-required', 'w') as f:
-    #    f.write("*** ")
-    #    f.write(_("System restart required"))
-    #    f.write(" ***\n")
-    #with io.open('/var/run/reboot-required.pkgs', 'a') as f:
-    #    f.write("pictl\n")
-    pass
+def reboot_required(args):
+    if args.reboot_required:
+        with io.open(args.reboot_required, 'w') as f:
+            f.write('*** ')
+            f.write(_('System restart required'))
+            f.write(' ***\n')
+    if args.reboot_required_pkgs and args.package_name:
+        with io.open(args.reboot_required_pkgs, 'a') as f:
+            f.write(args.package_name)
+            f.write('\n')
