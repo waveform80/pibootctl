@@ -1541,6 +1541,10 @@ class CommandCPUFreqMax(CommandInt):
         else:
             return 0
 
+    @property
+    def hint(self):
+        return 'MHz'
+
 
 class CommandCPUFreqMin(CommandInt):
     """
@@ -1555,6 +1559,10 @@ class CommandCPUFreqMin(CommandInt):
             return 600
         else:
             return 0
+
+    @property
+    def hint(self):
+        return 'MHz'
 
 
 class CommandCoreFreqMax(CommandInt):
@@ -1587,6 +1595,10 @@ class CommandCoreFreqMax(CommandInt):
             else:
                 yield from super().output()
 
+    @property
+    def hint(self):
+        return 'MHz'
+
 
 class CommandCoreFreqMin(CommandInt):
     """
@@ -1617,6 +1629,17 @@ class CommandCoreFreqMin(CommandInt):
                 yield 'gpu_freq_min={value}'.format(value=self.value)
             else:
                 yield from super().output()
+
+    def validate(self):
+        other = self.settings[self._relative('.max')]
+        if self.value > other.value:
+            raise ValueError(_(
+                '{self.name} cannot be greater then {other.name}').format(
+                    self=self, other=other))
+
+    @property
+    def hint(self):
+        return 'MHz'
 
 
 class CommandGPUFreqMax(CommandInt):
@@ -1649,6 +1672,10 @@ class CommandGPUFreqMax(CommandInt):
             else:
                 yield from super().output()
 
+    @property
+    def hint(self):
+        return 'MHz'
+
 
 class CommandGPUFreqMin(CommandInt):
     """
@@ -1679,6 +1706,17 @@ class CommandGPUFreqMin(CommandInt):
             else:
                 yield from super().output()
 
+    def validate(self):
+        other = self.settings[self._relative('.max')]
+        if self.value > other.value:
+            raise ValueError(_(
+                '{self.name} cannot be greater then {other.name}').format(
+                    self=self, other=other))
+
+    @property
+    def hint(self):
+        return 'MHz'
+
 
 class CommandGPUMem(CommandInt):
     """
@@ -1704,14 +1742,18 @@ class CommandGPUMem(CommandInt):
 
     def validate(self):
         if self.value < 16:
-            raise ValueError(
-                _('{self.name} must be at least 16Mb').format(self=self))
+            raise ValueError(_(
+                '{self.name} must be at least 16Mb').format(self=self))
         mem = get_board_mem()
         max_gpu_mem = {
             256: 192,
             512: 448,
         }.get(mem, 944)
         if self.value > max_gpu_mem:
-            raise ValueError(
-                _('{self.name} must be less than {max_gpu_mem}Mb').format(
+            raise ValueError(_(
+                '{self.name} must be less than {max_gpu_mem}Mb').format(
                     self=self, max_gpu_mem=max_gpu_mem))
+
+    @property
+    def hint(self):
+        return 'Mb'
