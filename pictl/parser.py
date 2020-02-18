@@ -308,6 +308,12 @@ class BootParser:
                 # the string is done in a precise order to ensure we excise
                 # chars beyond column 80 *before* stripping leading spaces
                 content = content[:80].lstrip()
-                if not content or content.startswith('#'):
+                try:
+                    comment = content.index('#')
+                except ValueError:
+                    pass
+                else:
+                    content = content[:comment]
+                if not content.strip():
                     continue
                 yield lineno, content
