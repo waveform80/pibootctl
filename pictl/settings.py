@@ -712,7 +712,7 @@ SETTINGS = {
             Switch this off to stop the bootloader from filling in ATAGS
             (memory from 0x100) before launching the kernel.
             """)),
-    setting.CommandIntHex(
+    setting.CommandDeviceTreeAddress(
         'boot.devicetree.address', command='device_tree_address', default=0,
         doc=_(
             """
@@ -737,21 +737,8 @@ SETTINGS = {
             tree for the platform that it is running on (it is unusual to
             require a specific device tree).
             """)),
-    setting.CommandFirmwareCamera(
-        'camera.enabled', commands=('start_x', 'start_file', 'fixup_file'),
-        doc=_(
-            """
-            Enables loading the Pi camera module firmware. This implies that
-            start_x.elf (or start4x.elf) will be loaded as the GPU firmware
-            rather than the default start.elf (and the corresponding fixup
-            file).
-
-            Note: with the camera firmware loaded, gpu.mem must be 64Mb or
-            larger (128Mb is recommended for most purposes; 256Mb may be
-            required for complex processing pipelines).
-            """)),
     setting.CommandFirmwareDebug(
-        'boot.firmware.debug',
+        'boot.debug.enabled',
         commands=('start_debug', 'start_file', 'fixup_file'), doc=_(
             """
             Enables loading the debugging firmware. This implies that
@@ -766,8 +753,7 @@ SETTINGS = {
             used when required.
             """)),
     setting.CommandFirmwareFilename(
-        'boot.firmware.filename',
-        commands=('start_file', 'start_x', 'start_debug'), doc=_(
+        'boot.firmware.filename', command='start_file', doc=_(
             """
             The filename of the GPU firmware that the bootloader should load
             The GPU firmware is also the tertiary bootloader which is
@@ -785,8 +771,7 @@ SETTINGS = {
             also manually specify an appropriate boot.firmware.fixup file.
             """)),
     setting.CommandFirmwareFixup(
-        'boot.firmware.fixup',
-        commands=('fixup_file', 'start_x', 'start_debug'), doc=_(
+        'boot.firmware.fixup', command='fixup_file', doc=_(
             """
             The filename of the fixup file for the GPU firmware specified in
             boot.firmware.filename.
@@ -850,7 +835,6 @@ SETTINGS = {
             shown on boot.
             """)),
     setting.CommandSerialEnabled(
-        # TODO: Fix setting refs
         'serial.enabled', command='enable_uart', doc=_(
             """
             Enable the primary/console UART (ttyS0 on a Pi 3, ttyAMA0
@@ -861,9 +845,9 @@ SETTINGS = {
             This is because, when the primary UART is UART1 (the mini-UART, or
             ttyS0 in Linux), it is necessary to stop the core VPU frequency
             from changing which would make the UART unusable. Under these
-            circumstances, activating serial.enabled implies core_freq=250
-            (unless force_turbo=1). In some cases this is a performance hit, so
-            it is off by default.
+            circumstances, activating serial.enabled implies
+            gpu.core.frequency.max=250 (unless cpu.turbo.force is on). In some
+            cases this is a performance hit, so it is off by default.
 
             More details on UARTs can be found at [1].
 
@@ -909,6 +893,40 @@ SETTINGS = {
 
             Note that disabling the module can affect the default state of
             serial.enabled and serial.uart.
+            """)),
+    setting.CommandFirmwareCamera(
+        'camera.enabled',
+        commands=('start_x', 'start_debug', 'start_file', 'fixup_file'),
+        doc=_(
+            """
+            Enables loading the Pi camera module firmware. This implies that
+            start_x.elf (or start4x.elf) will be loaded as the GPU firmware
+            rather than the default start.elf (and the corresponding fixup
+            file).
+
+            Note: with the camera firmware loaded, gpu.mem must be 64Mb or
+            larger (128Mb is recommended for most purposes; 256Mb may be
+            required for complex processing pipelines).
+            """)),
+    setting.CommandBoolInv(
+        'camera.led.enabled', command='disable_camera_led', default=True,
+        doc=_(
+            """
+            Switch this off to disable the red power LED on the Pi Camera
+            Module version 1. This is useful for preventing reflections when
+            the camera is facing a window, for example.
+            """)),
+    setting.CommandCPUL2Cache(
+        'cpu.l2.enabled', command='disable_l2cache', doc=_(
+            """
+            Switching this off disables the CPU's access to the GPU's L2 cache
+            and requires a corresponding L2 disabled kernel. Default value on
+            the Pi Zero and Pi 1 is on. On all other models (currently Pi 2, Pi
+            3, Pi 3+, and Pi 4), the ARMs have their own L2 cache and therefore
+            the default is off.
+
+            The standard Pi kernel.img and kernel7.img builds reflect this
+            difference in cache setting.
             """)),
     setting.CommandBool(
         'cpu.gic.enabled', command='enable_gic', default=True, doc=_(
@@ -1048,6 +1066,64 @@ SETTINGS = {
             """
             Minimum value of gpu.frequency.v3d.max used for dynamic frequency
             clocking. The default value is 250, or 500 on Pi 4B.
+            """)),
+    setting.CommandGPUMem(
+        'gpu.mem', command='gpu_mem', default=64, doc=_(
+            """
+            Sets the memory split between the CPU and GPU in megabytes; the CPU
+            gets the remaining memory. The minimum value is 16; the technical
+            maximum value is 192, 448, or 944, depending on whether you are
+            using a 256MB, 512MB, or 1024MB Pi. The default value is 64, values
+            above 512 will not provide increased performance and should not be
+            used. For the Raspberry Pi 4, which is available in 1GB, 2GB and
+            4GB versions, the minimum and maximum values are the same as for a
+            1GB device.
+
+            This setting refers to memory that is addressable from the GPU,
+            which includes the VPU, HVS, legacy codecs (e.g. H264), camera, and
+            on devices before the Raspberry Pi 4, the 3D system. The Raspberry
+            Pi 4 3D system has it's own Memory Mangement Unit (MMU) so textures
+            and other GL resources are not allocated from the GPU memory but
+            Linux system memory instead. This means that gpu.mem can be set to
+            a lower value, so even if you are using the H264 and camera then
+            128MB will probably be enough. On earlier models without the 3D
+            MMU, you may need up to 256 or 512 in some highly unusual cases.
+
+            For performance reasons, you should set this as low as possible to
+            give the Linux system as much memory as possible. However, setting
+            gpu.mem too low may automatically disable certain firmware
+            features, as there are some things the GPU cannot do if it has
+            access to too little memory. If a feature you are trying to use
+            isn't working, try setting a larger GPU memory split.
+
+            Values over 512 are not recommended, will provide no performance
+            improvements, and are untested.
+
+            See also: gpu.mem.256, gpu.mem.512, and gpu.mem.1024. These
+            settings allow you to swap the same SD card between different Pis
+            without having to modify the boot configuration each time.
+            """)),
+    setting.CommandInt(
+        'gpu.mem.256', command='gpu_mem_256', default=64, doc=_(
+            """
+            Sets the GPU memory in megabytes for the 256MB Raspberry Pi. It is
+            ignored if memory size is not 256MB. This overrides gpu.mem. The
+            maximum value is 192, and the default is not set.
+            """)),
+    setting.CommandInt(
+        'gpu.mem.512', command='gpu_mem_512', default=64, doc=_(
+            """
+            Sets the GPU memory in megabytes for the 512MB Raspberry Pi. It is
+            ignored if memory size is not 512MB. This overrides gpu.mem. The
+            maximum value is 448, and the default is not set.
+            """)),
+    setting.CommandInt(
+        'gpu.mem.1024', command='gpu_mem_1024', default=64, doc=_(
+            """
+            Sets the GPU memory in megabytes for Raspberry Pi devices with
+            1024MB or more of memory. It is ignored if memory size is smaller
+            than 1024MB. This overrides gpu.mem. The maximum value is 944, and
+            the default is not set.
             """)),
 }
 

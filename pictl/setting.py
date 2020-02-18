@@ -11,8 +11,8 @@ from collections import namedtuple, OrderedDict
 
 from .formatter import FormatDict, TransMap, int_ranges
 from .parser import BootOverlay, BootParam, BootCommand
-from .userstr import UserStr, to_bool, to_int, to_str
-from .info import get_board_types
+from .userstr import UserStr, to_bool, to_int, to_str, to_float
+from .info import get_board_types, get_board_mem
 
 _ = gettext.gettext
 
@@ -1240,44 +1240,51 @@ class CommandKernelCmdline(Command):
     # TODO modification/tracking of external file
 
 
+Firmware = namedtuple('Firmware', ('default', 'camera', 'debug', 'lite'))
+FW_START = {
+    # pi4:           default       camera         debug(+camera)  lite
+    False: Firmware('start.elf',  'start_x.elf', 'start_db.elf', 'start_cd.elf'),
+    True:  Firmware('start4.elf', 'start4x.elf', 'start4db.elf', 'start4cd.elf'),
+}
+FW_FIXUP = {
+    key: Firmware(*(
+        filename.replace('start', 'fixup').replace('.elf', '.dat')
+        for filename in filenames
+    ))
+    for key, filenames in FW_START.items()
+}
+
+
 class CommandFirmwareCamera(CommandBool):
     """
-    Handles the ``start_x`` setting.
+    Handles the ``start_x`` and ``start_debug`` settings.
     """
+    @property
+    def default(self):
+        pi4 = 'pi4' in get_board_types()
+        return (
+            self.settings['boot.firmware.filename'].value,
+            self.settings['boot.firmware.fixup'].value
+        ) in {
+            (FW_START[pi4].camera, FW_FIXUP[pi4].camera),
+            # The debug firmware includes the camera firmware, so start_debug
+            # also implicitly activates the camera
+            (FW_START[pi4].debug, FW_FIXUP[pi4].debug)
+        }
+
     def extract(self, config):
-        if 'pi4' in get_board_types():
-            camera_start_file = 'start4x.elf'
-            camera_fixup_file = 'fixup4x.dat'
-            start_file = 'start4.elf'
-            fixup_file = 'fixup4.dat'
-        else:
-            camera_start_file = 'start_x.elf'
-            camera_fixup_file = 'fixup_x.dat'
-            start_file = 'start.elf'
-            fixup_file = 'fixup.dat'
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'start_x':
+                    yield item, bool(to_int(item.params))
+                elif item.command == 'start_debug':
                     if to_int(item.params):
-                        start_file = camera_start_file
-                        fixup_file = camera_fixup_file
-                        yield item, True
-                    else:
-                        # XXX What does start_x=0 do?!
-                        yield item, False
-                elif item.command == 'start_file':
-                    start_file = item.params
-                    yield item, (
-                        start_file == camera_start_file and
-                        fixup_file == camera_fixup_file)
-                elif item.command == 'fixup_file':
-                    fixup_file = item.params
-                    yield item, (
-                        start_file == camera_start_file and
-                        fixup_file == camera_fixup_file)
+                        yield item, None
+                elif item.command in ('start_file', 'fixup_file'):
+                    yield item, None
 
     def validate(self):
-        # TODO validate gpu_mem setting
+        # TODO validate gpu_mem setting is >=64
         pass
 
 
@@ -1285,39 +1292,24 @@ class CommandFirmwareDebug(CommandBool):
     """
     Handles the ``start_debug`` setting.
     """
+    @property
+    def default(self):
+        pi4 = 'pi4' in get_board_types()
+        return (
+            self.settings['boot.firmware.filename'].value,
+            self.settings['boot.firmware.fixup'].value
+        ) == (FW_START[pi4].debug, FW_FIXUP[pi4].debug)
+
     def extract(self, config):
-        if 'pi4' in get_board_types():
-            debug_start_file = 'start4db.elf'
-            debug_fixup_file = 'fixup4db.dat'
-            start_file = 'start4.elf'
-            fixup_file = 'fixup4.dat'
-        else:
-            debug_start_file = 'start_db.elf'
-            debug_fixup_file = 'fixup_db.dat'
-            start_file = 'start.elf'
-            fixup_file = 'fixup.dat'
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'start_debug':
+                    yield item, bool(to_int(item.params))
+                elif item.command == 'start_x':
                     if to_int(item.params):
-                        # NOTE: According to the docs there is no special
-                        # handling for the pi4, hence the hard-coded names here
-                        start_file = 'start_db.elf'
-                        fixup_file = 'fixup_db.elf'
-                        yield item, True
-                    else:
-                        # XXX What does start_debug=0 do?!
-                        yield item, False
-                elif item.command == 'start_file':
-                    start_file = item.params
-                    yield item, (
-                        start_file == debug_start_file and
-                        fixup_file == debug_fixup_file)
-                elif item.command == 'fixup_file':
-                    fixup_file = item.params
-                    yield item, (
-                        start_file == debug_start_file and
-                        fixup_file == debug_fixup_file)
+                        yield item, None
+                elif item.command in ('start_file', 'fixup_file'):
+                    yield item, None
 
 
 class CommandFirmwareFilename(Command):
@@ -1327,37 +1319,17 @@ class CommandFirmwareFilename(Command):
     # TODO os_prefix integration
     @property
     def default(self):
-        return {
-            False: 'start.elf',
-            True:  'start4.elf',
-        }['pi4' in get_board_types()]
-
-    def extract(self, config):
-        value, cam_default = {
-            False: ('start.elf', 'start_x.elf'),
-            True:  ('start4.elf', 'start4x.elf'),
-        }['pi4' in get_board_types()]
-        for item in config:
-            if isinstance(item, BootCommand):
-                if item.command == 'start_x':
-                    if to_int(item.params):
-                        value = cam_default
-                    else:
-                        # XXX What does start_x=0 do?!
-                        pass
-                    yield item, value
-                elif item.command == 'start_debug':
-                    if to_int(item.params):
-                        # NOTE: According to the docs there is no special
-                        # handling for the pi4, hence the hard-coded name here
-                        value = 'start_db.elf'
-                    else:
-                        # XXX What does start_debug=0 do?!
-                        pass
-                    yield item, value
-                elif item.command == 'start_file':
-                    value = item.params
-                    yield item, value
+        pi4 = 'pi4' in get_board_types()
+        debug = self.settings['boot.debug.enabled']
+        camera = self.settings['camera.enabled']
+        # The "modified" tests below appear extraneous but aren't; they guard
+        # against a circular reference in the case where everything is default
+        if debug.modified and debug.value:
+            return FW_START[pi4].debug
+        elif camera.modified and camera.value:
+            return FW_START[pi4].camera
+        else:
+            return FW_START[pi4].default
 
 
 class CommandFirmwareFixup(Command):
@@ -1367,37 +1339,17 @@ class CommandFirmwareFixup(Command):
     # TODO os_prefix integration
     @property
     def default(self):
-        return {
-            False: 'fixup.dat',
-            True:  'fixup4.dat',
-        }['pi4' in get_board_types()]
-
-    def extract(self, config):
-        value, cam_default = {
-            False: ('fixup.dat', 'fixup_x.dat'),
-            True:  ('fixup4.dat', 'fixup4x.dat'),
-        }['pi4' in get_board_types()]
-        for item in config:
-            if isinstance(item, BootCommand):
-                if item.command == 'start_x':
-                    if to_int(item.params):
-                        value = cam_default
-                    else:
-                        # XXX What does fixup_x=0 do?!
-                        pass
-                    yield item, value
-                elif item.command == 'start_debug':
-                    if to_int(item.params):
-                        # NOTE: According to the docs there is no special
-                        # handling for the pi4, hence the hard-coded name here
-                        value = 'fixup_db.dat'
-                    else:
-                        # XXX What does fixup_debug=0 do?!
-                        pass
-                    yield item, value
-                elif item.command == 'fixup_file':
-                    value = item.params
-                    yield item, value
+        pi4 = 'pi4' in get_board_types()
+        debug = self.settings['boot.debug.enabled']
+        camera = self.settings['camera.enabled']
+        # The "modified" tests below appear extraneous but aren't; they guard
+        # against a circular reference in the case where everything is default
+        if debug.modified and debug.value:
+            return FW_FIXUP[pi4].debug
+        elif camera.modified and camera.value:
+            return FW_FIXUP[pi4].camera
+        else:
+            return FW_FIXUP[pi4].default
 
 
 class CommandDeviceTree(Command):
@@ -1405,6 +1357,15 @@ class CommandDeviceTree(Command):
     Handles the ``device_tree`` command.
     """
     # TODO os_prefix integration
+
+
+class CommandDeviceTreeAddress(CommandIntHex):
+    @property
+    def hint(self):
+        if self.value == 0:
+            return 'auto'
+        else:
+            return super().hint
 
 
 class CommandRamFSAddress(CommandIntHex):
@@ -1541,6 +1502,21 @@ class OverlayBluetoothEnabled(Setting):
                 yield 'dtoverlay=miniuart-bt'
 
 
+class CommandCPUL2Cache(CommandBoolInv):
+    """
+    Handles the ``disable_l2cache`` command.
+    """
+    @property
+    def default(self):
+        board_types = get_board_types()
+        if {'pi0', 'pi1'} & board_types:
+            return True
+        elif {'pi2', 'pi3', 'pi4'} & board_types:
+            return False
+        else:
+            return None
+
+
 class CommandCPUFreqMax(CommandInt):
     """
     Handles the ``arm_freq`` command.
@@ -1585,6 +1561,7 @@ class CommandCoreFreqMax(CommandInt):
     """
     Handles the ``core_freq`` command.
     """
+    # TODO Handle enable_uart effect
     @property
     def default(self):
         board_types = get_board_types()
@@ -1615,6 +1592,7 @@ class CommandCoreFreqMin(CommandInt):
     """
     Handles the ``core_freq_min`` command.
     """
+    # TODO Handle enable_uart effect
     @property
     def default(self):
         board_types = get_board_types()
@@ -1700,3 +1678,20 @@ class CommandGPUFreqMin(CommandInt):
                 pass
             else:
                 yield from super().output()
+
+
+class CommandGPUMem(CommandInt):
+    """
+    Handles the ``gpu_mem`` command.
+    """
+    @property
+    def hint(self):
+        mem = get_board_mem()
+        if mem:
+            override = self.settings[{
+                256: 'gpu.mem.256',
+                512: 'gpu.mem.512',
+            }.get(mem, 'gpu.mem.1024')]
+            if override.modified and override.value != self.value:
+                return '{override.value}; overridden by {override.name}'.format(
+                    override=override)
