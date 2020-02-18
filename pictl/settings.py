@@ -1068,7 +1068,9 @@ SETTINGS = {
             clocking. The default value is 250, or 500 on Pi 4B.
             """)),
     setting.CommandGPUMem(
-        'gpu.mem', command='gpu_mem', default=64, doc=_(
+        'gpu.mem', default=64,
+        commands=('gpu_mem', 'gpu_mem_256', 'gpu_mem_512', 'gpu_mem_1024'),
+        doc=_(
             """
             Sets the memory split between the CPU and GPU in megabytes; the CPU
             gets the remaining memory. The minimum value is 16; the technical
@@ -1098,32 +1100,6 @@ SETTINGS = {
 
             Values over 512 are not recommended, will provide no performance
             improvements, and are untested.
-
-            See also: gpu.mem.256, gpu.mem.512, and gpu.mem.1024. These
-            settings allow you to swap the same SD card between different Pis
-            without having to modify the boot configuration each time.
-            """)),
-    setting.CommandInt(
-        'gpu.mem.256', command='gpu_mem_256', default=64, doc=_(
-            """
-            Sets the GPU memory in megabytes for the 256MB Raspberry Pi. It is
-            ignored if memory size is not 256MB. This overrides gpu.mem. The
-            maximum value is 192, and the default is not set.
-            """)),
-    setting.CommandInt(
-        'gpu.mem.512', command='gpu_mem_512', default=64, doc=_(
-            """
-            Sets the GPU memory in megabytes for the 512MB Raspberry Pi. It is
-            ignored if memory size is not 512MB. This overrides gpu.mem. The
-            maximum value is 448, and the default is not set.
-            """)),
-    setting.CommandInt(
-        'gpu.mem.1024', command='gpu_mem_1024', default=64, doc=_(
-            """
-            Sets the GPU memory in megabytes for Raspberry Pi devices with
-            1024MB or more of memory. It is ignored if memory size is smaller
-            than 1024MB. This overrides gpu.mem. The maximum value is 944, and
-            the default is not set.
             """)),
 }
 

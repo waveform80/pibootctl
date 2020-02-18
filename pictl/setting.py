@@ -1684,14 +1684,34 @@ class CommandGPUMem(CommandInt):
     """
     Handles the ``gpu_mem`` command.
     """
-    @property
-    def hint(self):
+    def extract(self, config):
+        values = {name: None for name in self.commands}
+        override = 'gpu_mem_{mem}'.format(mem=min(1024, get_board_mem()))
+        if override not in values:
+            override = None
+        for item in config:
+            if isinstance(item, BootCommand):
+                # The following convoluted logic deals with the fact that
+                # gpu_mem_1024 et al. override gpu_mem regardless of ordering
+                if item.command in values:
+                    values[item.command] = to_int(item.params)
+                if item.command in ('gpu_mem', override):
+                    yield item, (
+                        values['gpu_mem']
+                        if values.get(override) is None else
+                        values.get(override)
+                    )
+
+    def validate(self):
+        if self.value < 16:
+            raise ValueError(
+                _('{self.name} must be at least 16Mb').format(self=self))
         mem = get_board_mem()
-        if mem:
-            override = self.settings[{
-                256: 'gpu.mem.256',
-                512: 'gpu.mem.512',
-            }.get(mem, 'gpu.mem.1024')]
-            if override.modified and override.value != self.value:
-                return '{override.value}; overridden by {override.name}'.format(
-                    override=override)
+        max_gpu_mem = {
+            256: 192,
+            512: 448,
+        }.get(mem, 944)
+        if self.value > max_gpu_mem:
+            raise ValueError(
+                _('{self.name} must be less than {max_gpu_mem}Mb').format(
+                    self=self, max_gpu_mem=max_gpu_mem))
