@@ -34,10 +34,10 @@ def store(request):
 def left_right_diff(request):
     left = Settings()
     right = left.copy()
-    right.update({'video.cec.name': 'Foo', 'test.enabled': None})
+    right.update({'video.cec.name': 'Foo', 'boot.test.enabled': None})
     diff = [
         (left['video.cec.name'], right['video.cec.name']),
-        (left['test.enabled'], None),
+        (left['boot.test.enabled'], None),
     ]
     return left, right, diff
 
@@ -97,12 +97,12 @@ def test_dump_diff_user(left_right_diff):
     output = Namespace(use_unicode=False)
     output.dump_diff('left', 'right', diff, buf)
     assert buf.getvalue() == """\
-+----------------+----------------+-------+
-| Name           | left           | right |
-|----------------+----------------+-------|
-| test.enabled   | off            | -     |
-| video.cec.name | 'Raspberry Pi' | 'Foo' |
-+----------------+----------------+-------+
++-------------------+----------------+-------+
+| Name              | left           | right |
+|-------------------+----------------+-------|
+| boot.test.enabled | off            | -     |
+| video.cec.name    | 'Raspberry Pi' | 'Foo' |
++-------------------+----------------+-------+
 """
     buf = io.StringIO()
     output.dump_diff('left', 'right', [], buf)
@@ -115,7 +115,7 @@ def test_dump_diff_json(left_right_diff):
     output = Namespace(default_style='json')
     output.dump_diff('left', 'right', diff, buf)
     assert json.loads(buf.getvalue()) == {
-        'test.enabled': {'left': False},
+        'boot.test.enabled': {'left': False},
         'video.cec.name': {'left': 'Raspberry Pi', 'right': 'Foo'},
     }
 
@@ -126,7 +126,7 @@ def test_dump_diff_yaml(left_right_diff):
     output = Namespace(default_style='yaml')
     output.dump_diff('left', 'right', diff, buf)
     assert yaml_loads(buf.getvalue()) == {
-        'test.enabled': {'left': False},
+        'boot.test.enabled': {'left': False},
         'video.cec.name': {'left': 'Raspberry Pi', 'right': 'Foo'},
     }
 
@@ -138,7 +138,7 @@ def test_dump_diff_shell(left_right_diff):
     output.dump_diff('left', 'right', diff, buf)
     assert buf.getvalue() == """\
 video.cec.name\t'Raspberry Pi'\tFoo
-test.enabled\toff\t-
+boot.test.enabled\toff\t-
 """
 
 
