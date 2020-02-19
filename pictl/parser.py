@@ -1,7 +1,9 @@
+import os
 import hashlib
 import zipfile
 import warnings
 from pathlib import Path
+from datetime import datetime
 from collections import defaultdict
 
 from .info import get_board_types, get_board_serial
@@ -194,14 +196,42 @@ class BootParser:
     def __init__(self):
         self._content = defaultdict(list)
         self._hash = None
+        self._config = None
+        self._timestamp = None
+
+    @property
+    def config(self):
+        """
+        The parsed configuration; a sequence of :class:`BootLine` items, after
+        :meth:`parse` has been successfully called.
+        """
+        return self._config
 
     @property
     def content(self):
+        """
+        The content of all parsed files; a mapping of filename to a sequence of
+        :class:`bytes` objects.
+        """
         return self._content
 
     @property
     def hash(self):
+        """
+        After :meth:`parse` is successfully called, this is a
+        :class:`hashlib.sha1` instance which represents the hash of the
+        complete configuration in parsed order (i.e. starting at "config.txt"
+        and proceeding through all included files).
+        """
         return self._hash
+
+    @property
+    def timestamp(self):
+        """
+        The latest modified timestamp on all files that were read as a result
+        of calling :meth:`parse`.
+        """
+        return self._timestamp
 
     def parse(self, path, filename="config.txt"):
         """
@@ -213,14 +243,14 @@ class BootParser:
         """
         self._content.clear()
         self._hash = hashlib.sha1()
+        self._timestamp = datetime.fromtimestamp(0)  # UNIX epoch
         if not isinstance(filename, Path):
             filename = Path(filename)
         if not isinstance(path, Path):
             path = Path(path)
         if not path.is_dir():
             path = zipfile.ZipFile(str(path))
-        return list(self._parse(path, filename))
-        # XXX verify hash in stored configs?
+        self._config = list(self._parse(path, filename))
 
     def _parse(self, path, filename):
         overlay = 'base'
@@ -293,10 +323,6 @@ class BootParser:
             yield param, value
 
     def _read(self, path, filename):
-        if isinstance(path, Path):
-            context = lambda: (path / filename).open('rb')
-        else:
-            context = lambda: path.open(str(filename), 'r')
         with context() as text:
             for lineno, line in enumerate(text, start=1):
                 self._hash.update(line)
@@ -316,3 +342,14 @@ class BootParser:
                 if not content.strip():
                     continue
                 yield lineno, content
+
+    def _open(self, path, filename, encoding='ascii', errors='replace'):
+        if isinstance(path, Path):
+            context = lambda: (path / filename).open('rb')
+            modified = lambda f: datetime.fromtimestamp(
+                os.fstat(f.fileno()).st_mtime)
+        else:
+            context = lambda: path.open(str(filename), 'r')
+            modified = lambda f: datetime(*path.getinfo(f.name).date_time)
+        with context() as file:
+            self._timestamp = max(self._timestamp, modified(file))

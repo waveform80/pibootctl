@@ -1,13 +1,9 @@
 import gettext
-from copy import deepcopy
-from weakref import ref
 from operator import or_
 from textwrap import dedent
-from fnmatch import fnmatch
 from functools import reduce
-from collections.abc import Mapping
+from collections import namedtuple
 from contextlib import contextmanager
-from collections import namedtuple, OrderedDict
 
 from .formatter import FormatDict, TransMap, int_ranges
 from .parser import BootOverlay, BootParam, BootCommand
@@ -17,175 +13,11 @@ from .info import get_board_types, get_board_mem
 _ = gettext.gettext
 
 
-#BASE_PARAM_DEFAULTS = {
-#    'audio':            False,
-#    'axiperf':          False,
-#    'eee':              True,
-#    'i2c_arm':          False,
-#    'i2c_vc':           False,
-#    'i2s':              False,
-#    'random':           True,
-#    'sd_debug':         False,
-#    'sd_force_pio':     False,
-#    'spi':              False,
-#    'uart0':            True,
-#    'uart1':            False,
-#    'watchdog':         False,
-#}
-
-
 class ValueWarning(Warning):
     """
     Warning class used by :meth:`Setting.validate` to warn about dangerous
     or inappropriate configurations.
     """
-
-
-class Settings(Mapping):
-    """
-    Represents a complete configuration; acts like an ordered mapping of
-    names to :class:`Setting` objects.
-    """
-    def __init__(self):
-        # This is deliberately imported upon construction instead of at the
-        # module level, partly to avoid a circular reference but mostly because
-        # the settings module is "expensive" to import and materially affects
-        # start-up time on slower Pis; this matters where it is not required
-        # (e.g. just running --help)
-        from .settings import SETTINGS
-
-        self._items = deepcopy(SETTINGS)
-        for setting in self._items.values():
-            setting._settings = ref(self)
-        self._visible = set(self._items.keys())
-
-    def __len__(self):
-        return len(self._visible)
-
-    def __iter__(self):
-        # This curious ordering is necessary to ensure the sorting order of
-        # _items is preserved
-        for key in self._items:
-            if key in self._visible:
-                yield key
-
-    def __contains__(self, key):
-        return key in self._visible
-
-    def __getitem__(self, key):
-        if key not in self._visible:
-            raise KeyError(key)
-        return self._items[key]
-
-    def copy(self):
-        """
-        Returns a distinct copy of the configuration that can be updated
-        without affecting the original.
-        """
-        new = deepcopy(self)
-        for setting in new._items.values():
-            setting._settings = ref(new)
-        return new
-
-    def modified(self):
-        """
-        Returns a copy of the configuration which only contains modified
-        settings.
-        """
-        # When filtering we mustn't actually remove any members of _items as
-        # Setting instances may need to refer to a "hidden" value to, for
-        # example, determine their default value
-        new_visible = {
-            name for name in self._visible
-            if self[name].modified
-        }
-        copy = self.copy()
-        copy._visible = new_visible
-        return copy
-
-    def filter(self, pattern):
-        """
-        Returns a copy of the configuration which only contains settings with
-        names matching *pattern*, which may contain regular shell globbing
-        patterns.
-        """
-        new_visible = {
-            name for name in self._visible
-            if fnmatch(name, pattern)
-        }
-        copy = self.copy()
-        copy._visible = new_visible
-        return copy
-
-    def diff(self, other):
-        """
-        Returns a set of (self, other) setting tuples for all settings that
-        differ between *self* and *other* (another :class:`Settings` instance).
-        If a particular setting is missing from either side, its entry will be
-        given as :data:`None`.
-        """
-        return {
-            (setting, other[setting.name]
-                      if setting.name in other else
-                      None)
-            for setting in self.values()
-            if setting.name not in other or
-            other[setting.name].value != setting.value
-        } | {
-            (None, setting)
-            for name in other
-            if name not in self
-        }
-
-    def extract(self, config):
-        """
-        Extracts values for the settings from the parsed *config* (which must
-        be a sequence of :class:`BootLine` objects or their descendents).
-        """
-        for setting in self.values():
-            for item, value in setting.extract(config):
-                setting._value = value
-                # TODO track the config items affecting the setting
-
-    def update(self, values):
-        """
-        Given a mapping of setting names to new values, updates the values
-        of the corresponding settings in this collection. If a value is
-        :data:`None`, the setting is reset to its default value.
-        """
-        for name, value in values.items():
-            if name not in self._visible:
-                raise KeyError(name)
-            item = self._items[name]
-            item._value = item.update(value)
-
-    def validate(self):
-        """
-        Checks for errors in the configuration. This ensures that each setting
-        makes sense in the wider context of all other settings.
-        """
-        # This ignores the _visible filter; the complete configuration is
-        # always validated
-        for item in self._items.values():
-            item.validate()
-
-    def output(self):
-        """
-        Generate a new boot configuration file which represents the settings
-        stored in this mapping.
-        """
-        output = """\
-# This file is intended to contain system-made configuration changes. User
-# configuration changes should be placed in "usercfg.txt". Please refer to the
-# README file for a description of the various configuration files on the boot
-# partition.
-
-""".splitlines()
-        for name, setting in self._items.items():
-            if name in self._visible:
-                for line in setting.output():
-                    output.append(line)
-        return '\n'.join(output)
 
 
 class Setting:

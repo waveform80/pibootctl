@@ -6,12 +6,10 @@ import argparse
 import configparser
 from pathlib import Path
 from datetime import datetime
-from zipfile import ZipFile, ZIP_DEFLATED
 
+from .store import Store
 from .term import ErrorHandler
-from .parser import BootParser
 from .userstr import UserStr
-from .setting import Settings
 from .output import Namespace
 
 try:
@@ -236,6 +234,8 @@ def get_parser():
 
 def do_help(args):
     default = Settings()
+    # TODO Use something like levenshtein to detect "close" but incorrect
+    # setting names
     if 'cmd' in args and args.cmd in default:
         args.dump_setting(default[args.cmd], fp=sys.stdout)
     else:
@@ -247,22 +247,20 @@ def do_help(args):
 
 
 def do_dump(args):
-    do_dump_or_show(args, args.boot_path)
+    do_dump_or_show(args, None)
 
 
 def do_show(args):
-    zip_path = (args.store_path / args.name).with_suffix('.zip')
-    do_dump_or_show(args, zip_path)
+    do_dump_or_show(args, args.name)
 
 
-def do_dump_or_show(args, path):
-    parser = BootParser()
-    default = Settings()
-    stored = default.copy()
-    stored.extract(parser.parse(path, args.config_read))
-    # NOTE: need to keep a reference to the stored set; some settings depend
-    # on the overall context to determine their value and their reference to it
-    # is weak
+def do_dump_or_show(args, key):
+    store = Store(args)
+    stored = store[key].settings
+    # TODO Is this still necessary?
+    # Need to keep a reference to the stored set; some settings depend on the
+    # overall context to determine their value and their reference to it is
+    # weak
     settings = stored
     if args.vars:
         settings = settings.filter(args.vars)
@@ -272,10 +270,8 @@ def do_dump_or_show(args, path):
 
 
 def do_get(args):
-    parser = BootParser()
-    default = Settings()
-    current = default.copy()
-    current.extract(parser.parse(args.boot_path, args.config_read))
+    store = Store(args)
+    current = store[None]
     if len(args.get_vars) == 1:
         try:
             print(args.format_value(current[args.get_vars[0]].value))
@@ -292,9 +288,8 @@ def do_get(args):
 
 
 def do_set(args):
-    parser = BootParser()
-    current = Settings()
-    current.extract(parser.parse(args.boot_path, args.config_read))
+    store = Store(args)
+    current = store[None]
     updated = current.copy()
     if args.style == 'user':
         settings = {}
@@ -308,6 +303,7 @@ def do_set(args):
     updated.update(settings)
     updated.validate()
     backup_if_needed(args, parser)
+    # TODO Only write settings that aren't present in non-written files
     with io.open(str(args.boot_path / args.config_write),
                  'w', encoding='ascii') as out:
         out.write(updated.output())
@@ -316,27 +312,22 @@ def do_set(args):
 
 
 def do_save(args):
-    parser = BootParser()
-    parser.parse(args.boot_path, args.config_read)
-    store_parsed(args, parser, args.name)
+    store = Store(args)
+    store[args.name] = store[None]
 
 
 def do_load(args):
-    parser = BootParser()
-    parser.parse(args.boot_path, args.config_read)
-    backup_if_needed(args, parser)
-    zip_path = (args.store_path / args.name).with_suffix('.zip')
-    with ZipFile(str(zip_path), 'r') as arc:
-        if not arc.comment.startswith(b'pictl:0:'):
-            raise ValueError(_(
-                '{file} is not a valid pictl boot configuration'
-            ).format(file=zip_path))
-        for info in arc.infolist():
-            arc.extract(info, path=str(args.boot_path))
+    store = Store(args)
+    # Look up the config to load before we do any backups, just in case the
+    # user's made a mistake and the config doesn't exist
+    to_load = store[args.name]
+    backup_if_needed(args, store)
+    store[None] = to_load
     reboot_required(args)
 
 
 def do_diff(args):
+    store = Store(args)
     parser = BootParser()
     left = Settings()
     right = left.copy()
@@ -351,26 +342,19 @@ def do_diff(args):
 
 
 def do_list(args):
-    parser = BootParser()
-    parser.parse(args.boot_path, args.config_read)
-    active_hash = parser.hash.hexdigest().lower()
-    table = []
-    for name, arc_hash, timestamp in enumerate_store(args):
-        table.append((name, arc_hash == active_hash, timestamp))
+    store = Store(args)
+    current = store[None]
+    table = [
+        (key, value.hash == current.hash, value.timestamp)
+        for key, value in store.items()
+        if key is not None
+    ]
     args.dump_store(table, fp=sys.stdout)
 
 
 def do_remove(args):
-    zip_path = (args.store_path / args.name).with_suffix('.zip')
-    zip_path.unlink()
-
-
-def enumerate_store(args):
-    for p in args.store_path.glob('*.zip'):
-        with ZipFile(str(p), 'r') as arc:
-            if arc.comment.startswith(b'pictl:0:'):
-                arc_hash = arc.comment[8:48].decode('ascii').lower()
-                yield p.stem, arc_hash, datetime.fromtimestamp(p.stat().st_mtime)
+    store = Store(args)
+    del store[args.name]
 
 
 def store_parsed(args, parser, name):
@@ -379,21 +363,22 @@ def store_parsed(args, parser, name):
     # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
     with ZipFile(str(zip_path), 'w', compression=ZIP_DEFLATED) as arc:
         arc.comment = 'pictl:0:{}'.format(parser.hash.hexdigest()).encode('ascii')
-        for path, lines in parser.content.items():
-            arc.writestr(str(path), b''.join(lines))
+        for path, data in parser.content.items():
+            if isinstance(data, list):
+                for line in data:
+                    arc.writestr(str(path), b''.join(lines))
+                else:
+                    arc.writestr(str(path), data)
 
 
-def backup_if_needed(args, parser):
-    if args.backup:
-        active_hash = parser.hash.hexdigest().lower()
-        for name, arc_hash, timestamp in enumerate_store(args):
-            if arc_hash == active_hash:
-                # There's already an archive of the parsed configuration
-                return
+def backup_if_needed(args, store):
+    if args.backup and store.active is None:
         name = 'backup-{now:%Y%m%d-%H%M%S}'.format(now=datetime.now())
+        # TODO Clocks can be funny on the pi; make absolutely damned certain
+        # that name doesn't already exist
         print(_('Backing up current configuration in {name}').format(name=name),
               file=sys.stderr)
-        store_parsed(args, parser, name)
+        store[name] = store[None]
 
 
 def reboot_required(args):
