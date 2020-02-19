@@ -34,12 +34,13 @@ class Namespace(argparse.Namespace):
 
     These methods change the format they work with based on the value of the
     :attr:`style` attribute which defaults to "user" (human-readable output),
-    but can alternatively be "json", "yaml", or "shell", usually by the user
-    specifying one of the style arguments which the :meth:`add_style_arg` can
-    be used to create.
+    but can alternatively be "json", "yaml", or "shell", if the user specifies
+    one of the style arguments which the :meth:`add_style_arg` can be used to
+    create.
     """
     def __init__(self, default_style='user', use_unicode=None):
         self.style = default_style
+        locale.setlocale(locale.LC_ALL, '')
         if use_unicode is None:
             use_unicode = locale.nl_langinfo(locale.CODESET) == 'UTF-8'
         if use_unicode:
@@ -305,11 +306,7 @@ class Namespace(argparse.Namespace):
                 (_('Parameter'), setting.param),
             ]
         max_field_width = max(len(name) for name, value in fields)
-        fp.write("""\
-{fields}
-
-{doc}
-""".format(
+        fp.write('{fields}\n\n{doc}\n'.format(
             fields='\n'.join(
                 '{name:>{width}}: {value}'.format(
                     name=name, width=max_field_width, value=value)

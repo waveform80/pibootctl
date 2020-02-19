@@ -888,7 +888,7 @@ SETTINGS = {
     setting.OverlayBluetoothEnabled(
         'bluetooth.enabled', doc=_(
             """
-            Controls whether the Bluetooth module (Raspberry Pi 3 and laster,
+            Controls whether the Bluetooth module (Raspberry Pi 3 and later,
             and the Raspberry Pi Zero W), is enabled (which it is by default).
 
             Note that disabling the module can affect the default state of

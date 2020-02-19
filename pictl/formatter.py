@@ -93,7 +93,7 @@ class TableWrapper:
 
     def generate_lines(self, data):
         widths = [
-            max(1, max(len(str(item)) for item in row))
+            max(1, max(len(self.format(item)) for item in row))
             for row in zip(*data)  # transpose
         ]
         widths = self.fit_widths(widths)

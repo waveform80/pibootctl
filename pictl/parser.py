@@ -233,10 +233,9 @@ class BootParser:
             elif filter.enabled:
                 if '=' in content:
                     cmd, value = content.split('=', 1)
-                    # NOTE: We deliberately don't strip cmd or value here
-                    # because the bootloader doesn't either; whitespace on
-                    # either side of the = is significant and can invalidate
-                    # lines
+                    # We deliberately don't strip cmd or value here because the
+                    # bootloader doesn't either; whitespace on either side of
+                    # the = is significant and can invalidate lines
                     if cmd in {'device_tree_overlay', 'dtoverlay'}:
                         if ':' in value:
                             overlay, params = value.split(':', 1)
@@ -280,7 +279,7 @@ class BootParser:
         for token in params.split(','):
             if '=' in token:
                 param, value = token.split('=', 1)
-                # NOTE: Again, we deliberately don't strip param or value
+                # Again, we deliberately don't strip param or value
             else:
                 param = token
                 value = 'on'
@@ -303,7 +302,7 @@ class BootParser:
                 self._hash.update(line)
                 self._content[filename].append(line)
                 content = line.decode('ascii', errors='replace').rstrip()
-                # NOTE: The bootloader ignores everything beyond column 80 and
+                # The bootloader ignores everything beyond column 80 and
                 # leading whitespace. The following slicing and stripping of
                 # the string is done in a precise order to ensure we excise
                 # chars beyond column 80 *before* stripping leading spaces

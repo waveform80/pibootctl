@@ -164,8 +164,8 @@ class Settings(Mapping):
         Checks for errors in the configuration. This ensures that each setting
         makes sense in the wider context of all other settings.
         """
-        # NOTE: This ignores the _visible filter; the complete configuration
-        # is always validated
+        # This ignores the _visible filter; the complete configuration is
+        # always validated
         for item in self._items.values():
             item.validate()
 
@@ -1610,7 +1610,7 @@ class CommandCoreFreqMin(CommandInt):
         board_types = get_board_types()
         if (
                 ('pi4' in board_types) and
-                self._value(settings, 'video.hdmi.mode.4kp60', default=True)):
+                self.settings['video.hdmi.mode.4kp60'].value):
             return 275
         elif board_types:
             return 250

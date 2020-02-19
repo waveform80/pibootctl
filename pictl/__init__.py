@@ -1,7 +1,6 @@
 import io
 import os
 import sys
-import locale
 import gettext
 import argparse
 import configparser
@@ -29,7 +28,6 @@ def main(args=None):
         sys.excepthook = ErrorHandler()
         sys.excepthook[PermissionError] = (permission_error, 1)
         sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
-    locale.setlocale(locale.LC_ALL, '')
     parser = get_parser()
     args = parser.parse_args(args, namespace=Namespace())
     args.func(args)
@@ -39,7 +37,8 @@ def permission_error(exc_type, exc_value, exc_tb):
     msg = [exc_value]
     if os.geteuid() != 0:
         msg.append(_(
-            "You need root permissions to modify the boot configuration"))
+            "You need root permissions to modify the boot configuration or "
+            "stored boot configurations"))
     return msg
 
 
@@ -56,9 +55,16 @@ def get_parser():
             'reboot_required_pkgs':  '/var/run/reboot-required.pkgs',
         },
         default_section='defaults',
+        delimiters=('=',),
+        comment_prefixes=('#',),
         interpolation=None)
     config.read(
-        ['/etc/pictl.conf', os.path.expanduser('~/.config/pictl/pictl.conf')],
+        [
+            '/etc/pictl.conf',
+            '{xdg_config}/pictl.conf'.format(
+                xdg_config=os.environ.get(
+                    'XDG_CONFIG_HOME', os.path.expanduser('~/.config'))),
+        ],
         encoding='ascii')
     section = config['defaults']
 
@@ -94,6 +100,7 @@ def get_parser():
             "to %(default)r."))
     parser.set_defaults(
         func=do_help,
+        backup=section.getboolean('backup'),
         package_name=section['package_name'],
         reboot_required=section['reboot_required'],
         reboot_required_pkgs=section['reboot_required_pkgs'])
@@ -148,8 +155,7 @@ def get_parser():
     group.add_argument(
         "set_vars", nargs="*", metavar="name=value", default=[],
         help=_("Specify one or more settings to change on the command line"))
-    set_cmd.set_defaults(func=do_set,
-                         backup=section.getboolean('backup'))
+    set_cmd.set_defaults(func=do_set)
 
     save_cmd = commands.add_parser(
         "save",
@@ -174,8 +180,7 @@ def get_parser():
         "--no-backup", action="store_false", dest="backup",
         help=_("Don't take an automatic backup of the current boot "
                "configuration if one doesn't exist"))
-    load_cmd.set_defaults(func=do_load,
-                          backup=section.getboolean('backup'))
+    load_cmd.set_defaults(func=do_load)
 
     diff_cmd = commands.add_parser(
         "diff",
@@ -212,8 +217,7 @@ def get_parser():
 
     ls_cmd = commands.add_parser(
         "list", aliases=["ls"],
-        description=_(
-            "List all stored boot configurations."),
+        description=_("List all stored boot configurations."),
         help=_("List the stored boot configurations"))
     Namespace.add_style_arg(ls_cmd)
     ls_cmd.set_defaults(func=do_list)
@@ -387,7 +391,8 @@ def backup_if_needed(args, parser):
                 # There's already an archive of the parsed configuration
                 return
         name = 'backup-{now:%Y%m%d-%H%M%S}'.format(now=datetime.now())
-        print(_('Backing up current configuration in {name}').format(name=name))
+        print(_('Backing up current configuration in {name}').format(name=name),
+              file=sys.stderr)
         store_parsed(args, parser, name)
 
 
