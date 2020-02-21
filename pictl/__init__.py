@@ -7,7 +7,7 @@ import configparser
 from pathlib import Path
 from datetime import datetime
 
-from .store import Store, Settings
+from .store import Store, Current, Default
 from .term import ErrorHandler
 from .userstr import UserStr
 from .output import Namespace
@@ -233,12 +233,14 @@ def get_parser():
 
 
 def do_help(args):
-    default = Settings()
+    store = Store(args)
+    default = store[Default].settings
     # TODO Use something like levenshtein to detect "close" but incorrect
     # setting names
     if 'cmd' in args and args.cmd in default:
         args.dump_setting(default[args.cmd], fp=sys.stdout)
     else:
+        # TODO Lookup underlying boot commands if default lookup fails
         parser = get_parser()
         if 'cmd' not in args or args.cmd is None:
             parser.parse_args(['-h'])
@@ -247,21 +249,13 @@ def do_help(args):
 
 
 def do_dump(args):
-    do_dump_or_show(args, None)
+    args.name = Current
+    do_show(args)
 
 
 def do_show(args):
-    do_dump_or_show(args, args.name)
-
-
-def do_dump_or_show(args, key):
     store = Store(args)
-    stored = store[key].settings
-    # TODO Is this still necessary?
-    # Need to keep a reference to the stored set; some settings depend on the
-    # overall context to determine their value and their reference to it is
-    # weak
-    settings = stored
+    settings = store[args.name].settings
     if args.vars:
         settings = settings.filter(args.vars)
     if not args.all:
@@ -271,7 +265,7 @@ def do_dump_or_show(args, key):
 
 def do_get(args):
     store = Store(args)
-    current = store[None]
+    current = store[Current]
     if len(args.get_vars) == 1:
         try:
             print(args.format_value(current[args.get_vars[0]].value))
@@ -289,7 +283,7 @@ def do_get(args):
 
 def do_set(args):
     store = Store(args)
-    current = store[None]
+    current = store[Current]
     updated = current.copy()
     if args.style == 'user':
         settings = {}
@@ -313,7 +307,7 @@ def do_set(args):
 
 def do_save(args):
     store = Store(args)
-    store[args.name] = store[None]
+    store[args.name] = store[Current]
 
 
 def do_load(args):
@@ -335,11 +329,11 @@ def do_diff(args):
 
 def do_list(args):
     store = Store(args)
-    current = store[None]
+    current = store[Current]
     table = [
         (key, value.hash == current.hash, value.timestamp)
         for key, value in store.items()
-        if key is not None
+        if key not in (Current, Default)
     ]
     args.dump_store(table, fp=sys.stdout)
 
@@ -356,7 +350,7 @@ def backup_if_needed(args, store):
         # that name doesn't already exist
         print(_('Backing up current configuration in {name}').format(name=name),
               file=sys.stderr)
-        store[name] = store[None]
+        store[name] = store[Current]
 
 
 def reboot_required(args):

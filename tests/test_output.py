@@ -6,7 +6,7 @@ from unittest import mock
 import yaml
 import pytest
 
-from pictl.setting import *
+from pictl.store import *
 from pictl.output import *
 
 

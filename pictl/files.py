@@ -46,7 +46,7 @@ class AtomicReplaceFile:
         If ``None`` (the default), the temporary file will be opened in binary
         mode. Otherwise, this specifies the encoding to use with text mode.
     """
-    umask = None
+    umask = get_umask()
 
     def __init__(self, path, encoding=None):
         if isinstance(path, str):
@@ -62,8 +62,6 @@ class AtomicReplaceFile:
         return self._withfile
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        if AtomicReplaceFile.umask is None:
-            AtomicReplaceFile.umask = get_umask()
         os.fchmod(self._withfile.file.fileno(),
                   0o666 & AtomicReplaceFile.umask)
         result = self._tempfile.__exit__(exc_type, exc_value, exc_tb)

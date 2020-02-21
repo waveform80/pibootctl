@@ -218,12 +218,11 @@ class BootParser:
     @property
     def hash(self):
         """
-        After :meth:`parse` is successfully called, this is a
-        :class:`hashlib.sha1` instance which represents the hash of the
-        complete configuration in parsed order (i.e. starting at "config.txt"
-        and proceeding through all included files).
+        After :meth:`parse` is successfully called, this is the SHA1 hash of
+        the complete configuration in parsed order (i.e. starting at
+        "config.txt" and proceeding through all included files).
         """
-        return self._hash
+        return self._hash.hexdigest().lower()
 
     @property
     def timestamp(self):

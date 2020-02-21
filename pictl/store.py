@@ -3,57 +3,67 @@ import tempfile
 from weakref import ref
 from pathlib import Path
 from copy import deepcopy
+from textwrap import dedent
 from fnmatch import fnmatch
+from datetime import datetime
 from collections import OrderedDict
 from collections.abc import Mapping
 from zipfile import ZipFile, BadZipFile, ZIP_DEFLATED
 
-from .files import AtomicReplaceFile
 from .parser import BootParser
+from .files import AtomicReplaceFile
 from .setting import CommandIncludedFile
+from .settings import SETTINGS
 
 _ = gettext.gettext
 
 
+Current = object()
+Default = object()
+
+
 class Store(Mapping):
     """
-    A mapping representing all stored boot configurations and the current
-    boot configuration.
+    A mapping representing all boot configurations (current, default, and
+    stored).
 
-    Acts as a mapping keyed by the name of the stored configuration, or
-    :data:`None` for the current boot configuration. The values of the mapping
-    are objects which provide the parsed :class:`Settings`, an identifying
-    :attr:`~StoredSettings.hash`, and a dictionary mapping filenames to
-    contents.
+    Acts as a mapping keyed by the name of the stored configuration, or the
+    special values :data:`Current` for the current boot configuration, or
+    :data:`Default` for the default (empty) configuration. The values of the
+    mapping are objects which provide the parsed :class:`Settings`, an
+    identifying :attr:`~StoredSettings.hash`, and a dictionary mapping
+    filenames to contents.
 
     The mapping is mutable and this can be used to manipulate stored boot
     configurations. For instance, to store the current boot configuration under
-    the name "default"::
+    the name "foo"::
 
         >>> store = Store(config)
-        >>> store["default"] = store[None]
+        >>> store["foo"] = store[Current]
 
-    Setting the item with the key :data:`None` overwrites the current boot
+    Setting the item with the key :data:`Current` overwrites the current boot
     configuration::
 
-        >>> store[None] = store["serial"]
+        >>> store[Current] = store["serial"]
 
     Note that items retrieved from the store are ephemeral and modifying them
     does *not* modify the content of the store. To modify the content of the
     store, an item must be explicitly set::
 
-        >>> default = store["default"]
-        >>> default.settings.update({"serial.enabled": True})
-        >>> store["serial"] = default
+        >>> foo = store["foo"]
+        >>> foo.settings.update({"serial.enabled": True})
+        >>> store["serial"] = foo
 
     The same applies to the current boot configuration item::
 
-        >>> current = store[None]
+        >>> current = store[Current]
         >>> current.settings.update({"camera.enabled": True, "gpu.mem": 128})
-        >>> store[None] = current
+        >>> store[Current] = current
 
     Items can be deleted to remove them from the store, with the obvious
-    exception of the item with the key :data:`None` which cannot be removed.
+    exception of the items with the keys :data:`Current` and :data:`Default`
+    which cannot be removed. Furthermore, the item with the key :data:`Default`
+    cannot be modified either.
     """
     def __init__(self, config):
         self._store_path = Path(config.store_path)
@@ -71,15 +81,17 @@ class Store(Mapping):
                     yield p.stem
 
     def __len__(self):
-        return sum(1 for i in self._enumerate()) + 1  # for the current config
+        # +2 for the current and default configs
+        return sum(1 for i in self._enumerate()) + 2
 
     def __iter__(self):
-        yield None  # the current boot configuration has no name
+        yield Default
+        yield Current
         yield from self._enumerate()
 
     def __contains__(self, key):
-        if key is None:
-            # The current boot configuration is always present (even if
+        if key in (Current, Default):
+            # The current and boot configurations are always present (even if
             # config.txt doesn't exist, there's still technically a boot
             # configuration - just a default one)
             return True
@@ -92,16 +104,21 @@ class Store(Mapping):
                 return False
 
     def __getitem__(self, key):
-        if key is None:
+        if key is Default:
+            return DefaultConfiguration()
+        elif key is Current:
             return BootConfiguration(self._boot_path, self._config_read)
         elif key in self:
-            return BootConfiguration(self._path_of(key), self._config_read)
+            return StoredConfiguration(self._path_of(key), self._config_read)
         else:
             raise KeyError(_(
                 "No stored configuration named {key}").format(key=key))
 
     def __setitem__(self, key, item):
-        if key is None:
+        if key is Default:
+            raise KeyError(_(
+                "Cannot change the default configuration"))
+        elif key is Current:
             # TODO Sort contents so config.txt is written last; this will allow
             # effectively atomic switches of configuration for systems using
             # os_prefix
@@ -127,9 +144,10 @@ class Store(Mapping):
                         arc.writestr(str(path), b''.join(
                             line.encode('ascii') for line in data))
 
-
     def __delitem__(self, key):
-        if key is None:
+        if key is Default:
+            raise KeyError(_("Cannot remove the default configuration"))
+        elif key is Current:
             raise KeyError(_("Cannot remove the current boot configuration"))
         else:
             try:
@@ -142,24 +160,49 @@ class Store(Mapping):
     def active(self):
         """
         Returns the key of the active configuration, if any. If no
-        configuration is currently active, returns :data:`None` (the key of the
-        current boot configuration).
+        configuration is currently active, returns :data:`None`.
         """
-        current = self[None]
+        current = self[Current]
         for key in self:
-            if key is not None:
+            if key not in (Current, Default):
                 stored = self[key]
                 if stored.hash == current.hash:
                     return key
 
 
+class DefaultConfiguration:
+    """
+    Represents the default boot configuration with an entirely empty content
+    and a fresh :class:`Settings` instance.
+    """
+    @property
+    def content(self):
+        return {}
+
+    @property
+    def hash(self):
+        return 'da39a3ee5e6b4b0d3255bfef95601890afd80709'  # empty sha1
+
+    @property
+    def timestamp(self):
+        return datetime.fromtimestamp(0)  # UNIX epoch
+
+    @property
+    def settings(self):
+        return Settings()
+
+
 class BootConfiguration:
+    """
+    Represents the current boot configuration, as parsed from *filename*
+    (default "config.txt") on the boot partition (presumably mounted at
+    *path*).
+    """
     def __init__(self, path, filename='config.txt'):
         self._path = path
         self._filename = filename
         self._settings = None
         self._content = None
-        # TODO Extract hash and timestamp from zip metadata for stored configs
         self._hash = None
         self._timestamp = None
 
@@ -176,7 +219,7 @@ class BootConfiguration:
             if isinstance(setting, CommandIncludedFile):
                 parser.add(self._path, setting.filename)
         self._content = parser.content
-        self._hash = parser.hash.hexdigest().lower()
+        self._hash = parser.hash
         self._timestamp = parser.timestamp
 
     @property
@@ -212,18 +255,39 @@ class BootConfiguration:
         return self._content
 
 
+class StoredConfiguration(BootConfiguration):
+    """
+    Represents a boot configuration stored in a zip file specified by *path*.
+    The starting file of the configuration is given by *filename*.
+    """
+    def __init__(self, path, filename='config.txt'):
+        super().__init__(path, filename)
+        # We can grab the hash and timestamp from the arc's meta-data without
+        # any decompression work (it's all in the uncompressed footer)
+        with ZipFile(str(path), 'r') as arc:
+            comment = arc.comment
+            if comment.startswith(b'pictl:0:'):
+                if not set(comment[8:48]) <= set(b'0123456789abcdef'):
+                    raise ValueError(_(
+                        'Invalid stored configuration: non-hex hash'))
+                self._hash = comment[8:48].decode('ascii')
+                # A stored archive can be empty, hence default= is required
+                self._timestamp = max(
+                    (datetime(*info.date_time) for info in arc.infolist()),
+                    default=datetime.fromtimestamp(0))
+            else:
+                # TODO Should we allow "self-made" archives without a pictl
+                # header comment?
+                raise ValueError(_(
+                    'Invalid stored configuration: missing hash'))
+
+
 class Settings(Mapping):
     """
-    Represents a complete configuration; acts like an ordered mapping of
-    names to :class:`Setting` objects.
+    Represents all settings in a boot configuration; acts like an ordered
+    mapping of names to :class:`Setting` objects.
     """
     def __init__(self):
-        # This is deliberately imported upon construction instead of at the
-        # module level because the settings module is "expensive" to import and
-        # materially affects start-up time on slower Pis; this matters where it
-        # is not required (e.g. just running --help)
-        from .settings import SETTINGS
-
         self._items = deepcopy(SETTINGS)
         for setting in self._items.values():
             setting._settings = ref(self)
@@ -313,6 +377,8 @@ class Settings(Mapping):
         of the corresponding settings in this collection. If a value is
         :data:`None`, the setting is reset to its default value.
         """
+        # TODO move this to BootConfiguration and have it wipe content and hash
+        # upon call (for later recalculation)
         for name, value in values.items():
             if name not in self._visible:
                 raise KeyError(name)
@@ -324,6 +390,7 @@ class Settings(Mapping):
         Checks for errors in the configuration. This ensures that each setting
         makes sense in the wider context of all other settings.
         """
+        # TODO move to BootConfiguration?
         # This ignores the _visible filter; the complete configuration is
         # always validated
         for item in self._items.values():
@@ -334,6 +401,7 @@ class Settings(Mapping):
         Generate a new boot configuration file which represents the settings
         stored in this mapping.
         """
+        # TODO move to BootConfiguration; have it update content and hash too
         output = """\
 # This file is intended to contain system-made configuration changes. User
 # configuration changes should be placed in "usercfg.txt". Please refer to the
