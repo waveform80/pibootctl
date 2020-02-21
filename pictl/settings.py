@@ -661,6 +661,18 @@ SETTINGS = {
             composited, but is slower and may limit screen framerate to
             typically 30fps.
             """)),
+    setting.Command(
+        'boot.prefix', command='os_prefix', default='', doc=_(
+            """
+            The string to prefix all filenames (e.g. boot.kernel.filename,
+            boot.devicetree.filename, etc.) with.
+
+            Note that this is literally a prefix, not a directory. For example,
+            if boot.prefix is "foo-" and boot.kernel.filename is "kernel.img"
+            then "foo-kernel.img" will be used as the kernel's filename. Hence,
+            if you wish to specify a directory, make sure to end the value with
+            "/".
+            """)),
     setting.CommandBool(
         'boot.test.enabled', command='test_mode', default=False, doc=_(
             """
@@ -1124,7 +1136,7 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
-    setting.Command(
+    setting.CommandFilename(
         'video.hdmi{}.edid.filename'.format(hdmi), index=hdmi,
         default='edid.dat', command='hdmi_edid_filename', doc=_(
             """

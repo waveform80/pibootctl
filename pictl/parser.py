@@ -1,10 +1,10 @@
+import io
 import os
 import hashlib
 import zipfile
 import warnings
 from pathlib import Path
 from datetime import datetime
-from collections import defaultdict
 
 from .info import get_board_types, get_board_serial
 
@@ -194,7 +194,7 @@ class BootFilter:
 
 class BootParser:
     def __init__(self):
-        self._content = defaultdict(list)
+        self._content = {}
         self._hash = None
         self._config = None
         self._timestamp = None
@@ -252,10 +252,32 @@ class BootParser:
             path = zipfile.ZipFile(str(path))
         self._config = list(self._parse(path, filename))
 
+    def add(self, path, filename, encoding=None, errors=None):
+        """
+        Adds the auxilliary *filename* under *path* to the configuration. This
+        is used to update the :attr:`hash` and :attr:`content` of the parsed
+        configuration to include files which are referenced by the boot
+        configuration but aren't themselves configuration files (e.g. EDID
+        data, and the kernel cmdline.txt).
+
+        If specified, *encoding* and *errors* are as for :func:`open`. If
+        *encoding* is :data:`None`, the data is assumed to be binary and the
+        method will return the content of the file as a :class:`bytes` string.
+        Otherwise, the content of the file is assumed to be text and will be
+        returned as a :class:`list` of :class:`str`.
+        """
+        if not isinstance(filename, Path):
+            filename = Path(filename)
+        if not isinstance(path, Path):
+            path = Path(path)
+        if not path.is_dir():
+            path = zipfile.ZipFile(str(path))
+        return self._open(path, filename, encoding, errors)
+
     def _parse(self, path, filename):
         overlay = 'base'
         filter = BootFilter()
-        for lineno, content in self._read(path, filename):
+        for lineno, content in self._read_text(path, filename):
             if content.startswith('[') and content.endswith(']'):
                 content = content[1:-1]
                 filter.evaluate(content)
@@ -322,28 +344,29 @@ class BootParser:
                     param = 'i2c_arm_baudrate'
             yield param, value
 
-    def _read(self, path, filename):
-        with context() as text:
-            for lineno, line in enumerate(text, start=1):
-                self._hash.update(line)
-                self._content[filename].append(line)
-                content = line.decode('ascii', errors='replace').rstrip()
-                # The bootloader ignores everything beyond column 80 and
-                # leading whitespace. The following slicing and stripping of
-                # the string is done in a precise order to ensure we excise
-                # chars beyond column 80 *before* stripping leading spaces
-                content = content[:80].lstrip()
-                try:
-                    comment = content.index('#')
-                except ValueError:
-                    pass
-                else:
-                    content = content[:comment]
-                if not content.strip():
-                    continue
-                yield lineno, content
+    def _read_text(self, path, filename):
+        for lineno, line in enumerate(
+                self._open(path, filename, encoding='ascii', errors='replace'),
+                start=1):
+            # The bootloader ignores everything beyond column 80 and
+            # leading whitespace. The following slicing and stripping of
+            # the string is done in a precise order to ensure we excise
+            # chars beyond column 80 *before* stripping leading spaces
+            line = line.rstrip()[:80].lstrip()
+            try:
+                comment = line.index('#')
+            except ValueError:
+                pass
+            else:
+                line = line[:comment]
+            if not line.strip():
+                continue
+            yield lineno, line
 
-    def _open(self, path, filename, encoding='ascii', errors='replace'):
+    def _open(self, path, filename, encoding=None, errors=None):
+        # It is *not* an error if filename doesn't exist under path; e.g. if
+        # config.txt doesn't exist that just means a purely default config.
+        # Likewise, if edid.dat doesn't exist, that's normal
         if isinstance(path, Path):
             context = lambda: (path / filename).open('rb')
             modified = lambda f: datetime.fromtimestamp(
@@ -351,5 +374,23 @@ class BootParser:
         else:
             context = lambda: path.open(str(filename), 'r')
             modified = lambda f: datetime(*path.getinfo(f.name).date_time)
-        with context() as file:
-            self._timestamp = max(self._timestamp, modified(file))
+        try:
+            file = context()
+        except (FileNotFoundError, KeyError):
+            # Yes, ZipFile raises KeyError when an archive member isn't found!
+            if encoding is None:
+                return b''
+            else:
+                return []
+        else:
+            with file:
+                self._timestamp = max(self._timestamp, modified(file))
+                content = file.read()
+                self._hash.update(content)
+                if encoding is None:
+                    self._content[filename] = content
+                else:
+                    self._content[filename] = list(
+                        io.TextIOWrapper(io.BytesIO(content),
+                                         encoding=encoding, errors=errors))
+                return self._content[filename]

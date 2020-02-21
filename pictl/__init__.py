@@ -7,7 +7,7 @@ import configparser
 from pathlib import Path
 from datetime import datetime
 
-from .store import Store
+from .store import Store, Settings
 from .term import ErrorHandler
 from .userstr import UserStr
 from .output import Namespace
@@ -328,17 +328,9 @@ def do_load(args):
 
 def do_diff(args):
     store = Store(args)
-    parser = BootParser()
-    left = Settings()
-    right = left.copy()
-    if args.left is None:
-        left_path = args.boot_path
-    else:
-        left_path = (args.store_path / args.left).with_suffix('.zip')
-    left.extract(parser.parse(left_path, args.config_read))
-    right_path = (args.store_path / args.right).with_suffix('.zip')
-    right.extract(parser.parse(right_path, args.config_read))
-    args.dump_diff(args.left, args.right, left.diff(right), fp=sys.stdout)
+    args.dump_diff(args.left, args.right,
+                   store[args.left].settings.diff(store[args.right].settings),
+                   fp=sys.stdout)
 
 
 def do_list(args):
@@ -355,20 +347,6 @@ def do_list(args):
 def do_remove(args):
     store = Store(args)
     del store[args.name]
-
-
-def store_parsed(args, parser, name):
-    args.store_path.mkdir(parents=True, exist_ok=True)
-    zip_path = (args.store_path / name).with_suffix('.zip')
-    # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
-    with ZipFile(str(zip_path), 'w', compression=ZIP_DEFLATED) as arc:
-        arc.comment = 'pictl:0:{}'.format(parser.hash.hexdigest()).encode('ascii')
-        for path, data in parser.content.items():
-            if isinstance(data, list):
-                for line in data:
-                    arc.writestr(str(path), b''.join(lines))
-                else:
-                    arc.writestr(str(path), data)
 
 
 def backup_if_needed(args, store):

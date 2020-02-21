@@ -38,22 +38,12 @@ class Setting:
     * :attr:`hint` may be queried to describe a value in human-readable terms
     """
     def __init__(self, name, *, default=None, doc=''):
-        # NOTE: self._settings is set in Settings.__init__ and Settings.copy
+        # self._settings is set in Settings.__init__ and Settings.copy
         self._settings = None
         self._name = name
         self._default = default
         self._value = None
         self._doc = dedent(doc).format(name=name, default=default)
-
-    @property
-    def settings(self):
-        """
-        The overall settings that this setting belongs to.
-        """
-        assert self._settings
-        # This is set to a weakref.ref by the Settings initializer (and copy);
-        # hence why we call it to return the actual reference.
-        return self._settings()
 
     @property
     def name(self):
@@ -103,8 +93,8 @@ class Setting:
         Returns the current value of the setting (or the :attr:`default` if the
         setting has not been :attr:`modified`).
         """
-        # NOTE: Must use self.default here, not self._default as descendents
-        # may calculate more complex defaults
+        # Must use self.default here, not self._default as descendents may
+        # calculate more complex defaults
         return self.default if self._value is None else self._value
 
     @property
@@ -185,8 +175,7 @@ class Setting:
 
     def _relative(self, path):
         """
-        Internal method which returns the name of this setting with a suffix
-        replaced by *path*.
+        Returns the name of this setting with a suffix replaced by *path*.
 
         The number of leading dot-characters in *path* dictate how many
         dot-separated components of this setting's name are removed before
@@ -214,6 +203,20 @@ class Setting:
         path = path.split('.')
         return '.'.join(parts + path)
 
+    def _query(self, name):
+        """
+        Queries another setting in the same set as this one.
+
+        This method should be used in preference to simply querying
+        ``self._settings()[name]`` as it's possible that the named setting has
+        been "hidden" in the set by a filter. This method bypasses the visible
+        filter to ensure that settings can always query other settings.
+        """
+        assert self._settings
+        # This is set to a weakref.ref by the Settings initializer (and
+        # Settings.copy); hence why we call it to return the actual reference.
+        return self._settings()._items[name]
+
 
 class Overlay(Setting):
     """
@@ -240,8 +243,8 @@ class Overlay(Setting):
             if isinstance(item, BootOverlay):
                 if item.overlay == self.overlay:
                     yield item, True
-                    # NOTE: We can "break" here because there's no way to
-                    # "unload" an overlay in the config
+                    # We can "break" here because there's no way to "unload" an
+                    # overlay in the config
                     break
 
     def update(self, value):
@@ -287,16 +290,16 @@ class OverlayParam(Overlay):
                 if item.overlay == self.overlay and item.param == self.param:
                     value = item.value
                     yield item, value
-                    # NOTE: No break here because later settings override
-                    # earlier ones
+                    # No break here because later settings override earlier
+                    # ones
 
     def update(self, value):
         return value
 
     def output(self):
-        # NOTE: We don't worry about outputting the dtoverlay; presumably that
-        # is represented by another setting and the key property will order
-        # our output appropriately after the correct dtoverlay output
+        # We don't worry about outputting the dtoverlay; presumably that is
+        # represented by another setting and the key property will order our
+        # output appropriately after the correct dtoverlay output
         if self.modified:
             yield 'dtparam={self.param}={self.value}'.format(self=self)
 
@@ -386,8 +389,7 @@ class Command(Setting):
                     item.command in self.commands and
                     item.hdmi == self.index):
                 yield item, item.params
-                # NOTE: No break here because later settings override
-                # earlier ones
+                # No break here because later settings override earlier ones
 
     def output(self, fmt=''):
         if self.modified:
@@ -530,8 +532,7 @@ class CommandForceIgnore(CommandBool):
                     item.command in self.commands and
                     int(item.params)):
                 yield item, (item.command == self.force)
-                # NOTE: No break here because later settings override
-                # earlier ones
+                # No break here because later settings override earlier ones
 
     def output(self):
         if self.modified:
@@ -599,6 +600,33 @@ class CommandMaskDummy(CommandMaskMaster):
     """
     def output(self):
         return ()
+
+
+class CommandFilename(Command):
+    """
+    Represents settings that contain a filename affected by the os_prefix
+    command. The :attr:`filename` returns the full filename incorporating the
+    value of os_prefix (if set), and :attr:`hint` outputs a suitable message
+    including the full path.
+    """
+    @property
+    def filename(self):
+        return self._query('boot.prefix').value + self.value
+
+    @property
+    def hint(self):
+        if self.value and self._query('boot.prefix').modified:
+            return _('{!r} with boot.prefix').format(self.filename)
+
+
+class CommandIncludedFile(CommandFilename):
+    """
+    Represents settings that reference a file which should be included in any
+    stored boot configuration.
+    """
+    # This class is effectively just a flag; the store handles scanning all
+    # settings for descendents of this class and incorporating their content
+    # after parsing the rest of the boot configuration
 
 
 class CommandDisplayGroup(CommandInt):
@@ -789,10 +817,10 @@ class CommandDisplayMode(CommandInt):
             0: _('auto from EDID'),
             1: self._valid_cea.get(self.value, '?'),
             2: self._valid_dmt.get(self.value, '?'),
-        }.get(self.settings[self._relative('.group')].value, '?')
+        }.get(self._query(self._relative('.group')).value, '?')
 
     def validate(self):
-        group = self.settings[self._relative('.group')]
+        group = self._query(self._relative('.group'))
         min_, max_ = {
             0: (0, 0),
             1: (1, 59),
@@ -874,7 +902,7 @@ class CommandDisplayRotate(CommandInt):
             ).format(self=self))
 
     def output(self):
-        flip = self.settings[self._relative('.flip')]
+        flip = self._query(self._relative('.flip'))
         if self.modified or flip.modified:
             value = (self.value // 90) | (flip.value << 16)
             if 'lcd_rotate' in self.commands:
@@ -922,7 +950,7 @@ class CommandDPIOutput(CommandMaskMaster):
     Represents the format portion of ``dpi_output_format``.
     """
     def output(self):
-        if self.settings[self._relative('.enabled')].value:
+        if self._query(self._relative('.enabled')).value:
             # For the DPI LCD display, always output dpi_output_format when
             # enable_dpi_lcd is set (and conversely, don't output it when not
             # set)
@@ -1016,7 +1044,7 @@ class CommandKernelAddress(CommandIntHex):
     """
     @property
     def default(self):
-        if self.settings[self._relative('.64bit')].value:
+        if self._query(self._relative('.64bit')).value:
             return 0x80000
         else:
             return 0x8000
@@ -1045,14 +1073,13 @@ class CommandKernel64(CommandBool):
                     yield item, bool(to_int(item.params) & 0x200)
 
 
-class CommandKernelFilename(Command):
+class CommandKernelFilename(CommandFilename):
     """
     Handles the ``kernel`` setting and its platform-dependent defaults.
     """
-    # TODO os_prefix integration
     @property
     def default(self):
-        if self.settings[self._relative('.64bit')].value:
+        if self._query(self._relative('.64bit')).value:
             return 'kernel8.img'
         else:
             board_types = get_board_types()
@@ -1064,11 +1091,10 @@ class CommandKernelFilename(Command):
                 return 'kernel.img'
 
 
-class CommandKernelCmdline(Command):
+class CommandKernelCmdline(CommandIncludedFile):
     """
     Handles the ``cmdline`` setting.
     """
-    # TODO os_prefix integration
     # TODO modification/tracking of external file
 
 
@@ -1095,8 +1121,8 @@ class CommandFirmwareCamera(CommandBool):
     def default(self):
         pi4 = 'pi4' in get_board_types()
         return (
-            self.settings['boot.firmware.filename'].value,
-            self.settings['boot.firmware.fixup'].value
+            self._query('boot.firmware.filename').value,
+            self._query('boot.firmware.fixup').value
         ) in {
             (FW_START[pi4].camera, FW_FIXUP[pi4].camera),
             # The debug firmware includes the camera firmware, so start_debug
@@ -1116,8 +1142,9 @@ class CommandFirmwareCamera(CommandBool):
                     yield item, None
 
     def validate(self):
-        # TODO validate gpu_mem setting is >=64
-        pass
+        if self.value and self._query('gpu.mem').value < 64:
+            raise ValueError(_(
+                'gpu.mem must be at least 64 when camera.enabled is on'))
 
 
 class CommandFirmwareDebug(CommandBool):
@@ -1128,8 +1155,8 @@ class CommandFirmwareDebug(CommandBool):
     def default(self):
         pi4 = 'pi4' in get_board_types()
         return (
-            self.settings['boot.firmware.filename'].value,
-            self.settings['boot.firmware.fixup'].value
+            self._query('boot.firmware.filename').value,
+            self._query('boot.firmware.fixup').value
         ) == (FW_START[pi4].debug, FW_FIXUP[pi4].debug)
 
     def extract(self, config):
@@ -1144,16 +1171,15 @@ class CommandFirmwareDebug(CommandBool):
                     yield item, None
 
 
-class CommandFirmwareFilename(Command):
+class CommandFirmwareFilename(CommandFilename):
     """
     Handles the ``start_file`` setting.
     """
-    # TODO os_prefix integration
     @property
     def default(self):
         pi4 = 'pi4' in get_board_types()
-        debug = self.settings['boot.debug.enabled']
-        camera = self.settings['camera.enabled']
+        debug = self._query('boot.debug.enabled')
+        camera = self._query('camera.enabled')
         # The "modified" tests below appear extraneous but aren't; they guard
         # against a circular reference in the case where everything is default
         if debug.modified and debug.value:
@@ -1164,16 +1190,15 @@ class CommandFirmwareFilename(Command):
             return FW_START[pi4].default
 
 
-class CommandFirmwareFixup(Command):
+class CommandFirmwareFixup(CommandFilename):
     """
     Handles the ``start_file`` setting.
     """
-    # TODO os_prefix integration
     @property
     def default(self):
         pi4 = 'pi4' in get_board_types()
-        debug = self.settings['boot.debug.enabled']
-        camera = self.settings['camera.enabled']
+        debug = self._query('boot.debug.enabled')
+        camera = self._query('camera.enabled')
         # The "modified" tests below appear extraneous but aren't; they guard
         # against a circular reference in the case where everything is default
         if debug.modified and debug.value:
@@ -1184,11 +1209,10 @@ class CommandFirmwareFixup(Command):
             return FW_FIXUP[pi4].default
 
 
-class CommandDeviceTree(Command):
+class CommandDeviceTree(CommandFilename):
     """
     Handles the ``device_tree`` command.
     """
-    # TODO os_prefix integration
 
 
 class CommandDeviceTreeAddress(CommandIntHex):
@@ -1262,7 +1286,7 @@ class CommandSerialEnabled(CommandBool):
     @property
     def default(self):
         if {'pi3', 'pi4', 'pi0w'} & get_board_types():
-            return not self.settings['bluetooth.enabled'].value
+            return not self._query('bluetooth.enabled').value
         else:
             return True
 
@@ -1271,7 +1295,7 @@ class OverlaySerialUART(Setting):
     @property
     def default(self):
         if {'pi3', 'pi4', 'pi0w'} & get_board_types():
-            if self.settings['bluetooth.enabled'].value:
+            if self._query('bluetooth.enabled').value:
                 return 1
             else:
                 return 0
@@ -1295,7 +1319,7 @@ class OverlaySerialUART(Setting):
         return to_int(value)
 
     def validate(self):
-        if self.value == 1 and not self.settings['bluetooth.enabled'].value:
+        if self.value == 1 and not self._query('bluetooth.enabled').value:
             raise ValueError(_(
                 'serial.uart must be 0 when bluetooth.enabled is off'))
 
@@ -1326,11 +1350,11 @@ class OverlayBluetoothEnabled(Setting):
         return to_bool(value)
 
     def output(self):
-        if self.modified or self.settings['serial.uart'].modified:
+        if self.modified or self._query('serial.uart').modified:
             # TODO what about pi3- prefix on systems with deprecated overlays?
             if not self.value:
                 yield 'dtoverlay=disable-bt'
-            elif self.settings['serial.uart'].value == 0:
+            elif self._query('serial.uart').value == 0:
                 yield 'dtoverlay=miniuart-bt'
 
 
@@ -1363,8 +1387,8 @@ class CommandCPUFreqMax(CommandInt):
         elif 'pi2' in board_types:
             return 900
         elif 'pi3+' in board_types:
-            # NOTE: pi3+ must come first here as pi3 & pi3+ appear together
-            # in pi3+ specific board-type entries
+            # pi3+ must come first here as pi3 & pi3+ appear together in pi3+
+            # specific board-type entries
             return 1400
         elif 'pi3' in board_types:
             return 1200
@@ -1416,9 +1440,9 @@ class CommandCoreFreqMax(CommandInt):
 
     def output(self):
         blocks = [self] + [
-            self.settings[self._relative(
+            self._query(self._relative(
                 '...{block}.frequency.max'.format(block=block)
-            )]
+            ))
             for block in ('h264', 'isp', 'v3d')
         ]
         if any(block.modified for block in blocks):
@@ -1442,7 +1466,7 @@ class CommandCoreFreqMin(CommandInt):
         board_types = get_board_types()
         if (
                 ('pi4' in board_types) and
-                self.settings['video.hdmi.mode.4kp60'].value):
+                self._query('video.hdmi.mode.4kp60').value):
             return 275
         elif board_types:
             return 250
@@ -1451,9 +1475,9 @@ class CommandCoreFreqMin(CommandInt):
 
     def output(self):
         blocks = [self] + [
-            self.settings[self._relative(
+            self._query(self._relative(
                 '...{block}.frequency.max'.format(block=block)
-            )]
+            ))
             for block in ('h264', 'isp', 'v3d')
         ]
         if any(block.modified for block in blocks):
@@ -1463,7 +1487,7 @@ class CommandCoreFreqMin(CommandInt):
                 yield from super().output()
 
     def validate(self):
-        other = self.settings[self._relative('.max')]
+        other = self._query(self._relative('.max'))
         if self.value > other.value:
             raise ValueError(_(
                 '{self.name} cannot be greater then {other.name}').format(
@@ -1492,9 +1516,9 @@ class CommandGPUFreqMax(CommandInt):
 
     def output(self):
         blocks = [self] + [
-            self.settings[self._relative(
+            self._query(self._relative(
                 '...{block}.frequency.max'.format(block=block)
-            )]
+            ))
             for block in ('h264', 'isp', 'v3d')
         ]
         if any(block.modified for block in blocks):
@@ -1526,9 +1550,9 @@ class CommandGPUFreqMin(CommandInt):
 
     def output(self):
         blocks = [self] + [
-            self.settings[self._relative(
+            self._query(self._relative(
                 '...{block}.frequency.max'.format(block=block)
-            )]
+            ))
             for block in ('h264', 'isp', 'v3d')
         ]
         if any(block.modified for block in blocks):
@@ -1539,7 +1563,7 @@ class CommandGPUFreqMin(CommandInt):
                 yield from super().output()
 
     def validate(self):
-        other = self.settings[self._relative('.max')]
+        other = self._query(self._relative('.max'))
         if self.value > other.value:
             raise ValueError(_(
                 '{self.name} cannot be greater then {other.name}').format(

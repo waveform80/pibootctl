@@ -132,12 +132,15 @@ class Namespace(argparse.Namespace):
         if not diff:
             fp.write(
                 _("No differences between {left} and {right}").format(
-                    left=_('Current') if left is None else left,
+                    left='<{}>'.format(_('Current')) if left is None else left,
                     right=right))
             fp.write("\n")
         else:
             self._print_table([
-                (_('Name'), '<{}>'.format(_('Current')) if left is None else left, right)
+                (_('Name'),
+                 '<{}>'.format(_('Current')) if left is None else left,
+                 right,
+                 )
             ] + sorted([
                 (l.name if l is not None else r.name,
                  '-' if l is None else self._format_setting_user(l),

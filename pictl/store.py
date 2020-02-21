@@ -10,6 +10,7 @@ from zipfile import ZipFile, BadZipFile, ZIP_DEFLATED
 
 from .files import AtomicReplaceFile
 from .parser import BootParser
+from .setting import CommandIncludedFile
 
 _ = gettext.gettext
 
@@ -112,10 +113,20 @@ class Store(Mapping):
             # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
             with ZipFile(str(self._path_of(key)), 'w',
                          compression=ZIP_DEFLATED) as arc:
-                arc.comment = 'pictl:0:{}'.format(item.hash).encode('ascii')
+                arc.comment = 'pictl:0:{hash}\n\n{warning}'.format(
+                    hash=item.hash, warning=_(
+                        'Do not edit the content of this archive; the line '
+                        'above is a hash of the content which will not match '
+                        'after manual editing. Please use the pictl tool to '
+                        'manipulate stored boot configurations'),
+                ).encode('ascii')
                 for path, data in item.content.items():
-                    if isinstance(data, list):
+                    if isinstance(data, bytes):
                         arc.writestr(str(path), data)
+                    else:
+                        arc.writestr(str(path), b''.join(
+                            line.encode('ascii') for line in data))
+
 
     def __delitem__(self, key):
         if key is None:
@@ -148,6 +159,7 @@ class BootConfiguration:
         self._filename = filename
         self._settings = None
         self._content = None
+        # TODO Extract hash and timestamp from zip metadata for stored configs
         self._hash = None
         self._timestamp = None
 
@@ -160,7 +172,9 @@ class BootConfiguration:
             for item, value in setting.extract(parser.config):
                 setting._value = value
                 # TODO track the config items affecting the setting
-        # TODO add externally referenced files to content/hash
+        for setting in self._settings.values():
+            if isinstance(setting, CommandIncludedFile):
+                parser.add(self._path, setting.filename)
         self._content = parser.content
         self._hash = parser.hash.hexdigest().lower()
         self._timestamp = parser.timestamp
@@ -205,10 +219,9 @@ class Settings(Mapping):
     """
     def __init__(self):
         # This is deliberately imported upon construction instead of at the
-        # module level, partly to avoid a circular reference but mostly because
-        # the settings module is "expensive" to import and materially affects
-        # start-up time on slower Pis; this matters where it is not required
-        # (e.g. just running --help)
+        # module level because the settings module is "expensive" to import and
+        # materially affects start-up time on slower Pis; this matters where it
+        # is not required (e.g. just running --help)
         from .settings import SETTINGS
 
         self._items = deepcopy(SETTINGS)
