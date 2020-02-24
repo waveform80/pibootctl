@@ -119,12 +119,16 @@ class Store(Mapping):
             raise KeyError(_(
                 "Cannot change the default configuration"))
         elif key is Current:
-            # TODO Sort contents so config.txt is written last; this will allow
+            # TODO Sort content so config.txt is written last; this will allow
             # effectively atomic switches of configuration for systems using
             # os_prefix
-            for filename, content in item.contents.items():
+            for filename, data in item.content.items():
                 with AtomicReplaceFile(self._boot_path / filename) as temp:
-                    temp.write(content)
+                    if isinstance(data, bytes):
+                        temp.write(data)
+                    else:
+                        temp.write(b''.join(
+                            line.encode('ascii') for line in data))
         else:
             self._store_path.mkdir(parents=True, exist_ok=True)
             # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
@@ -277,7 +281,9 @@ class StoredConfiguration(BootConfiguration):
                     default=datetime.fromtimestamp(0))
             else:
                 # TODO Should we allow "self-made" archives without a pictl
-                # header comment?
+                # header comment? We can't currently reach here because the
+                # enumerate and contains tests check for pictl:0: but that
+                # could be relaxed...
                 raise ValueError(_(
                     'Invalid stored configuration: missing hash'))
 

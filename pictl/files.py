@@ -63,7 +63,7 @@ class AtomicReplaceFile:
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         os.fchmod(self._withfile.file.fileno(),
-                  0o666 & AtomicReplaceFile.umask)
+                  0o666 & ~AtomicReplaceFile.umask)
         result = self._tempfile.__exit__(exc_type, exc_value, exc_tb)
         if exc_type is None:
             os.rename(self._withfile.name, str(self._path))

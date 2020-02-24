@@ -1136,7 +1136,7 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
 
             [1]: https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
             """)),
-    setting.CommandFilename(
+    setting.CommandIncludedFile(
         'video.hdmi{}.edid.filename'.format(hdmi), index=hdmi,
         default='edid.dat', command='hdmi_edid_filename', doc=_(
             """

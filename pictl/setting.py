@@ -1397,6 +1397,13 @@ class CommandCPUFreqMax(CommandInt):
         else:
             return 0
 
+    def validate(self):
+        other = self._query(self._relative('.min'))
+        if self.value < other.value:
+            raise ValueError(_(
+                '{self.name} cannot be less then {other.name}').format(
+                    self=self, other=other))
+
     @property
     def hint(self):
         return 'MHz'
@@ -1408,13 +1415,16 @@ class CommandCPUFreqMin(CommandInt):
     """
     @property
     def default(self):
-        board_types = get_board_types()
-        if {'pi0', 'pi1'} & board_types:
-            return 700
-        elif {'pi2', 'pi3', 'pi4'} & board_types:
-            return 600
+        if self._query('cpu.turbo.force').value:
+            return self._query(self._relative('.max')).value
         else:
-            return 0
+            board_types = get_board_types()
+            if {'pi0', 'pi1'} & board_types:
+                return 700
+            elif {'pi2', 'pi3', 'pi4'} & board_types:
+                return 600
+            else:
+                return 0
 
     @property
     def hint(self):
@@ -1425,18 +1435,28 @@ class CommandCoreFreqMax(CommandInt):
     """
     Handles the ``core_freq`` command.
     """
-    # TODO Handle enable_uart effect
     @property
     def default(self):
-        board_types = get_board_types()
-        if {'pi1', 'pi2'} & board_types:
-            return 250
-        elif {'pi0', 'pi3'} & board_types:
-            return 400
-        elif 'pi4' in board_types:
-            return 500
+        if (
+                self._query('serial.enabled').value and
+                self._query('serial.uart').value == 1 and
+                not self._query('cpu.turbo.force').value):
+            return self._query(self._relative('.min')).value
         else:
-            return 0
+            board_types = get_board_types()
+            if {'pi1', 'pi2'} & board_types:
+                return 250
+            elif {'pi0', 'pi3'} & board_types:
+                return 400
+            elif 'pi4' in board_types:
+                if self._query('video.tv.enabled').value:
+                    return 432
+                elif self._query('video.hdmmi.mode.4kp60').value:
+                    return 550
+                else:
+                    return 500
+            else:
+                return 0
 
     def output(self):
         blocks = [self] + [
@@ -1451,6 +1471,13 @@ class CommandCoreFreqMax(CommandInt):
             else:
                 yield from super().output()
 
+    def validate(self):
+        other = self._query(self._relative('.min'))
+        if self.value < other.value:
+            raise ValueError(_(
+                '{self.name} cannot be less then {other.name}').format(
+                    self=self, other=other))
+
     @property
     def hint(self):
         return 'MHz'
@@ -1460,18 +1487,20 @@ class CommandCoreFreqMin(CommandInt):
     """
     Handles the ``core_freq_min`` command.
     """
-    # TODO Handle enable_uart effect
     @property
     def default(self):
-        board_types = get_board_types()
-        if (
-                ('pi4' in board_types) and
-                self._query('video.hdmi.mode.4kp60').value):
-            return 275
-        elif board_types:
-            return 250
+        if self._query('cpu.turbo.force').value:
+            return self._query(self._relative('.max')).value
         else:
-            return 0
+            board_types = get_board_types()
+            if (
+                    ('pi4' in board_types) and
+                    self._query('video.hdmi.mode.4kp60').value):
+                return 275
+            elif board_types:
+                return 250
+            else:
+                return 0
 
     def output(self):
         blocks = [self] + [
@@ -1485,13 +1514,6 @@ class CommandCoreFreqMin(CommandInt):
                 yield 'gpu_freq_min={value}'.format(value=self.value)
             else:
                 yield from super().output()
-
-    def validate(self):
-        other = self._query(self._relative('.max'))
-        if self.value > other.value:
-            raise ValueError(_(
-                '{self.name} cannot be greater then {other.name}').format(
-                    self=self, other=other))
 
     @property
     def hint(self):
@@ -1528,6 +1550,13 @@ class CommandGPUFreqMax(CommandInt):
             else:
                 yield from super().output()
 
+    def validate(self):
+        other = self._query(self._relative('.min'))
+        if self.value < other.value:
+            raise ValueError(_(
+                '{self.name} cannot be less then {other.name}').format(
+                    self=self, other=other))
+
     @property
     def hint(self):
         return 'MHz'
@@ -1540,13 +1569,16 @@ class CommandGPUFreqMin(CommandInt):
     """
     @property
     def default(self):
-        board_types = get_board_types()
-        if 'pi4' in board_types:
-            return 500
-        elif board_types:
-            return 250
+        if self._query('cpu.turbo.force').value:
+            return self._query(self._relative('.max')).value
         else:
-            return 0
+            board_types = get_board_types()
+            if 'pi4' in board_types:
+                return 500
+            elif board_types:
+                return 250
+            else:
+                return 0
 
     def output(self):
         blocks = [self] + [

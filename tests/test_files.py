@@ -11,6 +11,7 @@ def test_atomic_write_success(tmpdir):
         temp_name = f.name
     assert os.path.exists(str(tmpdir.join('foo')))
     assert not os.path.exists(temp_name)
+    # TODO Test file permissions?
 
 
 def test_atomic_write_failed(tmpdir):
