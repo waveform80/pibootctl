@@ -56,8 +56,8 @@ initramfs initrd.img followkernel
 device_tree_address=0x3000000
 dtoverlay=vc4-fkms-v3d
 """)
-    p = BootParser()
-    p.parse(str(tmpdir))
+    p = BootParser(Path(str(tmpdir)))
+    p.parse()
     assert p.config == [
         BootCommand(Path('config.txt'), 2, 'kernel', 'vmlinuz', 0),
         BootCommand(Path('config.txt'), 3, 'initramfs', ('initrd.img', 'followkernel')),
@@ -70,9 +70,9 @@ def test_parse_invalid(tmpdir):
     tmpdir.join('config.txt').write("""# This is a comment
 This is not
 """)
-    p = BootParser()
+    p = BootParser(Path(str(tmpdir)))
     with pytest.warns(BootInvalid) as w:
-        p.parse(str(tmpdir))
+        p.parse()
         assert p.config == []
         assert len(w) == 1
         assert w[0].message.args[0] == 'config.txt:2 invalid line'
@@ -84,8 +84,8 @@ dtparam=audio=on,i2c=on,i2c_baudrate=400000
 dtparam=spi,i2c0
 dtoverlay=lirc-rpi:gpio_out_pin=16,gpio_in_pin=17,gpio_in_pull=down
 """)
-    p = BootParser()
-    p.parse(str(tmpdir))
+    p = BootParser(Path(str(tmpdir)))
+    p.parse()
     assert p.config == [
         BootParam(Path('config.txt'), 1, 'base', 'audio', 'on'),
         BootParam(Path('config.txt'), 1, 'base', 'i2c_arm', 'on'),
@@ -114,8 +114,8 @@ dtparam=spi=on
 hdmi_group=1
 hdmi_mode=4
 """)
-    p = BootParser()
-    p.parse(str(tmpdir))
+    p = BootParser(Path(str(tmpdir)))
+    p.parse()
     assert p.config == [
         BootSection(Path('config.txt'), 2, 'none'),
         BootSection(Path('config.txt'), 5, 'all'),
@@ -137,8 +137,8 @@ hdmi_mode=4
 hdmi_group=2
 hdmi_mode=28
 """)
-    p = BootParser()
-    p.parse(str(tmpdir))
+    p = BootParser(Path(str(tmpdir)))
+    p.parse()
     assert p.config == [
         BootCommand(Path('config.txt'), 2, 'hdmi_group', '1', 0),
         BootCommand(Path('config.txt'), 3, 'hdmi_mode', '4', 0),
@@ -154,8 +154,8 @@ hdmi_group:0=1
 hdmi_mode:1=4
 hdmi_mode:a=4
 """)
-    p = BootParser()
-    p.parse(str(tmpdir))
+    p = BootParser(Path(str(tmpdir)))
+    p.parse()
     assert p.config == [
         BootCommand(Path('config.txt'), 1, 'hdmi_group', '1', 0),
         BootCommand(Path('config.txt'), 2, 'hdmi_mode', '4', 1),
@@ -173,8 +173,8 @@ hdmi_mode=16
 hdmi_group=1
 hdmi_mode=4
 """)
-    p = BootParser()
-    p.parse(str(tmpdir))
+    p = BootParser(Path(str(tmpdir)))
+    p.parse()
     assert p.config == [
         BootSection(Path('config.txt'), 2, 'EDID=BNQ-BenQ_GW2270'),
         BootCommand(Path('config.txt'), 3, 'hdmi_group', '1', 0),
@@ -190,8 +190,8 @@ def test_parse_gpio_section(tmpdir):
 [gpio4=1]
 dtparam=audio=on
 """)
-    p = BootParser()
-    p.parse(str(tmpdir))
+    p = BootParser(Path(str(tmpdir)))
+    p.parse()
     assert p.config == [
         BootSection(Path('config.txt'), 2, 'gpio4=1'),
         BootParam(Path('config.txt'), 3, 'base', 'audio', 'on'),
@@ -204,8 +204,8 @@ def test_parse_serial_bad_section(tmpdir):
 [0xwtf]
 dtparam=audio=on
 """)
-        p = BootParser()
-        p.parse(str(tmpdir))
+        p = BootParser(Path(str(tmpdir)))
+        p.parse()
         assert p.config == [
             BootSection(Path('config.txt'), 2, '0xwtf'),
             BootParam(Path('config.txt'), 3, 'base', 'audio', 'on'),
@@ -219,8 +219,8 @@ def test_parse_serial_section_match(tmpdir):
 [0xdeadd00d]
 dtparam=audio=on
 """)
-        p = BootParser()
-        p.parse(str(tmpdir))
+        p = BootParser(Path(str(tmpdir)))
+        p.parse()
         assert p.config == [
             BootSection(Path('config.txt'), 2, '0xdeadd00d'),
             BootParam(Path('config.txt'), 3, 'base', 'audio', 'on'),
@@ -234,8 +234,8 @@ def test_parse_serial_section_mismatch(tmpdir):
 [0x12345678]
 dtparam=audio=on
 """)
-        p = BootParser()
-        p.parse(str(tmpdir))
+        p = BootParser(Path(str(tmpdir)))
+        p.parse()
         assert p.config == [
             BootSection(Path('config.txt'), 2, '0x12345678'),
         ]
@@ -252,8 +252,8 @@ kernel=uboot_3_32b.bin
 [pi4]
 kernel=uboot_4_32b.bin
 """)
-        p = BootParser()
-        p.parse(str(tmpdir))
+        p = BootParser(Path(str(tmpdir)))
+        p.parse()
         assert p.config == [
             BootSection(Path('config.txt'), 2, 'pi2'),
             BootSection(Path('config.txt'), 4, 'pi3'),
@@ -273,8 +273,8 @@ kernel=uboot_3_32b.bin
 [pi4]
 kernel=uboot_4_32b.bin
 """)
-        p = BootParser()
-        p.parse(str(tmpdir))
+        p = BootParser(Path(str(tmpdir)))
+        p.parse()
         content = [
             "# This is a comment\n",
             "[pi2]\n",
@@ -306,19 +306,48 @@ dtoverlay=vc4-fkms-v3d
     h = hashlib.sha1()
     h.update(data1)
     h.update(data2)
-    p = BootParser()
-    p.parse(str(tmpdir.join('stored.zip')))
-    p.add(str(tmpdir.join('stored.zip')), 'cmdline.txt')
-    assert p.config == [
-        BootCommand(Path('config.txt'), 2, 'kernel', 'vmlinuz', 0),
-        BootCommand(Path('config.txt'), 3, 'device_tree_address', '0x3000000', 0),
-        BootOverlay(Path('config.txt'), 4, 'vc4-fkms-v3d'),
+    with zipfile.ZipFile(str(tmpdir.join('stored.zip')), 'r') as arc:
+        p = BootParser(arc)
+        p.parse()
+        p.add('cmdline.txt')
+        assert p.config == [
+            BootCommand(Path('config.txt'), 2, 'kernel', 'vmlinuz', 0),
+            BootCommand(Path('config.txt'), 3, 'device_tree_address', '0x3000000', 0),
+            BootOverlay(Path('config.txt'), 4, 'vc4-fkms-v3d'),
+        ]
+        assert p.hash == h.hexdigest().lower()
+
+
+def test_parse_dict(tmpdir):
+    tmpdir = Path(str(tmpdir))
+    (tmpdir / 'config.txt').write_text("""# This is a comment
+[all]
+dtoverlay=foo
+include syscfg.txt
+""")
+    (tmpdir / 'syscfg.txt').write_text("""dtparam=i2c=on
+dtparam=spi=on
+hdmi_group=1
+hdmi_mode=4
+""")
+    (tmpdir / 'edid.dat').write_bytes(b'\x00\x00\x00\xFF')
+    p1 = BootParser(tmpdir)
+    p1.parse()
+    p1.add('edid.dat')
+    masked = p1.content.copy()
+    masked[Path('syscfg.txt')] = []
+    p2 = BootParser(masked)
+    p2.parse()
+    p2.add('edid.dat')
+    assert p2.config == [
+        BootSection(Path('config.txt'), 2, 'all'),
+        BootOverlay(Path('config.txt'), 3, 'foo'),
+        BootInclude(Path('config.txt'), 4, Path('syscfg.txt')),
     ]
-    assert p.hash == h.hexdigest().lower()
 
 
 def test_parse_empty(tmpdir):
-    p = BootParser()
-    p.parse(str(tmpdir))
+    p = BootParser(Path(str(tmpdir)))
+    p.parse()
     assert p.config == []
     assert p.hash == hashlib.sha1().hexdigest().lower()

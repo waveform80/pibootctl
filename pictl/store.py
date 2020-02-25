@@ -212,8 +212,8 @@ class BootConfiguration:
 
     def _parse(self):
         assert self._settings is None
-        parser = BootParser()
-        parser.parse(self._path, self._filename)
+        parser = BootParser(self._path)
+        parser.parse(self._filename)
         self._settings = Settings()
         for setting in self._settings.values():
             for item, value in setting.extract(parser.config):
@@ -221,7 +221,7 @@ class BootConfiguration:
                 # TODO track the config items affecting the setting
         for setting in self._settings.values():
             if isinstance(setting, CommandIncludedFile):
-                parser.add(self._path, setting.filename)
+                parser.add(setting.filename)
         self._content = parser.content
         self._hash = parser.hash
         self._timestamp = parser.timestamp
@@ -265,27 +265,29 @@ class StoredConfiguration(BootConfiguration):
     The starting file of the configuration is given by *filename*.
     """
     def __init__(self, path, filename='config.txt'):
-        super().__init__(path, filename)
+        super().__init__(ZipFile(str(path), 'r'), filename)
         # We can grab the hash and timestamp from the arc's meta-data without
         # any decompression work (it's all in the uncompressed footer)
-        with ZipFile(str(path), 'r') as arc:
-            comment = arc.comment
-            if comment.startswith(b'pictl:0:'):
-                if not set(comment[8:48]) <= set(b'0123456789abcdef'):
-                    raise ValueError(_(
-                        'Invalid stored configuration: non-hex hash'))
-                self._hash = comment[8:48].decode('ascii')
-                # A stored archive can be empty, hence default= is required
-                self._timestamp = max(
-                    (datetime(*info.date_time) for info in arc.infolist()),
-                    default=datetime.fromtimestamp(0))
-            else:
-                # TODO Should we allow "self-made" archives without a pictl
-                # header comment? We can't currently reach here because the
-                # enumerate and contains tests check for pictl:0: but that
-                # could be relaxed...
+        comment = self.path.comment
+        if comment.startswith(b'pictl:0:'):
+            h = comment[8:48].decode('ascii')
+            if len(h) != 40:
                 raise ValueError(_(
-                    'Invalid stored configuration: missing hash'))
+                    'Invalid stored configuration: invalid length'))
+            if not set(h) <= set('0123456789abcdef'):
+                raise ValueError(_(
+                    'Invalid stored configuration: non-hex hash'))
+            self._hash = h
+            # A stored archive can be empty, hence default= is required
+            self._timestamp = max(
+                (datetime(*info.date_time) for info in self.path.infolist()),
+                default=datetime.fromtimestamp(0))
+        else:
+            # TODO Should we allow "self-made" archives without a pictl
+            # header comment? We can't currently reach here because the
+            # enumerate and contains tests check for pictl:0: but that
+            # could be relaxed...
+            assert False, 'Invalid stored configuration: missing hash'
 
 
 class Settings(Mapping):

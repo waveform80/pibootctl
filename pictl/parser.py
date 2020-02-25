@@ -1,9 +1,9 @@
 import io
 import os
 import hashlib
-import zipfile
 import warnings
 from pathlib import Path
+from zipfile import ZipFile
 from datetime import datetime
 
 from .info import get_board_types, get_board_serial
@@ -193,11 +193,38 @@ class BootFilter:
 
 
 class BootParser:
-    def __init__(self):
+    """
+    Parser for the files used to configure the Raspberry Pi's bootloader.
+
+    The *path* specifies the container of all files that make up the
+    configuration. It be one of:
+
+    * a :class:`~pathlib.Path` in which case the path must be a directory
+
+    * a :class:`~zipfile.ZipFile`
+
+    * a :class:`dict` mapping filenames to sequences of :class:`str` (for
+      configuration files), or :class:`bytes` strings for auxilliary binary
+      files; effectively the output of :attr:`content` after parsing
+    """
+    def __init__(self, path):
+        assert isinstance(path, (Path, ZipFile, dict))
+        if isinstance(path, Path):
+            assert path.is_dir()
+        self._path = path
         self._content = {}
         self._hash = None
         self._config = None
         self._timestamp = None
+
+    @property
+    def path(self):
+        """
+        The path under which all configuration files can be found. This may be
+        a :class:`~pathlib.Path` instance, or a :class:`~zipfile.ZipFile`, or a
+        :class:`dict`.
+        """
+        return self._path
 
     @property
     def config(self):
@@ -232,30 +259,24 @@ class BootParser:
         """
         return self._timestamp
 
-    def parse(self, path, filename="config.txt"):
+    def parse(self, filename="config.txt"):
         """
-        Parse the boot configuration on *path* which may either be a string or
-        a :class:`~pathlib.Path`. The path must either be a directory
-        containing *filename* (which defaults to "config.txt"), or a .zip file
-        containing *filename* (i.e. a stored boot configuration as produced by
-        the "save" command).
+        Parse the boot configuration on :attr:`path`. The optional *filename*
+        specifies the "root" of the configuration, and defaults to
+        :file:`config.txt`.
         """
+        if not isinstance(filename, Path):
+            filename = Path(filename)
         self._content.clear()
         self._hash = hashlib.sha1()
         self._timestamp = datetime.fromtimestamp(0)  # UNIX epoch
-        if not isinstance(filename, Path):
-            filename = Path(filename)
-        if not isinstance(path, Path):
-            path = Path(path)
-        if not path.is_dir():
-            path = zipfile.ZipFile(str(path))
-        self._config = list(self._parse(path, filename))
+        self._config = list(self._parse(filename))
 
-    def add(self, path, filename, encoding=None, errors=None):
+    def add(self, filename, encoding=None, errors=None):
         """
-        Adds the auxilliary *filename* under *path* to the configuration. This
-        is used to update the :attr:`hash` and :attr:`content` of the parsed
-        configuration to include files which are referenced by the boot
+        Adds the auxilliary *filename* under :attr:`path` to the configuration.
+        This is used to update the :attr:`hash` and :attr:`content` of the
+        parsed configuration to include files which are referenced by the boot
         configuration but aren't themselves configuration files (e.g. EDID
         data, and the kernel cmdline.txt).
 
@@ -267,16 +288,12 @@ class BootParser:
         """
         if not isinstance(filename, Path):
             filename = Path(filename)
-        if not isinstance(path, Path):
-            path = Path(path)
-        if not path.is_dir():
-            path = zipfile.ZipFile(str(path))
-        return self._open(path, filename, encoding, errors)
+        return self._open(filename, encoding, errors)
 
-    def _parse(self, path, filename):
+    def _parse(self, filename):
         overlay = 'base'
         filter = BootFilter()
-        for lineno, content in self._read_text(path, filename):
+        for lineno, content in self._read_text(filename):
             if content.startswith('[') and content.endswith(']'):
                 content = content[1:-1]
                 filter.evaluate(content)
@@ -316,7 +333,7 @@ class BootParser:
                     command, included = content.split(None, 1)
                     included = Path(included)
                     yield BootInclude(filename, lineno, included)
-                    yield from self._parse(path, included)
+                    yield from self._parse(included)
                 elif content.startswith('initramfs'):
                     command, initrd, address = content.split(None, 2)
                     yield BootCommand(
@@ -343,9 +360,9 @@ class BootParser:
                     param = 'i2c_arm_baudrate'
             yield param, value
 
-    def _read_text(self, path, filename):
+    def _read_text(self, filename):
         for lineno, line in enumerate(
-                self._open(path, filename, encoding='ascii', errors='replace'),
+                self._open(filename, encoding='ascii', errors='replace'),
                 start=1):
             # The bootloader ignores everything beyond column 80 and
             # leading whitespace. The following slicing and stripping of
@@ -362,21 +379,28 @@ class BootParser:
                 continue
             yield lineno, line
 
-    def _open(self, path, filename, encoding=None, errors=None):
+    def _open(self, filename, encoding=None, errors=None):
+        if isinstance(self.path, Path):
+            context = lambda: (self.path / filename).open('rb')
+            modified = lambda f: datetime.fromtimestamp(
+                os.fstat(f.fileno()).st_mtime)
+        elif isinstance(self.path, ZipFile):
+            context = lambda: self.path.open(str(filename), 'r')
+            modified = lambda f: datetime(*self.path.getinfo(f.name).date_time)
+        elif isinstance(self.path, dict):
+            context = lambda: DictOpen(self.path[filename])
+            modified = lambda f: f.timestamp
+        else:
+            assert False
+
         # It is *not* an error if filename doesn't exist under path; e.g. if
         # config.txt doesn't exist that just means a purely default config.
         # Likewise, if edid.dat doesn't exist, that's normal
-        if isinstance(path, Path):
-            context = lambda: (path / filename).open('rb')
-            modified = lambda f: datetime.fromtimestamp(
-                os.fstat(f.fileno()).st_mtime)
-        else:
-            context = lambda: path.open(str(filename), 'r')
-            modified = lambda f: datetime(*path.getinfo(f.name).date_time)
         try:
             file = context()
         except (FileNotFoundError, KeyError):
             # Yes, ZipFile raises KeyError when an archive member isn't found!
+            # Of course, so does dict...
             if encoding is None:
                 return b''
             else:
@@ -393,3 +417,33 @@ class BootParser:
                         io.TextIOWrapper(io.BytesIO(content),
                                          encoding=encoding, errors=errors))
                 return self._content[filename]
+
+
+class DictOpen:
+    """
+    Mutates file contents (in the manner of :attr:`BootParser.output`; lists of
+    :class:`str` for configuration files, and simple :class:`bytes` strings for
+    binary data) into something that acts a little like a file-like object,
+    just to ease the code in :class:`BootParser` a bit.
+    """
+    def __init__(self, data):
+        if isinstance(data, list):
+            self._data = b''.join(line.encode('ascii') for line in data)
+        else:
+            assert isinstance(data, bytes)
+            self._data = data
+
+    @property
+    def timestamp(self):
+        # We don't care about the modification date when dealing with a dict
+        # for a path; this case is only used for internal diffs of settings
+        return datetime.fromtimestamp(0)
+
+    def read(self):
+        return self._data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        pass

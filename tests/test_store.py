@@ -58,6 +58,12 @@ dtparam=spi=on
             z.writestr('config.txt', b'')
     with pytest.raises(ValueError):
         store['foo']
+    with (store_config.store_path / 'foo.zip').open('wb') as f:
+        with ZipFile(f, 'w') as z:
+            z.comment = b'pictl:0:' + b'h' * 40
+            z.writestr('config.txt', b'')
+    with pytest.raises(ValueError):
+        store['foo']
 
 
 def test_store_getitem(store_config):

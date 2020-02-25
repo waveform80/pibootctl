@@ -111,11 +111,10 @@ class Setting:
 
     def extract(self, config):
         """
-        Given a *config* which must be an iterable of :class:`BootLine` items
-        (e.g. as obtained by calling :meth:`BootParser.parse`), yields each
-        line that affects the setting's value, and the new value that the
-        line produces (or :data:`None` indicating that the value is now, or
-        is still, the default state).
+        Given a *config* which must be a sequence of :class:`BootLine` items,
+        yields each line that affects the setting's value, and the new value
+        that the line produces (or :data:`None` indicating that the value is
+        now, or is still, the default state).
 
         .. note::
 
