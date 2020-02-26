@@ -127,8 +127,7 @@ class Store(Mapping):
                     temp.write(file.content)
         else:
             self._store_path.mkdir(parents=True, exist_ok=True)
-            # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
-            with ZipFile(str(self._path_of(key)), 'w',
+            with ZipFile(str(self._path_of(key)), 'x',
                          compression=ZIP_DEFLATED) as arc:
                 arc.comment = 'pictl:0:{hash}\n\n{warning}'.format(
                     hash=item.hash, warning=_(

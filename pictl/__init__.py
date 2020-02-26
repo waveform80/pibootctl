@@ -1,6 +1,7 @@
 import io
 import os
 import sys
+import errno
 import gettext
 import argparse
 import configparser
@@ -358,12 +359,21 @@ class ApplicationNamespace(OutputNamespace):
     def backup_if_needed(self):
         if self.backup and self.store.active is None:
             name = 'backup-{now:%Y%m%d-%H%M%S}'.format(now=datetime.now())
-            # TODO Clocks can be funny on the pi; make absolutely damned
-            # certain that name doesn't already exist
-            print(_(
-                'Backing up current configuration in {name}').format(
-                    name=name), file=sys.stderr)
-            self.store[name] = self.store[Current]
+            suffix = 0
+            while True:
+                try:
+                    self.store[name] = self.store[Current]
+                except OSError as exc:
+                    if exc.errno != errno.EEXIST:
+                        raise
+                    suffix += 1
+                    name = 'backup-{now:%Y%m%d-%H%M%S}-{suffix}'.format(
+                        now=datetime.now(), suffix=suffix)
+                else:
+                    print(_(
+                        'Backed up current configuration in {name}').format(
+                            name=name), file=sys.stderr)
+                    break
 
     def mark_reboot_required(self):
         if self.reboot_required:
