@@ -1456,7 +1456,7 @@ class CommandCoreFreqMax(CommandInt):
             elif 'pi4' in board_types:
                 if self._query('video.tv.enabled').value:
                     return 432
-                elif self._query('video.hdmmi.mode.4kp60').value:
+                elif self._query('video.hdmi.mode.4kp60').value:
                     return 550
                 else:
                     return 500
