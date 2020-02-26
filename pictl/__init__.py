@@ -151,8 +151,9 @@ class ApplicationNamespace(OutputNamespace):
             help=_("Change the state of one or more boot settings"))
         set_cmd.add_argument(
             "--no-backup", action="store_false", dest="backup",
-            help=_("Don't take an automatic backup of the current boot "
-                   "configuration if one doesn't exist"))
+            help=_(
+                "Don't take an automatic backup of the current boot "
+                "configuration if one doesn't exist"))
         group = self.add_style_arg(set_cmd, required=True)
         group.add_argument(
             "set_vars", nargs="*", metavar="name=value", default=[],
@@ -167,8 +168,9 @@ class ApplicationNamespace(OutputNamespace):
             help=_("Store the current boot configuration for later use"))
         save_cmd.add_argument(
             "name",
-            help=_("The name to save the current boot configuration under; can "
-                   "include any characters legal in a filename"))
+            help=_(
+                "The name to save the current boot configuration under; can "
+                "include any characters legal in a filename"))
         save_cmd.set_defaults(func=self.do_save)
 
         load_cmd = commands.add_parser(
@@ -181,8 +183,9 @@ class ApplicationNamespace(OutputNamespace):
             help=_("The name of the boot configuration to restore"))
         load_cmd.add_argument(
             "--no-backup", action="store_false", dest="backup",
-            help=_("Don't take an automatic backup of the current boot "
-                   "configuration if one doesn't exist"))
+            help=_(
+                "Don't take an automatic backup of the current boot "
+                "configuration if one doesn't exist"))
         load_cmd.set_defaults(func=self.do_load)
 
         diff_cmd = commands.add_parser(
@@ -194,8 +197,9 @@ class ApplicationNamespace(OutputNamespace):
             help=_("Show the differences between boot configurations"))
         diff_cmd.add_argument(
             "left", nargs="?", default=Current,
-            help=_("The boot configuration to compare from, or the current "
-                   "configuration if omitted"))
+            help=_(
+                "The boot configuration to compare from, or the current "
+                "configuration if omitted"))
         diff_cmd.add_argument(
             "right",
             help=_("The boot configuration to compare against"))
@@ -215,7 +219,8 @@ class ApplicationNamespace(OutputNamespace):
         show_cmd.add_argument(
             "-a", "--all", action="store_true",
             help=_(
-                "Include all settings, not just those modified, in the output"))
+                "Include all settings, not just those modified, in the "
+                "output"))
         self.add_style_arg(show_cmd)
         show_cmd.set_defaults(func=self.do_show)
 
@@ -318,7 +323,6 @@ class ApplicationNamespace(OutputNamespace):
         left = self.store[self.left].settings
         right = self.store[self.right].settings
         self.dump_diff(self.left, self.right, left.diff(right), fp=sys.stdout)
-
 
     def do_list(self):
         current = self.store[Current]
