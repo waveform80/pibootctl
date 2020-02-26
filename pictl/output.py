@@ -9,6 +9,7 @@ from collections import OrderedDict
 
 import yaml
 
+from .store import Current
 from .setting import Command, OverlayParam
 from .formatter import TableWrapper, unicode_table, pretty_table, render
 from .term import term_size
@@ -129,15 +130,15 @@ class OutputNamespace(argparse.Namespace):
 
     def _dump_diff_user(self, left, right, diff, fp):
         if not diff:
-            fp.write(
-                _("No differences between {left} and {right}").format(
-                    left='<{}>'.format(_('Current')) if left is None else left,
+            fp.write(_(
+                "No differences between {left} and {right}").format(
+                    left='<{}>'.format(_('Current')) if left is Current else left,
                     right=right))
             fp.write("\n")
         else:
             self._print_table([
                 (_('Name'),
-                 '<{}>'.format(_('Current')) if left is None else left,
+                 '<{}>'.format(_('Current')) if left is Current else left,
                  right,
                  )
             ] + sorted([

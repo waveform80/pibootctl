@@ -324,13 +324,14 @@ class InvalidConfiguration(ValueError):
     """
     Error raised when an updated configuration fails to validate. All
     :exc:`ValueError` exceptions raised during validation are available from
-    the :attr:`errors` attribute which maps settings to the exception they
-    raised during validation.
+    the :attr:`errors` attribute.
     """
     def __init__(self, errors):
         super().__init__(_(
-            "Configuration failed to validate with {:d} "
-            "error(s)").format(len(errors)))
+            "Configuration failed to validate with {count:d} "
+            "error(s):\n{errors}").format(
+                count=len(errors),
+                errors='\n'.join(str(e) for e in errors)))
         self.errors = errors
 
 
@@ -342,7 +343,9 @@ class IneffectiveConfiguration(ValueError):
     """
     def __init__(self, settings):
         super().__init__(_(
-            "Failed to set {:d} setting(s)").format(len(settings)))
+            "Failed to set {count:d} setting(s):\n{messages}").format(
+                count=len(settings),
+                messages='\n'.join(s.name for s in settings)))
         self.settings = settings
 
 
@@ -411,7 +414,7 @@ class MutableConfiguration(BootConfiguration):
                     content.append(line)
         self._path[self._rewrite] = BootFile(
             self._rewrite, datetime.now(),
-            b''.join(line.encode('ascii') for line in content),
+            b'\n'.join(line.encode('ascii') for line in content),
             'ascii', 'replace')
         self._settings = self._files = self._hash = None
         self._parse()

@@ -45,6 +45,12 @@ class Setting:
         self._value = None
         self._doc = dedent(doc).format(name=name, default=default)
 
+    def __repr__(self):
+        return (
+            '<{self.__class__.__name__} name={self.name!r} '
+            'default={self.default!r} value={self.value!r} '
+            'modified={self.modified}>'.format(self=self))
+
     @property
     def name(self):
         """
