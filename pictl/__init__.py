@@ -7,6 +7,7 @@ import configparser
 from pathlib import Path
 from datetime import datetime
 
+from .setting import Command
 from .store import Store, Current, Default
 from .term import ErrorHandler
 from .userstr import UserStr
@@ -248,17 +249,35 @@ class ApplicationNamespace(OutputNamespace):
 
     def do_help(self):
         default = self.store[Default].settings
-        # TODO Use something like levenshtein to detect "close" but incorrect
-        # setting names
-        if 'cmd' in self and self.cmd in default:
-            self.dump_setting(default[self.cmd], fp=sys.stdout)
-        else:
-            # TODO Lookup underlying boot commands if default lookup fails
-            parser = self.get_parser()
-            if 'cmd' not in self or self.cmd is None:
-                parser.parse_args(['-h'])
+        if 'cmd' in self and self.cmd is not None:
+            if self.cmd in default:
+                self.dump_setting(default[self.cmd], fp=sys.stdout)
+            elif '.' in self.cmd:
+                # TODO Mis-spelled setting; use something like levenshtein to
+                # detect "close" but incorrect setting names
+                raise NotImplementedError
+            elif '_' in self.cmd:
+                # Old-style command
+                commands = [
+                    setting
+                    for setting in default.values()
+                    if isinstance(setting, Command)
+                    and self.cmd in setting.commands
+                ]
+                if len(commands) == 1:
+                    self.dump_setting(commands[0], fp=sys.stdout)
+                else:
+                    print(_(
+                        '{cmd} is controlled by the following settings:\n\n'
+                        '{settings}').format(
+                            cmd=self.cmd, settings='\n'.join(
+                                setting.name for setting in commands)))
             else:
+                parser = self.get_parser()
                 parser.parse_args([self.cmd, '-h'])
+        else:
+            parser = self.get_parser()
+            parser.parse_args(['-h'])
 
     def do_dump(self):
         self.name = Current
