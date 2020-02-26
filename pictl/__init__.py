@@ -242,6 +242,18 @@ class ApplicationNamespace(OutputNamespace):
             help=_("The name of the boot configuration to remove"))
         rm_cmd.set_defaults(func=self.do_remove)
 
+        mv_cmd = commands.add_parser(
+            "rename", aliases=["mv"],
+            description=_("Rename a stored boot configuration."),
+            help=_("Rename a stored boot configuration"))
+        mv_cmd.add_argument(
+            "name",
+            help=_("The name of the boot configuration to rename"))
+        mv_cmd.add_argument(
+            "to",
+            help=_("The new name of the boot configuration"))
+        mv_cmd.set_defaults(func=self.do_rename)
+
         return parser
 
     def run(self):
@@ -354,6 +366,10 @@ class ApplicationNamespace(OutputNamespace):
         self.dump_store(table, fp=sys.stdout)
 
     def do_remove(self):
+        del self.store[self.name]
+
+    def do_rename(self):
+        self.store[self.to] = self.store[self.name]
         del self.store[self.name]
 
     def backup_if_needed(self):
