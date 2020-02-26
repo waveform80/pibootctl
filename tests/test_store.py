@@ -30,11 +30,7 @@ dtparam=spi=on
     with (store_config.store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = ('pictl:0:' + store[Current].hash).encode('ascii')
-            z.writestr(
-                'config.txt',
-                ''.join(
-                    store[Current].content[Path('config.txt')]
-                ).encode('ascii'))
+            store[Current].files[Path('config.txt')].add_to_zip(z)
     assert len(store) == 3
     assert Current in store
     assert Default in store
@@ -68,18 +64,21 @@ dtparam=spi=on
 
 def test_store_getitem(store_config):
     store = Store(store_config)
-    content = [
-        'dtparam=i2c=on\n',
-        'dtparam=spi=on\n',
-        'hdmi_group=1\n',
-        'hdmi_mode=4\n',
-    ]
-    (store_config.boot_path / 'config.txt').write_text(''.join(content))
+    content = b"""\
+dtparam=i2c=on
+dtparam=spi=on
+hdmi_group=1
+hdmi_mode=4
+"""
+    (store_config.boot_path / 'config.txt').write_bytes(content)
     current = store[Current]
     assert current.path == store_config.boot_path
     assert current.filename == 'config.txt'
-    assert current.timestamp == datetime.fromtimestamp(
+    d = datetime.fromtimestamp(
         (store_config.boot_path / 'config.txt').stat().st_mtime)
+    d = d.replace(
+        second=d.second // 2 * 2, microsecond=0)
+    assert current.timestamp == d
     assert current.hash == '5179ada9ed2534c0d228d950c65d4d58babef1cd'
     assert current.settings['i2c.enabled'].value
     assert current.settings['spi.enabled'].value
@@ -88,7 +87,7 @@ def test_store_getitem(store_config):
     assert current.settings['video.hdmi0.mode'].value == 4
     assert current.settings['video.hdmi1.group'].value == 0
     assert current.settings['video.hdmi1.mode'].value == 0
-    assert current.content[Path('config.txt')] == content
+    assert current.files[Path('config.txt')].content == content
 
 
 def test_store_setitem(store_config):
@@ -107,13 +106,13 @@ def test_store_setitem(store_config):
     assert len(store) == 3
     assert 'foo' in store
     assert store['foo'].hash == store[Current].hash
-    assert store['foo'].content == store[Current].content
+    assert store['foo'].files == store[Current].files
     (store_config.boot_path / 'config.txt').write_text('')
     assert store['foo'].hash != store[Current].hash
-    assert store['foo'].content != store[Current].content
+    assert store['foo'].files != store[Current].files
     store[Current] = store['foo']
     assert store['foo'].hash == store[Current].hash
-    assert store['foo'].content == store[Current].content
+    assert store['foo'].files == store[Current].files
     with pytest.raises(KeyError):
         store[Default] = store[Current]
 
@@ -151,11 +150,7 @@ dtparam=spi=on
     with (store_config.store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = ('pictl:0:' + store[Current].hash).encode('ascii')
-            z.writestr(
-                'config.txt',
-                ''.join(
-                    store[Current].content[Path('config.txt')]
-                ).encode('ascii'))
+            store[Current].files[Path('config.txt')].add_to_zip(z)
     assert len(store) == 3
     assert store.active == 'foo'
 
@@ -170,7 +165,7 @@ def test_settings_container():
 def test_default_config(store_config):
     store = Store(store_config)
     default = store[Default]
-    assert default.content == {}
+    assert default.files == {}
     assert default.hash == 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
     assert default.timestamp == datetime(1970, 1, 1, 1)
 

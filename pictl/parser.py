@@ -3,8 +3,9 @@ import os
 import hashlib
 import warnings
 from pathlib import Path
-from zipfile import ZipFile
+from zipfile import ZipFile, ZipInfo
 from datetime import datetime
+from collections import namedtuple
 
 from .info import get_board_types, get_board_serial
 
@@ -192,6 +193,90 @@ class BootFilter:
         return self.pi and self.serial
 
 
+class BootFile(namedtuple('Content', (
+    'filename',
+    'timestamp',
+    'content',
+    'encoding',
+    'errors'
+))):
+    """
+    Represents a file in a boot configuration.
+
+    .. attribute:: filename
+
+        The :class:`~pathlib.Path` containing the file's path relative to
+        the boot configuration's container (whatever that may be: a path, a
+        zip archive, etc.)
+
+    .. attribute:: timestamp
+
+        A :class:`~datetime.datetime` containing the last modification
+        timestamp of the file.
+
+            .. note::
+
+                This is rounded down to a 2-second precision as that is all
+                that ZIP archives support.
+
+    .. attribute:: content
+
+        A :class:`bytes` string containing the complete content of the file.
+
+    .. attribute:: encoding
+
+        :data:`None` if the file is a binary file. Otherwise, specifies the
+        name of the character encoding to be used when reading the file.
+
+    .. attribute:: errors
+
+        :data:`None` if the file is a binary file. Otherwise, specifies the
+        character replacement strategy to be used with erroneous characters
+        encountered when reading the file.
+    """
+    __slots__ = ()
+
+    def __new__(cls, filename, timestamp, content, encoding=None, errors=None):
+        # Adjust timestamps down to 2-second precision (all that's supported in
+        # the PKZIP format), and to a minimum of 1980. This is to support those
+        # scenarios (e.g. no network) in which a pi has de-synced clock and
+        # winds up with files in 1970 (prior to the date PKZIP supports).
+        return super().__new__(
+            cls, filename,
+            timestamp.replace(
+                year=max(1980, timestamp.year),
+                second=timestamp.second // 2 * 2,
+                microsecond=0),
+            content, encoding, errors)
+
+    @classmethod
+    def empty(cls, filename, encoding=None, errors=None):
+        """
+        Class method for constructing an apparently empty :class:`BootFile`.
+        """
+        return cls(filename, datetime.fromtimestamp(0), b'', encoding, errors)
+
+    def lines(self):
+        """
+        Generator method which returns lines of text from the file using the
+        associated :attr:`encoding` and :attr:`errors`.
+        """
+        yield from io.TextIOWrapper(
+            io.BytesIO(self.content), encoding=self.encoding,
+            errors=self.errors)
+
+    def add_to_zip(self, arc):
+        """
+        Adds this :class:`BootFile` to the specified *arc* (which must be a
+        :class:`~zipfile.ZipFile` instance), using the stored filename and
+        last modification timestamp.
+        """
+        info = ZipInfo(str(self.filename), (
+            self.timestamp.year, self.timestamp.month, self.timestamp.day,
+            self.timestamp.hour, self.timestamp.minute, self.timestamp.second))
+        arc.writestr(info, self.content)
+
+
 class BootParser:
     """
     Parser for the files used to configure the Raspberry Pi's bootloader.
@@ -212,7 +297,7 @@ class BootParser:
         if isinstance(path, Path):
             assert path.is_dir()
         self._path = path
-        self._content = {}
+        self._files = {}
         self._hash = None
         self._config = None
         self._timestamp = None
@@ -235,12 +320,12 @@ class BootParser:
         return self._config
 
     @property
-    def content(self):
+    def files(self):
         """
-        The content of all parsed files; a mapping of filename to a sequence of
-        :class:`bytes` objects.
+        The content of all parsed files; a mapping of filename to
+        :class:`BootFile` objects.
         """
-        return self._content
+        return self._files
 
     @property
     def hash(self):
@@ -267,7 +352,7 @@ class BootParser:
         """
         if not isinstance(filename, Path):
             filename = Path(filename)
-        self._content.clear()
+        self._files.clear()
         self._hash = hashlib.sha1()
         self._timestamp = datetime.fromtimestamp(0)  # UNIX epoch
         self._config = list(self._parse(filename))
@@ -362,7 +447,7 @@ class BootParser:
 
     def _read_text(self, filename):
         for lineno, line in enumerate(
-                self._open(filename, encoding='ascii', errors='replace'),
+                self._open(filename, encoding='ascii', errors='replace').lines(),
                 start=1):
             # The bootloader ignores everything beyond column 80 and
             # leading whitespace. The following slicing and stripping of
@@ -381,69 +466,45 @@ class BootParser:
 
     def _open(self, filename, encoding=None, errors=None):
         if isinstance(self.path, Path):
-            context = lambda: (self.path / filename).open('rb')
-            modified = lambda f: datetime.fromtimestamp(
-                os.fstat(f.fileno()).st_mtime)
+            try:
+                with (self.path / filename).open('rb') as f:
+                    file = BootFile(
+                        filename,
+                        datetime.fromtimestamp(os.fstat(f.fileno()).st_mtime),
+                        f.read(), encoding, errors)
+            except FileNotFoundError:
+                file = None
         elif isinstance(self.path, ZipFile):
-            context = lambda: self.path.open(str(filename), 'r')
-            modified = lambda f: datetime(*self.path.getinfo(f.name).date_time)
+            try:
+                with self.path.open(str(filename), 'r') as f:
+                    file = BootFile(
+                        filename,
+                        datetime(*self.path.getinfo(f.name).date_time),
+                        f.read(), encoding, errors)
+            except KeyError:
+                # Yes, ZipFile raises KeyError when an archive member isn't
+                # found...
+                file = None
         elif isinstance(self.path, dict):
-            context = lambda: DictOpen(self.path[filename])
-            modified = lambda f: f.timestamp
+            try:
+                file = BootFile(
+                    filename,
+                    self.path[filename].timestamp,
+                    self.path[filename].content, encoding, errors)
+            except KeyError:
+                file = None
         else:
             assert False
 
-        # It is *not* an error if filename doesn't exist under path; e.g. if
-        # config.txt doesn't exist that just means a purely default config.
-        # Likewise, if edid.dat doesn't exist, that's normal
-        try:
-            file = context()
-        except (FileNotFoundError, KeyError):
-            # Yes, ZipFile raises KeyError when an archive member isn't found!
-            # Of course, so does dict...
-            if encoding is None:
-                return b''
-            else:
-                return []
+        if file is None:
+            # It is *not* an error if filename doesn't exist under path; e.g.
+            # if config.txt doesn't exist that just means a purely default
+            # config. Likewise, if edid.dat doesn't exist, that's normal. In
+            # this case we return an "empty" file, but we *don't* add an entry
+            # to files
+            file = BootFile.empty(filename)
         else:
-            with file:
-                self._timestamp = max(self._timestamp, modified(file))
-                content = file.read()
-                self._hash.update(content)
-                if encoding is None:
-                    self._content[filename] = content
-                else:
-                    self._content[filename] = list(
-                        io.TextIOWrapper(io.BytesIO(content),
-                                         encoding=encoding, errors=errors))
-                return self._content[filename]
-
-
-class DictOpen:
-    """
-    Mutates file contents (in the manner of :attr:`BootParser.output`; lists of
-    :class:`str` for configuration files, and simple :class:`bytes` strings for
-    binary data) into something that acts a little like a file-like object,
-    just to ease the code in :class:`BootParser` a bit.
-    """
-    def __init__(self, data):
-        if isinstance(data, list):
-            self._data = b''.join(line.encode('ascii') for line in data)
-        else:
-            assert isinstance(data, bytes)
-            self._data = data
-
-    @property
-    def timestamp(self):
-        # We don't care about the modification date when dealing with a dict
-        # for a path; this case is only used for internal diffs of settings
-        return datetime.fromtimestamp(0)
-
-    def read(self):
-        return self._data
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        pass
+            self._timestamp = max(self._timestamp, file.timestamp)
+            self._hash.update(file.content)
+            self._files[filename] = file
+        return file

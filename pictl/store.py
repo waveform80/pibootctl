@@ -10,8 +10,8 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from zipfile import ZipFile, BadZipFile, ZIP_DEFLATED
 
-from .parser import BootParser
 from .files import AtomicReplaceFile
+from .parser import BootParser, BootFile
 from .setting import CommandIncludedFile
 from .settings import SETTINGS
 
@@ -122,13 +122,9 @@ class Store(Mapping):
             # TODO Sort content so config.txt is written last; this will allow
             # effectively atomic switches of configuration for systems using
             # os_prefix
-            for filename, data in item.content.items():
-                with AtomicReplaceFile(self._boot_path / filename) as temp:
-                    if isinstance(data, bytes):
-                        temp.write(data)
-                    else:
-                        temp.write(b''.join(
-                            line.encode('ascii') for line in data))
+            for path, file in item.files.items():
+                with AtomicReplaceFile(self._boot_path / path) as temp:
+                    temp.write(file.content)
         else:
             self._store_path.mkdir(parents=True, exist_ok=True)
             # TODO use mode 'x'? Add a --force to overwrite with mode 'w'?
@@ -141,12 +137,8 @@ class Store(Mapping):
                         'after manual editing. Please use the pictl tool to '
                         'manipulate stored boot configurations'),
                 ).encode('ascii')
-                for path, data in item.content.items():
-                    if isinstance(data, bytes):
-                        arc.writestr(str(path), data)
-                    else:
-                        arc.writestr(str(path), b''.join(
-                            line.encode('ascii') for line in data))
+                for file in item.files.values():
+                    file.add_to_zip(arc)
 
     def __delitem__(self, key):
         if key is Default:
@@ -176,11 +168,11 @@ class Store(Mapping):
 
 class DefaultConfiguration:
     """
-    Represents the default boot configuration with an entirely empty content
+    Represents the default boot configuration with an entirely empty file-set
     and a fresh :class:`Settings` instance.
     """
     @property
-    def content(self):
+    def files(self):
         return {}
 
     @property
@@ -200,13 +192,13 @@ class BootConfiguration:
     """
     Represents the current boot configuration, as parsed from *filename*
     (default "config.txt") on the boot partition (presumably mounted at
-    *path*).
+    *path*, a :class:`~pathlib.Path` instance).
     """
     def __init__(self, path, filename='config.txt'):
         self._path = path
         self._filename = filename
         self._settings = None
-        self._content = None
+        self._files = None
         self._hash = None
         self._timestamp = None
 
@@ -222,41 +214,79 @@ class BootConfiguration:
         for setting in self._settings.values():
             if isinstance(setting, CommandIncludedFile):
                 parser.add(setting.filename)
-        self._content = parser.content
+        self._files = parser.files
         self._hash = parser.hash
         self._timestamp = parser.timestamp
 
     @property
     def path(self):
+        """
+        The path (or archive or entity) containing all the files that make up
+        the boot configuration.
+        """
         return self._path
 
     @property
     def filename(self):
+        """
+        The root file of the boot configuration. This is currently always
+        "config.txt".
+        """
         return self._filename
 
     @property
     def timestamp(self):
+        """
+        The last modified timestamp of the boot configuration, as a
+        :class:`~datetime.datetime`.
+        """
         if self._timestamp is None:
             self._parse()
         return self._timestamp
 
     @property
     def hash(self):
+        """
+        The SHA1 hash that identifies the boot configuration. This is obtained
+        by hashing the files of the boot configuration in parsing order.
+        """
         if self._hash is None:
             self._parse()
         return self._hash
 
     @property
     def settings(self):
+        """
+        A :class:`Settings` instance containing all the settings extracted from
+        the boot configuration.
+        """
         if self._settings is None:
             self._parse()
         return self._settings
 
     @property
-    def content(self):
-        if self._content is None:
+    def files(self):
+        """
+        A mapping of :class:`~pathlib.Path` to :class:`BootFile` instances
+        representing all the files that make up the boot configuration.
+        """
+        if self._files is None:
             self._parse()
-        return self._content
+        return self._files
+
+    def mutable(self, rewrite):
+        """
+        Return a :class:`MutableConfiguration` based on the parsed content of
+        this configuration.
+
+        The :class:`~pathlib.Path` named by *rewrite* is the file within the
+        configuration that should be considered mutable, i.e. this is the file
+        that gets re-written after the configuration is changed. Note that
+        mutable configurations are not backed by any files on disk, so nothing
+        is actually re-written until the updated mutable configuration is
+        assigned back to something in the :class:`Store`.
+        """
+        return MutableConfiguration(self, rewrite)
 
 
 class StoredConfiguration(BootConfiguration):
@@ -288,6 +318,111 @@ class StoredConfiguration(BootConfiguration):
             # enumerate and contains tests check for pictl:0: but that
             # could be relaxed...
             assert False, 'Invalid stored configuration: missing hash'
+
+
+class InvalidConfiguration(ValueError):
+    """
+    Error raised when an updated configuration fails to validate. All
+    :exc:`ValueError` exceptions raised during validation are available from
+    the :attr:`errors` attribute which maps settings to the exception they
+    raised during validation.
+    """
+    def __init__(self, errors):
+        super().__init__(_(
+            "Configuration failed to validate with {:d} "
+            "error(s)").format(len(errors)))
+        self.errors = errors
+
+
+class IneffectiveConfiguration(ValueError):
+    """
+    Error raised when an updated configuration has been overridden by something
+    in a file we're not allowed to edit. All settings which have been
+    overridden are available from the :attr:`settings` attribute.
+    """
+    def __init__(self, settings):
+        super().__init__(_(
+            "Failed to set {:d} setting(s)").format(len(settings)))
+        self.settings = settings
+
+
+class MutableConfiguration(BootConfiguration):
+    """
+    Represents a changeable boot configuration. This is constructed from a
+    *base* :class:`BootConfiguration`. Only one file in the configuration,
+    specified by *rewrite* (a :class:`~pathlib.Path`), is permitted to be
+    re-written.
+
+    Mutable configurations can be changed with the :meth:`update` method which
+    will also validate the new configuration, and check that the settings were
+    not overridden by later files. No link is maintained between the original
+    :class:`BootConfiguration` and the mutable copy. This implies that nothing
+    is re-written on disk when the mutable configuration is updated. The
+    resulting configuration must be assigned back to something in the
+    :class:`Store` in order to re-write disk files.
+    """
+    def __init__(self, base, rewrite):
+        super().__init__(base.files.copy(), base.filename)
+        self._rewrite = rewrite
+
+    def update(self, values):
+        """
+        Given a mapping of setting names to new values, updates the values of
+        the corresponding settings in this configuration. If a value is
+        :data:`None`, the setting is reset to its default value.
+        """
+        for name, value in values.items():
+            item = self.settings[name]
+            item._value = item.update(value)
+
+        # Validate the new configuration; aggregate all exceptions for the
+        # user's convenience
+        errors = []
+        for item in self.settings.values():
+            try:
+                item.validate()
+            except ValueError as exc:
+                errors.append(exc)
+        if errors:
+            raise InvalidConfiguration(errors)
+
+        # Regenerate the dict forming our "path". First, blank out the file we
+        # intend to re-write and re-parse the settings to see what they are
+        # without that file
+        updated = self.settings.copy()
+        del self._path[self._rewrite]
+        self._settings = self._files = self._hash = None
+        self._parse()
+
+        # Diff the re-parsed settings with the updated copy to figure out
+        # which settings actually need writing, and re-construct the _rewrite
+        # file from these
+        content = """\
+# This file is intended to contain system-made configuration changes. User
+# configuration changes should be placed in "usercfg.txt". Please refer to the
+# README file for a description of the various configuration files on the boot
+# partition.
+
+""".splitlines()
+        for old, new in self.settings.diff(updated):
+            if new is not None:
+                # XXX Can new ever be None? Would that be an error?
+                for line in new.output():
+                    content.append(line)
+        self._path[self._rewrite] = BootFile(
+            self._rewrite, datetime.now(),
+            b''.join(line.encode('ascii') for line in content),
+            'ascii', 'replace')
+        self._settings = self._files = self._hash = None
+        self._parse()
+
+        # Check whether any settings were overridden by files later than the
+        # _rewrite file
+        # TODO Check whether *rewrite* was ever read (should appear in files)
+        diff = updated.diff(self.settings)
+        if diff:
+            raise IneffectiveConfiguration([
+                new for old, new in diff if old is not None])
 
 
 class Settings(Mapping):
@@ -378,47 +513,3 @@ class Settings(Mapping):
             for name in other
             if name not in self
         }
-
-    def update(self, values):
-        """
-        Given a mapping of setting names to new values, updates the values
-        of the corresponding settings in this collection. If a value is
-        :data:`None`, the setting is reset to its default value.
-        """
-        # TODO move this to BootConfiguration and have it wipe content and hash
-        # upon call (for later recalculation)
-        for name, value in values.items():
-            if name not in self._visible:
-                raise KeyError(name)
-            item = self._items[name]
-            item._value = item.update(value)
-
-    def validate(self):
-        """
-        Checks for errors in the configuration. This ensures that each setting
-        makes sense in the wider context of all other settings.
-        """
-        # TODO move to BootConfiguration?
-        # This ignores the _visible filter; the complete configuration is
-        # always validated
-        for item in self._items.values():
-            item.validate()
-
-    def output(self):
-        """
-        Generate a new boot configuration file which represents the settings
-        stored in this mapping.
-        """
-        # TODO move to BootConfiguration; have it update content and hash too
-        output = """\
-# This file is intended to contain system-made configuration changes. User
-# configuration changes should be placed in "usercfg.txt". Please refer to the
-# README file for a description of the various configuration files on the boot
-# partition.
-
-""".splitlines()
-        for name, setting in self._items.items():
-            if name in self._visible:
-                for line in setting.output():
-                    output.append(line)
-        return '\n'.join(output)

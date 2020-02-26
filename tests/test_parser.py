@@ -3,6 +3,7 @@ import warnings
 from pathlib import Path
 from unittest import mock
 from hashlib import sha1
+from datetime import datetime
 
 import pytest
 
@@ -263,33 +264,29 @@ kernel=uboot_4_32b.bin
 
 
 def test_parse_attr(tmpdir):
-    with mock.patch('pictl.parser.get_board_types') as get_board_types:
-        get_board_types.return_value = {'pi3', 'pi3+'}
-        tmpdir.join('config.txt').write("""# This is a comment
+    tmpdir = Path(str(tmpdir))
+    content = b"""# This is a comment
 [pi2]
 kernel=uboot_2.bin
 [pi3]
 kernel=uboot_3_32b.bin
 [pi4]
 kernel=uboot_4_32b.bin
-""")
-        p = BootParser(Path(str(tmpdir)))
+"""
+    with mock.patch('pictl.parser.get_board_types') as get_board_types:
+        get_board_types.return_value = {'pi3', 'pi3+'}
+        (tmpdir / 'config.txt').write_bytes(content)
+        p = BootParser(tmpdir)
         p.parse()
-        content = [
-            "# This is a comment\n",
-            "[pi2]\n",
-            "kernel=uboot_2.bin\n",
-            "[pi3]\n",
-            "kernel=uboot_3_32b.bin\n",
-            "[pi4]\n",
-            "kernel=uboot_4_32b.bin\n",
-        ]
-        assert p.content == {
-            Path('config.txt'): content,
+        assert p.files == {
+            Path('config.txt'): BootFile(
+                Path('config.txt'),
+                datetime.fromtimestamp((tmpdir / 'config.txt').stat().st_mtime),
+                content, 'ascii', 'replace'
+            )
         }
         h = sha1()
-        for line in content:
-            h.update(line.encode('ascii'))
+        h.update(content)
         assert p.hash == h.hexdigest().lower()
 
 
@@ -334,8 +331,8 @@ hdmi_mode=4
     p1 = BootParser(tmpdir)
     p1.parse()
     p1.add('edid.dat')
-    masked = p1.content.copy()
-    masked[Path('syscfg.txt')] = []
+    masked = p1.files.copy()
+    del masked[Path('syscfg.txt')]
     p2 = BootParser(masked)
     p2.parse()
     p2.add('edid.dat')

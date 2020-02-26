@@ -34,7 +34,8 @@ def store(request):
 def left_right_diff(request):
     left = Settings()
     right = left.copy()
-    right.update({'video.cec.name': 'Foo', 'boot.test.enabled': None})
+    right['video.cec.name']._value = 'Foo'
+    right['boot.test.enabled']._value = None
     diff = [
         (left['video.cec.name'], right['video.cec.name']),
         (left['boot.test.enabled'], None),
@@ -145,7 +146,7 @@ boot.test.enabled\toff\t-
 def test_dump_settings_user():
     # Cut down the settings to something manageable for this test
     default = Settings().filter('video.cec.*')
-    default.update({'video.cec.name': 'Foo'})
+    default['video.cec.name']._value = 'Foo'
     buf = io.StringIO()
     output = Namespace(use_unicode=False)
     output.dump_settings(default, buf)
