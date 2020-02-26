@@ -1,23 +1,33 @@
 import os
+import io
 import sys
 import fcntl
+import errno
 import struct
+import locale
 import gettext
 import termios
 import argparse
 import traceback
+import subprocess
 from collections import OrderedDict, namedtuple
+from contextlib import contextmanager, redirect_stdout
 
 _ = gettext.gettext
 
 
-def term_color():
+def term_is_dumb():
     try:
         stdout_fd = sys.stdout.fileno()
     except OSError:
-        return False
+        return True
     else:
-        return os.isatty(stdout_fd)
+        return not os.isatty(stdout_fd)
+
+
+def term_is_utf8():
+    locale.setlocale(locale.LC_ALL, '')
+    return locale.nl_langinfo(locale.CODESET) == 'UTF-8'
 
 
 def term_size():
@@ -60,6 +70,33 @@ def term_size():
             # Default
             result = (80, 24)
     return result
+
+
+@contextmanager
+def pager():
+    if term_is_dumb():
+        yield
+    else:
+        env = os.environ.copy()
+        env['LESS'] = 'FRSXMK'
+        for exe in ('pager', 'less', 'more'):
+            try:
+                p = subprocess.Popen(exe, stdin=subprocess.PIPE, env=env)
+            except OSError as exc:
+                if exc.errno != errno.ENOENT:
+                    print(_("Failed to execute pager: {}").format(exe),
+                          file=sys.stderr)
+                    print(str(exc), file=sys.stderr)
+            else:
+                with io.TextIOWrapper(p.stdin, encoding=sys.stdout.encoding,
+                                      write_through=True) as w:
+                    with redirect_stdout(w):
+                        yield
+                p.stdin.close()
+                p.wait()
+                break
+        else:
+            yield
 
 
 class ErrorAction(namedtuple('ErrorAction', ('message', 'exitcode'))):

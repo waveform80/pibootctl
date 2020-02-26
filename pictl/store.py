@@ -1,3 +1,4 @@
+import os
 import gettext
 import tempfile
 from weakref import ref
@@ -125,6 +126,8 @@ class Store(Mapping):
             for path, file in item.files.items():
                 with AtomicReplaceFile(self._boot_path / path) as temp:
                     temp.write(file.content)
+                os.utime(str(self._boot_path / path), (
+                    datetime.now().timestamp(), file.timestamp.timestamp()))
         else:
             self._store_path.mkdir(parents=True, exist_ok=True)
             with ZipFile(str(self._path_of(key)), 'x',

@@ -1,18 +1,19 @@
+import io
 import argparse
 from unittest import mock
 
 from pictl.term import *
 
 
-def test_term_color():
+def test_term_is_dumb():
     with mock.patch('os.isatty') as m:
         m.return_value = False
-        assert not term_color()
+        assert term_is_dumb()
         m.return_value = True
-        assert term_color()
+        assert not term_is_dumb()
     with mock.patch('sys.stdout.fileno') as m:
         m.side_effect = OSError
-        assert not term_color()
+        assert term_is_dumb()
 
 
 def test_term_size():
@@ -78,3 +79,42 @@ def test_error_handler_call(capsys):
         captured = capsys.readouterr()
         assert not captured.out
         assert captured.err == 'Traceback lines\nfrom some file\nwith some context\n'
+
+
+def test_term_pager(capsys, tmpdir):
+    with mock.patch('pictl.term.term_is_dumb') as dumb, \
+            mock.patch('subprocess.Popen') as popen:
+        dumb.return_value = True
+        with pager():
+            print('dumb terminal passes thru')
+        captured = capsys.readouterr()
+        assert captured.out == 'dumb terminal passes thru\n'
+        assert captured.err == ''
+        dumb.return_value = False
+        popen.side_effect = OSError(2, "File not found")
+        with pager():
+            print('foo')
+        captured = capsys.readouterr()
+        assert captured.out == 'foo\n'
+        assert captured.err == ''
+        popen.side_effect = OSError(1, "Permission denied")
+        with pager():
+            print('foo bar')
+        captured = capsys.readouterr()
+        assert captured.out == 'foo bar\n'
+        assert captured.err == """\
+Failed to execute pager: pager
+[Errno 1] Permission denied
+Failed to execute pager: less
+[Errno 1] Permission denied
+Failed to execute pager: more
+[Errno 1] Permission denied
+"""
+        popen.side_effect = None
+        popen.return_value = mock.Mock(stdin=tmpdir.join('pager.out').open('wb'))
+        with pager():
+            print('foo bar baz')
+        captured = capsys.readouterr()
+        assert captured.out == ''
+        assert captured.err == ''
+        assert tmpdir.join('pager.out').read_binary() == b'foo bar baz\n'

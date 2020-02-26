@@ -4,13 +4,14 @@ import sys
 import errno
 import gettext
 import argparse
+import subprocess
 import configparser
 from pathlib import Path
 from datetime import datetime
 
 from .setting import Command
 from .store import Store, Current, Default
-from .term import ErrorHandler
+from .term import ErrorHandler, pager
 from .userstr import UserStr
 from .output import OutputNamespace
 
@@ -28,10 +29,11 @@ def main(args=None):
         sys.excepthook = ErrorHandler()
         sys.excepthook[PermissionError] = (permission_error, 1)
         sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
-    app = ApplicationNamespace()
-    parser = app.get_parser()
-    parser.parse_args(args, namespace=app)
-    app.run()
+    with pager():
+        app = ApplicationNamespace()
+        parser = app.get_parser()
+        parser.parse_args(args, namespace=app)
+        app.run()
 
 
 def permission_error(exc_type, exc_value, exc_tb):

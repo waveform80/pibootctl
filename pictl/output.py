@@ -1,7 +1,6 @@
 import io
 import json
 import shlex
-import locale
 import gettext
 import argparse
 from operator import attrgetter
@@ -12,7 +11,7 @@ import yaml
 from .store import Current
 from .setting import Command, OverlayParam
 from .formatter import TableWrapper, unicode_table, pretty_table, render
-from .term import term_size
+from .term import term_size, term_is_utf8
 
 _ = gettext.gettext
 
@@ -41,9 +40,8 @@ class OutputNamespace(argparse.Namespace):
     """
     def __init__(self, default_style='user', use_unicode=None):
         self.style = default_style
-        locale.setlocale(locale.LC_ALL, '')
         if use_unicode is None:
-            use_unicode = locale.nl_langinfo(locale.CODESET) == 'UTF-8'
+            use_unicode = term_is_utf8()
         if use_unicode:
             self._table_style = unicode_table
             self._check_mark = '✓'

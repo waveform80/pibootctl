@@ -77,6 +77,7 @@ hdmi_mode=4
     d = datetime.fromtimestamp(
         (store_config.boot_path / 'config.txt').stat().st_mtime)
     d = d.replace(
+        year=max(1980, d.year),
         second=d.second // 2 * 2, microsecond=0)
     assert current.timestamp == d
     assert current.hash == '5179ada9ed2534c0d228d950c65d4d58babef1cd'
