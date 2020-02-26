@@ -175,6 +175,10 @@ class ApplicationNamespace(OutputNamespace):
             help=_(
                 "The name to save the current boot configuration under; can "
                 "include any characters legal in a filename"))
+        save_cmd.add_argument(
+            "--force", action="store_true",
+            help=_(
+                "Overwrite an existing configuration, if one exists"))
         save_cmd.set_defaults(func=self.do_save)
 
         load_cmd = commands.add_parser(
@@ -242,6 +246,10 @@ class ApplicationNamespace(OutputNamespace):
         rm_cmd.add_argument(
             "name",
             help=_("The name of the boot configuration to remove"))
+        rm_cmd.add_argument(
+            "--force", action="store_true",
+            help=_(
+                "Ignore errors if the named configuration does not exist"))
         rm_cmd.set_defaults(func=self.do_remove)
 
         mv_cmd = commands.add_parser(
@@ -254,6 +262,10 @@ class ApplicationNamespace(OutputNamespace):
         mv_cmd.add_argument(
             "to",
             help=_("The new name of the boot configuration"))
+        mv_cmd.add_argument(
+            "--force", action="store_true",
+            help=_(
+                "Overwrite the target configuration, if it exists"))
         mv_cmd.set_defaults(func=self.do_rename)
 
         return parser
@@ -343,7 +355,13 @@ class ApplicationNamespace(OutputNamespace):
         self.mark_reboot_required()
 
     def do_save(self):
-        self.store[self.name] = self.store[Current]
+        try:
+            self.store[self.name] = self.store[Current]
+        except OSError as exc:
+            if exc.errno != errno.EEXIST or not self.force:
+                raise
+            del self.store[self.name]
+            self.store[self.name] = self.store[Current]
 
     def do_load(self):
         # Look up the config to load before we do any backups, just in case the
@@ -370,10 +388,20 @@ class ApplicationNamespace(OutputNamespace):
         self.dump_store(table, fp=sys.stdout)
 
     def do_remove(self):
-        del self.store[self.name]
+        try:
+            del self.store[self.name]
+        except KeyError:
+            if not self.force:
+                raise
 
     def do_rename(self):
-        self.store[self.to] = self.store[self.name]
+        try:
+            self.store[self.to] = self.store[self.name]
+        except OSError as exc:
+            if exc.errno != errno.EEXIST or not self.force:
+                raise
+            del store[self.to]
+            self.store[self.to] = self.store[self.name]
         del self.store[self.name]
 
     def backup_if_needed(self):
@@ -384,6 +412,9 @@ class ApplicationNamespace(OutputNamespace):
                 try:
                     self.store[name] = self.store[Current]
                 except OSError as exc:
+                    # Pi's clocks can be very wrong when there's no network;
+                    # this just exists to guarantee that we won't try and
+                    # clobber an existing backup
                     if exc.errno != errno.EEXIST:
                         raise
                     suffix += 1
