@@ -326,12 +326,15 @@ class InvalidConfiguration(ValueError):
     the :attr:`errors` attribute.
     """
     def __init__(self, errors):
-        super().__init__(_(
+        super().__init__()
+        self.errors = errors
+
+    def __str__(self):
+        return _(
             "Configuration failed to validate with {count:d} "
             "error(s):\n{errors}").format(
                 count=len(errors),
-                errors='\n'.join(str(e) for e in errors)))
-        self.errors = errors
+                errors='\n'.join(str(e) for e in errors))
 
 
 class IneffectiveConfiguration(ValueError):
@@ -341,11 +344,14 @@ class IneffectiveConfiguration(ValueError):
     overridden are available from the :attr:`settings` attribute.
     """
     def __init__(self, settings):
-        super().__init__(_(
-            "Failed to set {count:d} setting(s):\n{messages}").format(
-                count=len(settings),
-                messages='\n'.join(s.name for s in settings)))
+        super().__init__()
         self.settings = settings
+
+    def __str__(self):
+        return _(
+            "Failed to set {count:d} setting(s):\n{settings}").format(
+                count=len(settings),
+                settings='\n'.join(s.name for s in settings))
 
 
 class MutableConfiguration(BootConfiguration):

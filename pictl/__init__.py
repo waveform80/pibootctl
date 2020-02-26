@@ -268,7 +268,8 @@ class ApplicationNamespace(OutputNamespace):
             elif '.' in self.cmd:
                 # TODO Mis-spelled setting; use something like levenshtein to
                 # detect "close" but incorrect setting names
-                raise NotImplementedError
+                raise ValueError(_(
+                    'Unknown setting "{self.cmd}"').format(self=self))
             elif '_' in self.cmd:
                 # Old-style command
                 commands = [
@@ -281,9 +282,10 @@ class ApplicationNamespace(OutputNamespace):
                     self.dump_setting(commands[0], fp=sys.stdout)
                 else:
                     print(_(
-                        '{cmd} is controlled by the following settings:\n\n'
+                        '{self.cmd} is controlled by the following settings:'
+                        '\n\n'
                         '{settings}').format(
-                            cmd=self.cmd, settings='\n'.join(
+                            self=self, settings='\n'.join(
                                 setting.name for setting in commands)))
             else:
                 parser = self.get_parser()
