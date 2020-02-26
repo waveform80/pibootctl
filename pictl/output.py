@@ -25,7 +25,7 @@ def values(l, r):
     return obj
 
 
-class Namespace(argparse.Namespace):
+class OutputNamespace(argparse.Namespace):
     """
     A derivative of :class:`~argparse.Namespace` used by the main application,
     this class provides a variety of methods (:meth:`dump_store`,
@@ -50,8 +50,7 @@ class Namespace(argparse.Namespace):
             self._table_style = pretty_table
             self._check_mark = 'x'
 
-    @classmethod
-    def add_style_arg(cls, parser, *, required=False):
+    def add_style_arg(self, parser, *, required=False):
         """
         Create a mutually exclusive :mod:`argparse` group and add to it options
         for the various input and output styles supported by this class.
