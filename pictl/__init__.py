@@ -176,7 +176,7 @@ class ApplicationNamespace(OutputNamespace):
                 "The name to save the current boot configuration under; can "
                 "include any characters legal in a filename"))
         save_cmd.add_argument(
-            "--force", action="store_true",
+            "-f", "--force", action="store_true",
             help=_(
                 "Overwrite an existing configuration, if one exists"))
         save_cmd.set_defaults(func=self.do_save)
@@ -247,7 +247,7 @@ class ApplicationNamespace(OutputNamespace):
             "name",
             help=_("The name of the boot configuration to remove"))
         rm_cmd.add_argument(
-            "--force", action="store_true",
+            "-f", "--force", action="store_true",
             help=_(
                 "Ignore errors if the named configuration does not exist"))
         rm_cmd.set_defaults(func=self.do_remove)
@@ -263,7 +263,7 @@ class ApplicationNamespace(OutputNamespace):
             "to",
             help=_("The new name of the boot configuration"))
         mv_cmd.add_argument(
-            "--force", action="store_true",
+            "-f", "--force", action="store_true",
             help=_(
                 "Overwrite the target configuration, if it exists"))
         mv_cmd.set_defaults(func=self.do_rename)
