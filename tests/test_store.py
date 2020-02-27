@@ -156,6 +156,66 @@ dtparam=spi=on
     assert store.active == 'foo'
 
 
+def test_store_mutable_update(store_config):
+    store = Store(store_config)
+    (store_config.boot_path / 'config.txt').write_text("""\
+dtparam=i2c=on
+dtparam=spi=on
+""")
+    current = store[Current]
+    mutable = current.mutable(Path('config.txt'))
+    mutable.update({'i2c.enabled': None, 'camera.enabled': True})
+    assert mutable.files[Path('config.txt')].content == b"""\
+# This file is intended to contain system-made configuration changes. User
+# configuration changes should be placed in "usercfg.txt". Please refer to the
+# README file for a description of the various configuration files on the boot
+# partition.
+
+start_x=1
+dtparam=spi=on
+"""
+
+
+def test_store_mutable_invalid(store_config):
+    store = Store(store_config)
+    (store_config.boot_path / 'config.txt').write_text("""\
+dtparam=i2c=on
+dtparam=spi=on
+""")
+    current = store[Current]
+    mutable = current.mutable(Path('config.txt'))
+    with pytest.raises(InvalidConfiguration) as exc_info:
+        mutable.update({'video.hdmi0.mode': 1})
+    assert len(exc_info.value.errors) == 1
+    assert isinstance(exc_info.value.errors['video.hdmi0.mode'], ValueError)
+    assert str(exc_info.value) == """\
+Configuration failed to validate with 1 error(s):
+video.hdmi0.mode must be between 0 and 0 when video.hdmi0.group is 0"""
+
+
+def test_store_mutable_ineffective(store_config):
+    store = Store(store_config)
+    (store_config.boot_path / 'config.txt').write_text("""\
+include syscfg.txt
+include usercfg.txt
+""")
+    (store_config.boot_path / 'syscfg.txt').write_text("""\
+dtparam=i2c=on
+dtparam=spi=on
+""")
+    (store_config.boot_path / 'usercfg.txt').write_text("""\
+dtparam=i2c=on
+""")
+    current = store[Current]
+    mutable = current.mutable(Path('syscfg.txt'))
+    with pytest.raises(IneffectiveConfiguration) as exc_info:
+        mutable.update({'i2c.enabled': None})
+    assert len(exc_info.value.settings) == 1
+    assert str(exc_info.value) == """\
+Failed to set 1 setting(s):
+i2c.enabled"""
+
+
 def test_settings_container():
     settings = Settings()
     assert len([s for s in settings]) == len(settings)

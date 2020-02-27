@@ -326,7 +326,8 @@ class InvalidConfiguration(ValueError):
     """
     Error raised when an updated configuration fails to validate. All
     :exc:`ValueError` exceptions raised during validation are available from
-    the :attr:`errors` attribute.
+    the :attr:`errors` attribute which maps setting names to the
+    :exc:`ValueError` raised.
     """
     def __init__(self, errors):
         super().__init__()
@@ -337,7 +338,7 @@ class InvalidConfiguration(ValueError):
             "Configuration failed to validate with {count:d} "
             "error(s):\n{errors}").format(
                 count=len(self.errors),
-                errors='\n'.join(str(e) for e in self.errors))
+                errors='\n'.join(str(e) for e in self.errors.values()))
 
 
 class IneffectiveConfiguration(ValueError):
@@ -388,12 +389,12 @@ class MutableConfiguration(BootConfiguration):
 
         # Validate the new configuration; aggregate all exceptions for the
         # user's convenience
-        errors = []
+        errors = {}
         for item in self.settings.values():
             try:
                 item.validate()
             except ValueError as exc:
-                errors.append(exc)
+                errors[item.name] = exc
         if errors:
             raise InvalidConfiguration(errors)
 
@@ -408,21 +409,22 @@ class MutableConfiguration(BootConfiguration):
         # Diff the re-parsed settings with the updated copy to figure out
         # which settings actually need writing, and re-construct the _rewrite
         # file from these
+        # TODO Make the header configurable
         content = """\
 # This file is intended to contain system-made configuration changes. User
 # configuration changes should be placed in "usercfg.txt". Please refer to the
 # README file for a description of the various configuration files on the boot
 # partition.
 
-""".splitlines()
-        for old, new in self.settings.diff(updated):
-            if new is not None:
-                # XXX Can new ever be None? Would that be an error?
-                for line in new.output():
-                    content.append(line)
+""".splitlines(keepends=True)
+        # XXX Can new ever be None? Would that be an error?
+        for old, new in sorted(self.settings.diff(updated),
+                               key=lambda i: i[1].key):
+            for line in new.output():
+                content.append(line + '\n')
         self._path[self._rewrite] = BootFile(
             self._rewrite, datetime.now(),
-            b'\n'.join(line.encode('ascii') for line in content),
+            b''.join(line.encode('ascii') for line in content),
             'ascii', 'replace')
         self._settings = self._files = self._hash = None
         self._parse()
