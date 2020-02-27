@@ -82,7 +82,7 @@ SETTINGS = {
             * video.overscan.bottom = 24
             """)),
     setting.CommandBool(
-        'video.hdmi.mode.4kp60', command='hdmi_enable_4kp60', doc=_(
+        'video.hdmi.4kp60', command='hdmi_enable_4kp60', doc=_(
             """
             By default, when connected to a 4K monitor, the Raspberry Pi 4B
             will select a 30hz refresh rate. This setting allows selection of
@@ -90,7 +90,8 @@ SETTINGS = {
 
             Note: enabling this will increase power consumption and increase
             the running temperature of the Pi. It is not possible to use 60Hz
-            rates on both micro-HDMI ports simultaneously.
+            rates on both micro-HDMI ports simultaneously. Nor is it possible
+            to enable the TV-out at the same time.
             """)),
     setting.CommandEDIDIgnore(
         'video.hdmi.edid.ignore', command='hdmi_ignore_edid', doc=_(
@@ -265,7 +266,7 @@ SETTINGS = {
             Specifies the maximum height of the console framebuffer in pixels.
             The default is not to limit the size of the framebuffer.
             """)),
-    setting.CommandBool(
+    setting.CommandTVOut(
         'video.tv.enabled', command='enable_tvout', doc=_(
             """
             On the Pi 4, the composite TV output is disabled by default, as
@@ -275,7 +276,8 @@ SETTINGS = {
 
             Enable this setting to enable TV output on the Pi 4; on older Pi
             models this setting has no effect (composite output is always on
-            without performance degradation).
+            without performance degradation). Note that it is not possible to
+            enable this and the video.hdmi.4kp60 option simultaneously.
             """)),
     setting.CommandInt(
         'video.tv.mode', command='sdtv_mode', valid={

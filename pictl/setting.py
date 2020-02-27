@@ -1650,3 +1650,12 @@ class CommandGPUMem(CommandInt):
     @property
     def hint(self):
         return 'Mb'
+
+
+class CommandTVOut(CommandBool):
+    def validate(self):
+        other = self._query('video.hdmi.4kp60')
+        if self.value and other.value:
+            raise ValueError(_(
+                '{self.name} and {other.name} cannot both be on').format(
+                    self=self, other=other))

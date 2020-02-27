@@ -296,7 +296,7 @@ class ApplicationNamespace(OutputNamespace):
                     self.dump_setting(commands[0], fp=sys.stdout)
                 else:
                     print(_(
-                        '{self.cmd} is controlled by the following settings:'
+                        '{self.cmd} is affected by the following settings:'
                         '\n\n'
                         '{settings}').format(
                             self=self, settings='\n'.join(

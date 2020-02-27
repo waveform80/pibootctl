@@ -336,8 +336,8 @@ class InvalidConfiguration(ValueError):
         return _(
             "Configuration failed to validate with {count:d} "
             "error(s):\n{errors}").format(
-                count=len(errors),
-                errors='\n'.join(str(e) for e in errors))
+                count=len(self.errors),
+                errors='\n'.join(str(e) for e in self.errors))
 
 
 class IneffectiveConfiguration(ValueError):
@@ -353,8 +353,8 @@ class IneffectiveConfiguration(ValueError):
     def __str__(self):
         return _(
             "Failed to set {count:d} setting(s):\n{settings}").format(
-                count=len(settings),
-                settings='\n'.join(s.name for s in settings))
+                count=len(self.settings),
+                settings='\n'.join(s.name for s in self.settings))
 
 
 class MutableConfiguration(BootConfiguration):
