@@ -7,7 +7,7 @@ from contextlib import contextmanager
 
 from .formatter import FormatDict, TransMap, int_ranges
 from .parser import BootOverlay, BootParam, BootCommand
-from .userstr import UserStr, to_bool, to_int, to_str, to_float
+from .userstr import UserStr, to_bool, to_int, to_str, to_float, to_list
 from .info import get_board_types, get_board_mem
 
 _ = gettext.gettext
@@ -469,7 +469,7 @@ class CommandBool(Command):
 
     def extract(self, config):
         for item, value in super().extract(config):
-            yield item, bool(int(value))
+            yield item, bool(to_int(value))
 
     def update(self, value):
         return to_bool(value)
@@ -489,12 +489,9 @@ class CommandBoolInv(CommandBool):
         for item, value in super().extract(config):
             yield item, not value
 
-    def update(self, value):
-        return not super().update(value)
-
     def output(self, fmt='d'):
         if self.modified:
-            with self._override(not value):
+            with self._override(not self.value):
                 yield from super().output(fmt)
 
 
@@ -589,9 +586,9 @@ class CommandMaskMaster(CommandInt):
             return super().update(value)
 
     def output(self):
-        if any(settings[name].modified for name in self._names):
+        if any(self._query(name).modified for name in self._names):
             value = reduce(or_, (
-                settings[name].value << settings[name]._shift
+                self._query(name).value << self._query(name)._shift
                 for name in self._names
             ))
             template = '{self.commands[0]}={value:#x}'
@@ -959,7 +956,7 @@ class CommandDPIOutput(CommandMaskMaster):
             # For the DPI LCD display, always output dpi_output_format when
             # enable_dpi_lcd is set (and conversely, don't output it when not
             # set)
-            yield from super().output(settings)
+            yield from super().output()
 
 
 class CommandDPIDummy(CommandMaskDummy):
@@ -986,8 +983,13 @@ class CommandEDIDIgnore(CommandIntHex):
     Represents the ``hdmi_ignore_edid`` "boolean" setting with its bizarre
     "true" value.
     """
-    # See hdmi_edid_file in
+    # See hdmi_ignore_edid in
     # https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
+    def __init__(self, name, *, command=None, commands=None, default=False,
+                 doc=''):
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc)
+
     @property
     def hint(self):
         pass
@@ -1073,7 +1075,7 @@ class CommandKernel64(CommandBool):
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'arm_64bit':
-                    yield item, to_bool(item.params)
+                    yield item, bool(to_int(item.params))
                 elif item.command == 'arm_control':
                     yield item, bool(to_int(item.params) & 0x200)
 
@@ -1186,13 +1188,17 @@ class CommandFirmwareFilename(CommandFilename):
         debug = self._query('boot.debug.enabled')
         camera = self._query('camera.enabled')
         # The "modified" tests below appear extraneous but aren't; they guard
-        # against a circular reference in the case where everything is default
+        # against a circular reference in the case where everything is default.
+        # Furthermore, the hard-coded False is also deliberate; there's no
+        # special handling for the pi4 with start_debug
         if debug.modified and debug.value:
-            return FW_START[pi4].debug
+            return FW_START[False].debug
         elif camera.modified and camera.value:
             return FW_START[pi4].camera
         else:
             return FW_START[pi4].default
+
+    # TODO validate() to check for pi4/non-pi4 compatible firmware
 
 
 class CommandFirmwareFixup(CommandFilename):
@@ -1204,14 +1210,15 @@ class CommandFirmwareFixup(CommandFilename):
         pi4 = 'pi4' in get_board_types()
         debug = self._query('boot.debug.enabled')
         camera = self._query('camera.enabled')
-        # The "modified" tests below appear extraneous but aren't; they guard
-        # against a circular reference in the case where everything is default
+        # See notes above
         if debug.modified and debug.value:
-            return FW_FIXUP[pi4].debug
+            return FW_FIXUP[False].debug
         elif camera.modified and camera.value:
             return FW_FIXUP[pi4].camera
         else:
             return FW_FIXUP[pi4].default
+
+    # TODO validate() to check for pi4/non-pi4 compatible firmware
 
 
 class CommandDeviceTree(CommandFilename):
@@ -1224,7 +1231,7 @@ class CommandDeviceTreeAddress(CommandIntHex):
     @property
     def hint(self):
         if self.value == 0:
-            return 'auto'
+            return _('auto')
         else:
             return super().hint
 
@@ -1236,9 +1243,9 @@ class CommandRamFSAddress(CommandIntHex):
     @property
     def hint(self):
         if self.value == 0:
-            return 'followkernel'
+            return _('auto')  # followkernel
         else:
-            # FIXME
+            # FIXME What?
             return super().hint
 
     def extract(self, config):
@@ -1259,7 +1266,22 @@ class CommandRamFSFilename(Command):
     Handles the ``ramfsfile`` and ``initramfs`` commands which can both
     accept multiple files (to be concatenated).
     """
-    # TODO os_prefix integration
+    def __init__(self, name, *, command=None, commands=None, default=None,
+                 doc='', index=0):
+        if default is None:
+            default = []
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index)
+
+    @property
+    def filename(self):
+        prefix = self._query('boot.prefix').value
+        return [prefix + item for item in self.value]
+
+    @property
+    def hint(self):
+        if self.value and self._query('boot.prefix').modified:
+            return _('{!r} with boot.prefix').format(self.filename)
 
     def extract(self, config):
         for item in config:
@@ -1274,7 +1296,8 @@ class CommandRamFSFilename(Command):
         return to_list(value)
 
     def validate(self):
-        if self.modified and len(self.name) + len('=') + len(self.value) > 80:
+        if self.modified and len(self.name) + sum(
+                len(item) + 1 for item in self.value) > 80:
             raise ValueError(_('Excessively long list of initramfs files'))
 
     def output(self):
@@ -1456,7 +1479,7 @@ class CommandCoreFreqMax(CommandInt):
             elif 'pi4' in board_types:
                 if self._query('video.tv.enabled').value:
                     return 432
-                elif self._query('video.hdmi.mode.4kp60').value:
+                elif self._query('video.hdmi.4kp60').value:
                     return 550
                 else:
                     return 500
@@ -1500,7 +1523,7 @@ class CommandCoreFreqMin(CommandInt):
             board_types = get_board_types()
             if (
                     ('pi4' in board_types) and
-                    self._query('video.hdmi.mode.4kp60').value):
+                    self._query('video.hdmi.4kp60').value):
                 return 275
             elif board_types:
                 return 250
@@ -1510,7 +1533,7 @@ class CommandCoreFreqMin(CommandInt):
     def output(self):
         blocks = [self] + [
             self._query(self._relative(
-                '...{block}.frequency.max'.format(block=block)
+                '...{block}.frequency.min'.format(block=block)
             ))
             for block in ('h264', 'isp', 'v3d')
         ]
@@ -1588,7 +1611,7 @@ class CommandGPUFreqMin(CommandInt):
     def output(self):
         blocks = [self] + [
             self._query(self._relative(
-                '...{block}.frequency.max'.format(block=block)
+                '...{block}.frequency.min'.format(block=block)
             ))
             for block in ('h264', 'isp', 'v3d')
         ]
@@ -1598,13 +1621,6 @@ class CommandGPUFreqMin(CommandInt):
                 pass
             else:
                 yield from super().output()
-
-    def validate(self):
-        other = self._query(self._relative('.max'))
-        if self.value > other.value:
-            raise ValueError(_(
-                '{self.name} cannot be greater then {other.name}').format(
-                    self=self, other=other))
 
     @property
     def hint(self):
@@ -1653,6 +1669,13 @@ class CommandGPUMem(CommandInt):
 
 
 class CommandTVOut(CommandBool):
+    @property
+    def default(self):
+        if 'pi4' in get_board_types():
+            return False
+        else:
+            return True
+
     def validate(self):
         other = self._query('video.hdmi.4kp60')
         if self.value and other.value:

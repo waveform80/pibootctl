@@ -443,8 +443,10 @@ class Settings(Mapping):
     Represents all settings in a boot configuration; acts like an ordered
     mapping of names to :class:`Setting` objects.
     """
-    def __init__(self):
-        self._items = deepcopy(SETTINGS)
+    def __init__(self, items=None):
+        if items is None:
+            items = SETTINGS
+        self._items = deepcopy(items)
         for setting in self._items.values():
             setting._settings = ref(self)
         self._visible = set(self._items.keys())

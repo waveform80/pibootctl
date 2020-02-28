@@ -1,6 +1,4 @@
 import gettext
-from operator import attrgetter
-from collections import OrderedDict
 
 from . import setting
 
@@ -1271,7 +1269,4 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
         )),
 )}
 
-SETTINGS = OrderedDict(
-    (spec.name, spec)
-    for spec in sorted(SETTINGS, key=attrgetter('key'))
-)
+SETTINGS = {spec.name: spec for spec in SETTINGS}
