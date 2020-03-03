@@ -1,7 +1,6 @@
 import io
 import os
 import sys
-import errno
 import gettext
 import argparse
 import subprocess
@@ -13,7 +12,7 @@ from .setting import Command
 from .store import Store, Current, Default
 from .term import ErrorHandler, pager
 from .userstr import UserStr
-from .output import OutputNamespace
+from .output import Output
 
 try:
     import argcomplete
@@ -22,18 +21,6 @@ except ImportError:
 
 
 _ = gettext.gettext
-
-
-def main(args=None):
-    if not int(os.environ.get('DEBUG', '0')):
-        sys.excepthook = ErrorHandler()
-        sys.excepthook[PermissionError] = (permission_error, 1)
-        sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
-    with pager():
-        app = ApplicationNamespace()
-        parser = app.get_parser()
-        parser.parse_args(args, namespace=app)
-        app.run()
 
 
 def permission_error(exc_type, exc_value, exc_tb):
@@ -45,7 +32,20 @@ def permission_error(exc_type, exc_value, exc_tb):
     return msg
 
 
-class ApplicationNamespace(OutputNamespace):
+class Application:
+    def __call__(self, args=None):
+        if not int(os.environ.get('DEBUG', '0')):
+            sys.excepthook = ErrorHandler()
+            sys.excepthook[PermissionError] = (permission_error, 1)
+            sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
+        with pager():
+            self.parser = self.get_parser()
+            self.config = self.parser.parse_args(args)
+            self.output = Output(
+                self.config.style if 'style' in self.config else 'user')
+            self.store = Store(self.config)
+            self.config.func()
+
     def get_parser(self):
         config = configparser.ConfigParser(
             defaults={
@@ -132,7 +132,7 @@ class ApplicationNamespace(OutputNamespace):
             help=_(
                 "Include all settings, regardless of modification, in the "
                 "output"))
-        self.add_style_arg(dump_cmd)
+        Output.add_style_arg(dump_cmd)
         dump_cmd.set_defaults(func=self.do_dump)
 
         get_cmd = commands.add_parser(
@@ -145,7 +145,7 @@ class ApplicationNamespace(OutputNamespace):
                 "mapping, or list of shell vars is output."),
             help=_("Query the state of one or more boot settings"))
         get_cmd.add_argument("get_vars", nargs="+", metavar="setting")
-        self.add_style_arg(get_cmd)
+        Output.add_style_arg(get_cmd)
         get_cmd.set_defaults(func=self.do_get)
 
         set_cmd = commands.add_parser(
@@ -158,7 +158,7 @@ class ApplicationNamespace(OutputNamespace):
             help=_(
                 "Don't take an automatic backup of the current boot "
                 "configuration if one doesn't exist"))
-        group = self.add_style_arg(set_cmd, required=True)
+        group = Output.add_style_arg(set_cmd, required=True)
         group.add_argument(
             "set_vars", nargs="*", metavar="name=value", default=[],
             help=_(
@@ -211,7 +211,7 @@ class ApplicationNamespace(OutputNamespace):
         diff_cmd.add_argument(
             "right",
             help=_("The boot configuration to compare against"))
-        self.add_style_arg(diff_cmd)
+        Output.add_style_arg(diff_cmd)
         diff_cmd.set_defaults(func=self.do_diff)
 
         show_cmd = commands.add_parser(
@@ -229,14 +229,14 @@ class ApplicationNamespace(OutputNamespace):
             help=_(
                 "Include all settings, not just those modified, in the "
                 "output"))
-        self.add_style_arg(show_cmd)
+        Output.add_style_arg(show_cmd)
         show_cmd.set_defaults(func=self.do_show)
 
         ls_cmd = commands.add_parser(
             "list", aliases=["ls"],
             description=_("List all stored boot configurations."),
             help=_("List the stored boot configurations"))
-        self.add_style_arg(ls_cmd)
+        Output.add_style_arg(ls_cmd)
         ls_cmd.set_defaults(func=self.do_list)
 
         rm_cmd = commands.add_parser(
@@ -270,43 +270,38 @@ class ApplicationNamespace(OutputNamespace):
 
         return parser
 
-    def run(self):
-        self.store = Store(self)
-        self.func()
-
     def do_help(self):
         default = self.store[Default].settings
-        if 'cmd' in self and self.cmd is not None:
-            if self.cmd in default:
-                self.dump_setting(default[self.cmd], fp=sys.stdout)
-            elif '.' in self.cmd:
+        if 'cmd' in self.config and self.config.cmd is not None:
+            if self.config.cmd in default:
+                self.output.dump_setting(default[self.config.cmd],
+                                         fp=sys.stdout)
+            elif '.' in self.config.cmd:
                 # TODO Mis-spelled setting; use something like levenshtein to
                 # detect "close" but incorrect setting names
                 raise ValueError(_(
-                    'Unknown setting "{self.cmd}"').format(self=self))
-            elif '_' in self.cmd:
+                    'Unknown setting "{self.config.cmd}"').format(self=self))
+            elif '_' in self.config.cmd:
                 # Old-style command
                 commands = [
                     setting
                     for setting in default.values()
                     if isinstance(setting, Command)
-                    and self.cmd in setting.commands
+                    and self.config.cmd in setting.commands
                 ]
                 if len(commands) == 1:
-                    self.dump_setting(commands[0], fp=sys.stdout)
+                    self.output.dump_setting(commands[0], fp=sys.stdout)
                 else:
                     print(_(
-                        '{self.cmd} is affected by the following settings:'
-                        '\n\n'
+                        '{self.config.cmd} is affected by the following '
+                        'settings:\n\n'
                         '{settings}').format(
                             self=self, settings='\n'.join(
                                 setting.name for setting in commands)))
             else:
-                parser = self.get_parser()
-                parser.parse_args([self.cmd, '-h'])
+                self.parser.parse_args([self.config.cmd, '-h'])
         else:
-            parser = self.get_parser()
-            parser.parse_args(['-h'])
+            self.parser.parse_args(['-h'])
 
     def do_dump(self):
         self.name = Current
@@ -314,41 +309,42 @@ class ApplicationNamespace(OutputNamespace):
 
     def do_show(self):
         settings = self.store[self.name].settings
-        if self.vars:
-            settings = settings.filter(self.vars)
-        if not self.all:
+        if self.config.vars:
+            settings = settings.filter(self.config.vars)
+        if not self.config.all:
             settings = settings.modified()
-        self.dump_settings(settings, fp=sys.stdout, mod=self.all)
+        self.output.dump_settings(settings, fp=sys.stdout, mod=self.config.all)
 
     def do_get(self):
         current = self.store[Current]
-        if len(self.get_vars) == 1:
+        if len(self.config.get_vars) == 1:
             try:
-                print(self.format_value(current[self.get_vars[0]].value))
+                print(self.output.format_value(
+                    current[self.config.get_vars[0]].value))
             except KeyError:
                 raise ValueError(_(
-                    'unknown setting: {}').format(self.get_vars[0]))
+                    'unknown setting: {}').format(self.config.get_vars[0]))
         else:
             settings = set()
-            for var in self.get_vars:
+            for var in self.config.get_vars:
                 try:
                     settings.add(current[var])
                 except KeyError:
                     raise ValueError(_('unknown setting: {}').format(var))
-            self.dump_settings(settings, fp=sys.stdout)
+            self.output.dump_settings(settings, fp=sys.stdout)
 
     def do_set(self):
         current = self.store[Current]
-        mutable = current.mutable(self.config_write)
-        if self.style == 'user':
+        mutable = current.mutable(self.config.config_write)
+        if self.config.style == 'user':
             settings = {}
-            for var in self.set_vars:
+            for var in self.config.set_vars:
                 if not '=' in var:
                     raise ValueError(_('expected "=" in {}').format(var))
                 name, value = var.split('=', 1)
                 settings[name] = UserStr(value)
         else:
-            settings = self.load_settings()
+            settings = self.output.load_settings()
         mutable.update(settings)
         self.backup_if_needed()
         self.store[Current] = mutable
@@ -356,17 +352,17 @@ class ApplicationNamespace(OutputNamespace):
 
     def do_save(self):
         try:
-            self.store[self.name] = self.store[Current]
-        except OSError as exc:
-            if exc.errno != errno.EEXIST or not self.force:
+            self.store[self.config.name] = self.store[Current]
+        except FileExistsError:
+            if not self.config.force:
                 raise
-            del self.store[self.name]
-            self.store[self.name] = self.store[Current]
+            del self.store[self.config.name]
+            self.store[self.config.name] = self.store[Current]
 
     def do_load(self):
         # Look up the config to load before we do any backups, just in case the
         # user's made a mistake and the config doesn't exist
-        to_load = self.store[self.name]
+        to_load = self.store[self.config.name]
         self.backup_if_needed()
         self.store[Current] = to_load
         self.mark_reboot_required()
@@ -374,49 +370,50 @@ class ApplicationNamespace(OutputNamespace):
     def do_diff(self):
         # Keep references to the settings lying around while we dump the diff
         # as otherwise the settings lose their weak-ref during the dump
-        left = self.store[self.left].settings
-        right = self.store[self.right].settings
-        self.dump_diff(self.left, self.right, left.diff(right), fp=sys.stdout)
+        left = self.store[self.config.left].settings
+        right = self.store[self.config.right].settings
+        self.output.dump_diff(
+            self.config.left, self.config.right, left.diff(right),
+            fp=sys.stdout)
 
     def do_list(self):
         current = self.store[Current]
         table = [
             (key, value.hash == current.hash, value.timestamp)
+            # TODO Sort this alphabetically? By date?
             for key, value in self.store.items()
             if key not in (Current, Default)
         ]
-        self.dump_store(table, fp=sys.stdout)
+        self.output.dump_store(table, fp=sys.stdout)
 
     def do_remove(self):
         try:
-            del self.store[self.name]
+            del self.store[self.config.name]
         except KeyError:
             if not self.force:
                 raise
 
     def do_rename(self):
         try:
-            self.store[self.to] = self.store[self.name]
-        except OSError as exc:
-            if exc.errno != errno.EEXIST or not self.force:
+            self.store[self.config.to] = self.store[self.config.name]
+        except FileExistsError:
+            if not self.config.force:
                 raise
-            del store[self.to]
-            self.store[self.to] = self.store[self.name]
-        del self.store[self.name]
+            del store[self.config.to]
+            self.store[self.config.to] = self.store[self.config.name]
+        del self.store[self.config.name]
 
     def backup_if_needed(self):
-        if self.backup and self.store.active is None:
+        if self.config.backup and self.store.active is None:
             name = 'backup-{now:%Y%m%d-%H%M%S}'.format(now=datetime.now())
             suffix = 0
             while True:
                 try:
                     self.store[name] = self.store[Current]
-                except OSError as exc:
+                except FileExistsError:
                     # Pi's clocks can be very wrong when there's no network;
                     # this just exists to guarantee that we won't try and
                     # clobber an existing backup
-                    if exc.errno != errno.EEXIST:
-                        raise
                     suffix += 1
                     name = 'backup-{now:%Y%m%d-%H%M%S}-{suffix}'.format(
                         now=datetime.now(), suffix=suffix)
@@ -427,12 +424,15 @@ class ApplicationNamespace(OutputNamespace):
                     break
 
     def mark_reboot_required(self):
-        if self.reboot_required:
-            with io.open(self.reboot_required, 'w') as f:
+        if self.config.reboot_required:
+            with io.open(self.config.reboot_required, 'w') as f:
                 f.write('*** ')
                 f.write(_('System restart required'))
                 f.write(' ***\n')
-        if self.reboot_required_pkgs and self.package_name:
-            with io.open(self.reboot_required_pkgs, 'a') as f:
-                f.write(self.package_name)
+        if self.config.reboot_required_pkgs and self.config.package_name:
+            with io.open(self.config.reboot_required_pkgs, 'a') as f:
+                f.write(self.config.package_name)
                 f.write('\n')
+
+
+main = Application()

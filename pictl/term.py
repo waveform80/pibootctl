@@ -2,7 +2,6 @@ import os
 import io
 import sys
 import fcntl
-import errno
 import struct
 import locale
 import gettext
@@ -82,11 +81,12 @@ def pager():
         for exe in ('pager', 'less', 'more'):
             try:
                 p = subprocess.Popen(exe, stdin=subprocess.PIPE, env=env)
+            except FileNotFoundError:
+                pass
             except OSError as exc:
-                if exc.errno != errno.ENOENT:
-                    print(_("Failed to execute pager: {}").format(exe),
-                          file=sys.stderr)
-                    print(str(exc), file=sys.stderr)
+                print(_("Failed to execute pager: {}").format(exe),
+                      file=sys.stderr)
+                print(str(exc), file=sys.stderr)
             else:
                 with io.TextIOWrapper(p.stdin, encoding=sys.stdout.encoding,
                                       write_through=True) as w:

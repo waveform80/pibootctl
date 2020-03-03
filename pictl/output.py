@@ -25,7 +25,7 @@ def values(l, r):
     return obj
 
 
-class OutputNamespace(argparse.Namespace):
+class Output:
     """
     A derivative of :class:`~argparse.Namespace` used by the main application,
     this class provides a variety of methods (:meth:`dump_store`,
@@ -38,8 +38,8 @@ class OutputNamespace(argparse.Namespace):
     one of the style arguments which the :meth:`add_style_arg` can be used to
     create.
     """
-    def __init__(self, default_style='user', use_unicode=None):
-        self.style = default_style
+    def __init__(self, style='user', use_unicode=None):
+        self.style = style
         if use_unicode is None:
             use_unicode = term_is_utf8()
         if use_unicode:
@@ -49,7 +49,8 @@ class OutputNamespace(argparse.Namespace):
             self._table_style = pretty_table
             self._check_mark = 'x'
 
-    def add_style_arg(self, parser, *, required=False):
+    @classmethod
+    def add_style_arg(cls, parser, *, required=False):
         """
         Create a mutually exclusive :mod:`argparse` group and add to it options
         for the various input and output styles supported by this class.

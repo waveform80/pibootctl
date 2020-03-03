@@ -45,7 +45,7 @@ def left_right_diff(request):
 
 def test_dump_store_user(store):
     buf = io.StringIO()
-    output = OutputNamespace(use_unicode=False)
+    output = Output(use_unicode=False)
     output.dump_store(store, buf)
     assert buf.getvalue() == """\
 +------+--------+---------------------+
@@ -63,7 +63,7 @@ def test_dump_store_user(store):
 
 def test_dump_store_json(store):
     buf = io.StringIO()
-    output = OutputNamespace(default_style='json')
+    output = Output(style='json')
     output.dump_store(store, buf)
     assert json.loads(buf.getvalue()) == [
         {'name': n, 'active': a, 'timestamp': t.isoformat()}
@@ -73,7 +73,7 @@ def test_dump_store_json(store):
 
 def test_dump_store_yaml(store):
     buf = io.StringIO()
-    output = OutputNamespace(default_style='yaml')
+    output = Output(style='yaml')
     output.dump_store(store, buf)
     assert yaml_loads(buf.getvalue()) == [
         {'name': n, 'active': a, 'timestamp': t}
@@ -83,7 +83,7 @@ def test_dump_store_yaml(store):
 
 def test_dump_store_shell(store):
     buf = io.StringIO()
-    output = OutputNamespace(default_style='shell')
+    output = Output(style='shell')
     output.dump_store(store, buf)
     assert buf.getvalue() == """\
 2020-01-01T12:30:00\tinactive\tfoo
@@ -95,7 +95,7 @@ def test_dump_store_shell(store):
 def test_dump_diff_user(left_right_diff):
     left, right, diff = left_right_diff
     buf = io.StringIO()
-    output = OutputNamespace(use_unicode=False)
+    output = Output(use_unicode=False)
     output.dump_diff('left', 'right', diff, buf)
     assert buf.getvalue() == """\
 +-------------------+----------------+-------+
@@ -113,7 +113,7 @@ def test_dump_diff_user(left_right_diff):
 def test_dump_diff_json(left_right_diff):
     left, right, diff = left_right_diff
     buf = io.StringIO()
-    output = OutputNamespace(default_style='json')
+    output = Output(style='json')
     output.dump_diff('left', 'right', diff, buf)
     assert json.loads(buf.getvalue()) == {
         'boot.test.enabled': {'left': False},
@@ -124,7 +124,7 @@ def test_dump_diff_json(left_right_diff):
 def test_dump_diff_yaml(left_right_diff):
     left, right, diff = left_right_diff
     buf = io.StringIO()
-    output = OutputNamespace(default_style='yaml')
+    output = Output(style='yaml')
     output.dump_diff('left', 'right', diff, buf)
     assert yaml_loads(buf.getvalue()) == {
         'boot.test.enabled': {'left': False},
@@ -135,7 +135,7 @@ def test_dump_diff_yaml(left_right_diff):
 def test_dump_diff_shell(left_right_diff):
     left, right, diff = left_right_diff
     buf = io.StringIO()
-    output = OutputNamespace(default_style='shell')
+    output = Output(style='shell')
     output.dump_diff('left', 'right', diff, buf)
     assert buf.getvalue() == """\
 video.cec.name\t'Raspberry Pi'\tFoo
@@ -148,7 +148,7 @@ def test_dump_settings_user():
     default = Settings().filter('video.cec.*')
     default['video.cec.name']._value = 'Foo'
     buf = io.StringIO()
-    output = OutputNamespace(use_unicode=False)
+    output = Output(use_unicode=False)
     output.dump_settings(default, buf)
     assert buf.getvalue() == """\
 +-------------------+-------+
@@ -178,7 +178,7 @@ def test_dump_settings_user():
 def test_dump_settings_json():
     default = Settings()
     buf = io.StringIO()
-    output = OutputNamespace(default_style='json')
+    output = Output(style='json')
     output.dump_settings(default, buf)
     assert json.loads(buf.getvalue()) == {
         setting.name: setting.value for setting in default.values()
@@ -188,7 +188,7 @@ def test_dump_settings_json():
 def test_dump_settings_yaml():
     default = Settings()
     buf = io.StringIO()
-    output = OutputNamespace(default_style='yaml')
+    output = Output(style='yaml')
     output.dump_settings(default, buf)
     assert yaml_loads(buf.getvalue()) == {
         setting.name: setting.value for setting in default.values()
@@ -199,7 +199,7 @@ def test_dump_settings_shell():
     # Cut down the settings to something manageable for this test
     default = Settings().filter('video.cec.*')
     buf = io.StringIO()
-    output = OutputNamespace(default_style='shell')
+    output = Output(style='shell')
     output.dump_settings(default, buf)
     # Sets because there's no guarantee of order in the output
     assert set(buf.getvalue().splitlines()) == {
@@ -210,7 +210,7 @@ def test_dump_settings_shell():
 
 
 def test_load_settings_user():
-    output = OutputNamespace()
+    output = Output()
     with pytest.raises(NotImplementedError):
         output.load_settings(io.StringIO())
 
@@ -224,7 +224,7 @@ def test_load_settings_json():
     buf = io.StringIO()
     json.dump(settings, buf)
     buf.seek(0)
-    output = OutputNamespace(default_style='json')
+    output = Output(style='json')
     assert output.load_settings(buf) == settings
 
 
@@ -237,7 +237,7 @@ def test_load_settings_yaml():
     buf = io.StringIO()
     yaml.dump(settings, buf)
     buf.seek(0)
-    output = OutputNamespace(default_style='yaml')
+    output = Output(style='yaml')
     assert output.load_settings(buf) == settings
 
 
@@ -253,12 +253,12 @@ video_cec_enabled=on
 video_cec_init=off
 video_cec_name='Raspberry Pi'
 """)
-    output = OutputNamespace(default_style='shell')
+    output = Output(style='shell')
     assert output.load_settings(buf) == settings
 
 
 def test_format_value_user():
-    output = OutputNamespace(use_unicode=False)
+    output = Output(use_unicode=False)
     assert output.format_value(1) == '1'
     assert output.format_value(None) == 'auto'
     assert output.format_value(True) == 'on'
@@ -269,7 +269,7 @@ def test_format_value_user():
 
 
 def test_format_value_json():
-    output = OutputNamespace(default_style='json')
+    output = Output(style='json')
     assert output.format_value(1) == json.dumps(1)
     assert output.format_value(None) == json.dumps(None)
     assert output.format_value(True) == json.dumps(True)
@@ -280,7 +280,7 @@ def test_format_value_json():
 
 
 def test_format_value_yaml():
-    output = OutputNamespace(default_style='yaml')
+    output = Output(style='yaml')
     assert output.format_value(1) == yaml_dumps(1)
     assert output.format_value(None) == yaml_dumps(None)
     assert output.format_value(True) == yaml_dumps(True)
@@ -291,7 +291,7 @@ def test_format_value_yaml():
 
 
 def test_format_value_shell():
-    output = OutputNamespace(default_style='shell')
+    output = Output(style='shell')
     assert output.format_value(1) == '1'
     assert output.format_value(None) == 'auto'
     assert output.format_value(True) == 'on'
@@ -306,7 +306,7 @@ def test_dump_setting_user():
         term_size.return_value = (80, 24)
         default = Settings()
         buf = io.StringIO()
-        output = OutputNamespace(use_unicode=False)
+        output = Output(use_unicode=False)
         output.dump_setting(default['video.cec.name'], buf)
         assert buf.getvalue() == """\
       Name: video.cec.name
@@ -317,7 +317,7 @@ The name the Pi (as a CEC device) should provide to the connected display;
 defaults to "Raspberry Pi".
 """
         buf = io.StringIO()
-        output = OutputNamespace(use_unicode=False)
+        output = Output(use_unicode=False)
         output.dump_setting(default['i2c.baud'], buf)
         assert buf.getvalue() == """\
      Name: i2c.baud

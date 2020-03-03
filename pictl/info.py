@@ -1,7 +1,4 @@
 import io
-import os
-import shlex
-import errno
 import struct
 
 
