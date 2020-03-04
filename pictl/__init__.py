@@ -24,7 +24,7 @@ _ = gettext.gettext
 
 
 def permission_error(exc_type, exc_value, exc_tb):
-    msg = [exc_value]
+    msg = [str(exc_value.args[0])]
     if os.geteuid() != 0:
         msg.append(_(
             "You need root permissions to modify the boot configuration or "
@@ -74,7 +74,7 @@ class Application:
 
         parser = argparse.ArgumentParser(
             description=_(
-                "pictl is a tool for querying and modifying the boot "
+                "%(prog)s is a tool for querying and modifying the boot "
                 "configuration of the Raspberry Pi"))
         parser.add_argument(
             '--version', action='version', version='0.1')
@@ -276,6 +276,7 @@ class Application:
             if self.config.cmd in default:
                 self.output.dump_setting(default[self.config.cmd],
                                          fp=sys.stdout)
+                raise SystemExit(0)
             elif '.' in self.config.cmd:
                 # TODO Mis-spelled setting; use something like levenshtein to
                 # detect "close" but incorrect setting names
@@ -298,17 +299,18 @@ class Application:
                         '{settings}').format(
                             self=self, settings='\n'.join(
                                 setting.name for setting in commands)))
+                raise SystemExit(0)
             else:
                 self.parser.parse_args([self.config.cmd, '-h'])
         else:
             self.parser.parse_args(['-h'])
 
     def do_dump(self):
-        self.name = Current
+        self.config.name = Current
         self.do_show()
 
     def do_show(self):
-        settings = self.store[self.name].settings
+        settings = self.store[self.config.name].settings
         if self.config.vars:
             settings = settings.filter(self.config.vars)
         if not self.config.all:
@@ -320,22 +322,21 @@ class Application:
         if len(self.config.get_vars) == 1:
             try:
                 print(self.output.format_value(
-                    current[self.config.get_vars[0]].value))
+                    current.settings[self.config.get_vars[0]].value))
             except KeyError:
                 raise ValueError(_(
                     'unknown setting: {}').format(self.config.get_vars[0]))
         else:
-            settings = set()
+            settings = {}
             for var in self.config.get_vars:
                 try:
-                    settings.add(current[var])
+                    settings[var] = current.settings[var]
                 except KeyError:
                     raise ValueError(_('unknown setting: {}').format(var))
             self.output.dump_settings(settings, fp=sys.stdout)
 
     def do_set(self):
-        current = self.store[Current]
-        mutable = current.mutable(self.config.config_write)
+        mutable = self.store[Current].mutable(self.config.config_write)
         if self.config.style == 'user':
             settings = {}
             for var in self.config.set_vars:
@@ -344,7 +345,7 @@ class Application:
                 name, value = var.split('=', 1)
                 settings[name] = UserStr(value)
         else:
-            settings = self.output.load_settings()
+            settings = self.output.load_settings(sys.stdin)
         mutable.update(settings)
         self.backup_if_needed()
         self.store[Current] = mutable
@@ -390,8 +391,9 @@ class Application:
         try:
             del self.store[self.config.name]
         except KeyError:
-            if not self.force:
-                raise
+            if not self.config.force:
+                raise FileNotFoundError(_(
+                    'unknown configuration {}').format(self.config.name))
 
     def do_rename(self):
         try:
@@ -399,7 +401,7 @@ class Application:
         except FileExistsError:
             if not self.config.force:
                 raise
-            del store[self.config.to]
+            del self.store[self.config.to]
             self.store[self.config.to] = self.store[self.config.name]
         del self.store[self.config.name]
 

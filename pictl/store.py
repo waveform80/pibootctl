@@ -49,16 +49,18 @@ class Store(Mapping):
 
     Note that items retrieved from the store are ephemeral and modifying them
     does *not* modify the content of the store. To modify the content of the
-    store, an item must be explicitly set::
+    store, you must request a :meth:`~BootConfiguration.mutable` version of a
+    configuration (specifying which file to re-write within it), modify it, and
+    assign it back::
 
-        >>> foo = store["foo"]
-        >>> foo.settings.update({"serial.enabled": True})
+        >>> foo = store["foo"].mutable("config.txt")
+        >>> foo.update({"serial.enabled": True})
         >>> store["serial"] = foo
 
     The same applies to the current boot configuration item::
 
-        >>> current = store[Current]
-        >>> current.settings.update({"camera.enabled": True, "gpu.mem": 128})
+        >>> current = store[Current].mutable("syscfg.txt")
+        >>> current.update({"camera.enabled": True, "gpu.mem": 128})
         >>> store[Current] = current
 
     Items can be deleted to remove them from the store, with the obvious
@@ -288,7 +290,7 @@ class BootConfiguration:
         is actually re-written until the updated mutable configuration is
         assigned back to something in the :class:`Store`.
         """
-        return MutableConfiguration(self, rewrite)
+        return MutableConfiguration(self, Path(rewrite))
 
 
 class StoredConfiguration(BootConfiguration):
@@ -402,7 +404,7 @@ class MutableConfiguration(BootConfiguration):
         # intend to re-write and re-parse the settings to see what they are
         # without that file
         updated = self.settings.copy()
-        del self._path[self._rewrite]
+        self._path.pop(self._rewrite, None)
         self._settings = self._files = self._hash = None
         self._parse()
 

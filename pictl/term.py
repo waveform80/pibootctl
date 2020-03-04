@@ -136,15 +136,16 @@ class ErrorHandler:
 
     @staticmethod
     def exc_message(exc_type, exc_value, exc_tb):
-        return [exc_value]
+        return [str(exc_value.args[0])]
 
     @staticmethod
     def exc_value(exc_type, exc_value, exc_tb):
-        return exc_value
+        return exc_value.args[0]
 
     @staticmethod
     def syntax_error(exc_type, exc_value, exc_tb):
-        return [exc_value, _('Try the --help option for more information.')]
+        return [str(exc_value.args[0]),
+                _('Try the --help option for more information.')]
 
     def __len__(self):
         return len(self._config)
