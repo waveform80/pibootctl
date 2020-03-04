@@ -59,8 +59,12 @@ def test_overlay_init():
 def test_overlay_extract():
     o = Overlay('sense.enabled', overlay='sensehat')
 
-    config = [BootOverlay(Path('config.txt'), 4, 'sensehat')]
-    assert list(o.extract(config)) == [(config[0], True)]
+    config = [BootParam(Path('config.txt'), 3, 'base', 'i2c_arm', 'on')]
+    assert list(o.extract(config)) == []
+    config = [
+        BootOverlay(Path('config.txt'), 3, 'disable-bt'),
+        BootOverlay(Path('config.txt'), 4, 'sensehat')]
+    assert list(o.extract(config)) == [(config[1], True)]
 
 def test_overlay_output():
     o = Overlay('sense.enabled', overlay='sensehat')
@@ -661,6 +665,12 @@ def test_boot_delay2():
     assert delay.modified
     delay.validate()
     assert list(delay.output()) == ['boot_delay=2', 'boot_delay_ms=500']
+    delay._value = delay.update(UserStr('0.5'))
+    delay.validate()
+    assert list(delay.output()) == ['boot_delay_ms=500']
+    delay._value = delay.update(UserStr('0.0'))
+    delay.validate()
+    assert list(delay.output()) == []
 
     delay._value = -1
     with pytest.raises(ValueError):
@@ -728,12 +738,16 @@ def test_camera_firmware(fw_settings):
         assert not cam.value
         cam.validate()
 
+        # camera mode can be enabled (by default) by specifying firmware manually
         get_board_types.return_value = {'pi0'}
         start._value = 'start_x.elf'
         fixup._value = 'fixup_x.dat'
+        assert not cam.modified
         assert cam.value
         assert cam.default
         cam.validate()
+        assert list(cam.output()) == []
+
         get_board_types.return_value = {'pi4'}
         assert not cam.value
         assert not cam.default
@@ -746,6 +760,7 @@ def test_camera_firmware(fw_settings):
         assert cam.value
         assert start.value == 'start4x.elf'
         assert fixup.value == 'fixup4x.dat'
+        assert list(cam.output()) == ['start_x=1']
 
         mem._value = 32
         get_board_types.return_value = {'pi0'}
@@ -760,15 +775,10 @@ def test_camera_firmware_extract(fw_settings):
         BootCommand(Path('config.txt'), 2, 'start_x', '1', hdmi=0),
         BootCommand(Path('config.txt'), 3, 'start_x', '0', hdmi=0),
         BootCommand(Path('config.txt'), 4, 'start_debug', '1', hdmi=0),
-        BootCommand(Path('config.txt'), 5, 'start_file', 'start_x.elf', hdmi=0),
-        BootCommand(Path('config.txt'), 6, 'fixup_file', 'fixup_x.dat', hdmi=0),
     ]
     assert list(cam.extract(config)) == [
         (config[1], True),
-        (config[2], False),
-        (config[3], None),
-        (config[4], None),
-        (config[5], None),
+        (config[2], None),
     ]
 
 
@@ -785,25 +795,25 @@ def test_debug_firmware(fw_settings):
         get_board_types.return_value = {'pi0'}
         start._value = 'start_db.elf'
         fixup._value = 'fixup_db.dat'
+        assert not debug.modified
         assert debug.value
         assert debug.default
         debug.validate()
+        assert list(debug.output()) == []
 
-        # ... but pi4 uses different firmware
         get_board_types.return_value = {'pi4'}
         assert not debug.value
         assert not debug.default
 
-        # ... if debug is enabled directly, it still doesn't work on pi4 :)
         start._value = None
         fixup._value = None
         debug._value = True
         debug.validate()
         assert debug.modified
         assert debug.value
-        assert not debug.default
-        assert start.value == 'start_db.elf' # no special pi4 handling
-        assert fixup.value == 'fixup_db.dat'
+        assert start.value == 'start4db.elf'
+        assert fixup.value == 'fixup4db.dat'
+        assert list(debug.output()) == ['start_debug=1']
 
 
 def test_debug_firmware_extract(fw_settings):
@@ -811,15 +821,55 @@ def test_debug_firmware_extract(fw_settings):
     config = [
         BootCommand(Path('config.txt'), 1, 'start_debug', '1', hdmi=0),
         BootCommand(Path('config.txt'), 2, 'start_debug', '0', hdmi=0),
-        BootCommand(Path('config.txt'), 3, 'start_file', 'start_db.elf', hdmi=0),
-        BootCommand(Path('config.txt'), 4, 'fixup_file', 'fixup_db.elf', hdmi=0),
     ]
     assert list(debug.extract(config)) == [
         (config[0], True),
-        (config[1], False),
-        (config[2], None),
-        (config[3], None),
+        (config[1], None),
     ]
+
+
+def test_firmware_filename(fw_settings):
+    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+        cam = fw_settings['camera.enabled']
+        debug = fw_settings['boot.debug.enabled']
+        start = fw_settings['boot.firmware.filename']
+        fixup = fw_settings['boot.firmware.fixup']
+        mem = fw_settings['gpu.mem']
+
+        get_board_types.return_value = {'pi0'}
+        assert not start.modified
+        assert not fixup.modified
+        assert start.value == 'start.elf'
+        assert fixup.value == 'fixup.dat'
+
+        cam._value = True
+        assert start.value == 'start_x.elf'
+        assert fixup.value == 'fixup_x.dat'
+        debug._value = True
+        assert start.value == 'start_db.elf'
+        assert fixup.value == 'fixup_db.dat'
+        mem._value = 16
+        assert start.value == 'start_cd.elf'
+        assert fixup.value == 'fixup_cd.dat'
+
+        mem._value = None
+        cam._value = None
+        debug._value = None
+        get_board_types.return_value = {'pi4'}
+        assert not start.modified
+        assert not fixup.modified
+        assert start.value == 'start4.elf'
+        assert fixup.value == 'fixup4.dat'
+
+        cam._value = True
+        assert start.value == 'start4x.elf'
+        assert fixup.value == 'fixup4x.dat'
+        debug._value = True
+        assert start.value == 'start4db.elf'
+        assert fixup.value == 'fixup4db.dat'
+        mem._value = 16
+        assert start.value == 'start4cd.elf'
+        assert fixup.value == 'fixup4cd.dat'
 
 
 def test_dt_addr():
@@ -991,7 +1041,8 @@ def test_serial_bt_extract():
     config = [
         BootCommand(Path('config.txt'), 1, 'enable_uart', '1', hdmi=0),
         BootOverlay(Path('config.txt'), 2, 'pi3-miniuart-bt'),
-        BootOverlay(Path('config.txt'), 2, 'disable-bt'),
+        BootOverlay(Path('config.txt'), 3, 'disable-bt'),
+        BootOverlay(Path('config.txt'), 4, 'foo'),
     ]
     assert list(enable.extract(config)) == [(config[0], True)]
     assert list(bt.extract(config)) == [(config[1], True), (config[2], False)]
@@ -1009,6 +1060,8 @@ def test_serial_bt_output():
         uart = settings['serial.uart']
 
         get_board_types.return_value = {'pi3'}
+        assert list(chain(enable.output(), bt.output(), uart.output())) == []
+        bt._value = True
         assert list(chain(enable.output(), bt.output(), uart.output())) == []
         enable._value = True
         assert list(chain(enable.output(), bt.output(), uart.output())) == [

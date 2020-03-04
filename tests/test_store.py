@@ -31,6 +31,10 @@ dtparam=spi=on
         with ZipFile(f, 'w') as z:
             z.comment = ('pictl:0:' + store[Current].hash).encode('ascii')
             store[Current].files[Path('config.txt')].add_to_zip(z)
+    with (store_config.store_path / 'invalid.zip').open('wb') as f:
+        with ZipFile(f, 'w') as z:
+            z.comment = ('pictl:999:' + store[Current].hash).encode('ascii')
+            store[Current].files[Path('config.txt')].add_to_zip(z)
     assert len(store) == 3
     assert Current in store
     assert Default in store
@@ -50,7 +54,13 @@ dtparam=spi=on
     store_config.store_path.mkdir()
     with (store_config.store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
-            z.comment = b'pictl:0:foo'
+            z.comment = b'pictl:badver:'
+            z.writestr('config.txt', b'')
+    with pytest.raises(KeyError):
+        store['foo']
+    with (store_config.store_path / 'foo.zip').open('wb') as f:
+        with ZipFile(f, 'w') as z:
+            z.comment = b'pictl:0:badhash'
             z.writestr('config.txt', b'')
     with pytest.raises(ValueError):
         store['foo']

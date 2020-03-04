@@ -38,6 +38,18 @@ def test_table_wrap_basic(table_data):
     assert wrap.fill(table_data) == '\n'.join(expected)
 
 
+def test_table_wrap_no_header(table_data):
+    expected = [
+        "Key  Value                                                ",
+        "foo  bar                                                  ",
+        "baz  A much longer value which can wrap over several lines",
+        "quux Just for completeness                                ",
+    ]
+    wrap = TableWrapper(header_rows=0)
+    assert wrap.wrap(table_data) == expected
+    assert wrap.fill(table_data) == '\n'.join(expected)
+
+
 def test_table_wrap_thin(table_data):
     wrap = TableWrapper(width=40)
     expected = [
@@ -165,6 +177,45 @@ def test_table_wrap_bad_init():
         TableWrapper(corners=',-')
     with pytest.raises(ValueError):
         TableWrapper(internal_borders='foo')
+
+
+def test_table_wrap_align():
+    data = [
+        ('Key', 'Value'),
+        ('foo', 1),
+        ('bar', 2),
+    ]
+    expected = [
+        "Key Value",
+        "--- -----",
+        "foo     1",
+        "bar     2",
+    ]
+    wrap = TableWrapper(
+        width=40,
+        align=lambda data: '>' if isinstance(data, int) else '<')
+    assert wrap.wrap(data) == expected
+    assert wrap.fill(data) == '\n'.join(expected)
+
+
+def test_table_wrap_format():
+    data = [
+        ('Key', 'Value'),
+        ('foo', 1),
+        ('bar', 2),
+    ]
+    expected = [
+        "Key Value",
+        "--- -----",
+        "foo 001  ",
+        "bar 002  ",
+    ]
+    wrap = TableWrapper(
+        width=40,
+        format=lambda data: '{:03d}'.format(data)
+                            if isinstance(data, int) else str(data))
+    assert wrap.wrap(data) == expected
+    assert wrap.fill(data) == '\n'.join(expected)
 
 
 def test_int_ranges():

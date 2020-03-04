@@ -366,6 +366,8 @@ def parse(text):
             else:
                 yield 'para', ' '.join(para)
                 state = 'break'
+        else:
+            assert False  # pragma: no cover
 
     # Deal with residual state (lists have indeterminate endings)
     if state == 'list':
@@ -426,4 +428,6 @@ def render(text, width=70, list_space=False, table_style=None):
                 ))
         elif token == 'table':
             chunks.append(table_wrapper.fill(data))
+        else:
+            assert False  # pragma: no cover
     return '\n\n'.join(chunks)

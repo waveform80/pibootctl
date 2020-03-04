@@ -754,11 +754,10 @@ SETTINGS = {
         commands=('start_debug', 'start_file', 'fixup_file'), doc=_(
             """
             Enables loading the debugging firmware. This implies that
-            start_db.elf will be loaded as the GPU firmware rather than the
-            default start.elf. Note that, unlike the camera firmware, there is
-            no special handling for the Pi 4 (i.e. setting this will not
-            implicitly load start4db.elf on the Pi 4). On the Pi 4, you must
-            specify boot.firmware.filename (and boot.firmware.fixup) manually.
+            start_db.elf (or start4db.elf) will be loaded as the GPU firmware
+            rather than the default start.elf (or start4.elf). Note that the
+            debugging firmware incorporates the camera firmware so this will
+            implicitly switch camera.enabled on if it is not already.
 
             The debugging firmware performs considerably more logging than the
             default firmware but at a performance cost, ergo it should only be
@@ -776,8 +775,7 @@ SETTINGS = {
             require the camera firmware simply set camera.enabled. However, if
             you require the specialized debugging (start_db.elf) or lightweight
             (start_cd.elf) firmwares you may need to specify them manually
-            here, especially on the Pi 4 where there's no special handling of
-            the commands usually used to activate these firmwares.
+            here.
 
             Please note that if you manually specify a GPU firmware, you should
             also manually specify an appropriate boot.firmware.fixup file.
@@ -792,8 +790,7 @@ SETTINGS = {
             require the camera firmware simply set camera.enabled. However, if
             you require the specialized debugging (start_db.elf) or lightweight
             (start_cd.elf) firmwares you may need to specify them manually
-            here, especially on the Pi 4 where there's no special handling of
-            the commands usually used to activate these firmwares.
+            here.
             """)),
     setting.CommandRamFSAddress(
         'boot.initramfs.address', commands=('ramfsaddr', 'initramfs'), doc=_(

@@ -34,10 +34,12 @@ def store(request):
 def left_right_diff(request):
     left = Settings()
     right = left.copy()
+    right['video.hdmi0.enabled']._value = True
     right['video.cec.name']._value = 'Foo'
     right['boot.test.enabled']._value = None
     diff = [
         (left['video.cec.name'], right['video.cec.name']),
+        (None, right['video.hdmi0.enabled']),
         (left['boot.test.enabled'], None),
     ]
     return left, right, diff
@@ -98,12 +100,13 @@ def test_dump_diff_user(left_right_diff):
     output = Output(use_unicode=False)
     output.dump_diff('left', 'right', diff, buf)
     assert buf.getvalue() == """\
-+-------------------+----------------+-------+
-| Name              | left           | right |
-|-------------------+----------------+-------|
-| boot.test.enabled | off            | -     |
-| video.cec.name    | 'Raspberry Pi' | 'Foo' |
-+-------------------+----------------+-------+
++---------------------+----------------+-------+
+| Name                | left           | right |
+|---------------------+----------------+-------|
+| boot.test.enabled   | off            | -     |
+| video.cec.name      | 'Raspberry Pi' | 'Foo' |
+| video.hdmi0.enabled | -              | on    |
++---------------------+----------------+-------+
 """
     buf = io.StringIO()
     output.dump_diff('left', 'right', [], buf)
@@ -118,6 +121,7 @@ def test_dump_diff_json(left_right_diff):
     assert json.loads(buf.getvalue()) == {
         'boot.test.enabled': {'left': False},
         'video.cec.name': {'left': 'Raspberry Pi', 'right': 'Foo'},
+        'video.hdmi0.enabled': {'right': True},
     }
 
 
@@ -129,6 +133,7 @@ def test_dump_diff_yaml(left_right_diff):
     assert yaml_loads(buf.getvalue()) == {
         'boot.test.enabled': {'left': False},
         'video.cec.name': {'left': 'Raspberry Pi', 'right': 'Foo'},
+        'video.hdmi0.enabled': {'right': True},
     }
 
 
@@ -137,10 +142,11 @@ def test_dump_diff_shell(left_right_diff):
     buf = io.StringIO()
     output = Output(style='shell')
     output.dump_diff('left', 'right', diff, buf)
-    assert buf.getvalue() == """\
-video.cec.name\t'Raspberry Pi'\tFoo
-boot.test.enabled\toff\t-
-"""
+    assert set(buf.getvalue().splitlines()) == {
+        "boot.test.enabled\toff\t-",
+        "video.cec.name\t'Raspberry Pi'\tFoo",
+        "video.hdmi0.enabled\t-\ton",
+    }
 
 
 def test_dump_settings_user():
@@ -305,6 +311,7 @@ def test_dump_setting_user():
     with mock.patch('pictl.output.term_size') as term_size:
         term_size.return_value = (80, 24)
         default = Settings()
+
         buf = io.StringIO()
         output = Output(use_unicode=False)
         output.dump_setting(default['video.cec.name'], buf)
@@ -316,6 +323,7 @@ Command(s): cec_osd_name
 The name the Pi (as a CEC device) should provide to the connected display;
 defaults to "Raspberry Pi".
 """
+
         buf = io.StringIO()
         output = Output(use_unicode=False)
         output.dump_setting(default['i2c.baud'], buf)
@@ -326,4 +334,18 @@ defaults to "Raspberry Pi".
 Parameter: i2c_arm_baudrate
 
 The baud-rate of the ARM I2C bus.
+"""
+
+        buf = io.StringIO()
+        output = Output(use_unicode=False)
+        output.dump_setting(default['bluetooth.enabled'], buf)
+        assert buf.getvalue() == """\
+   Name: bluetooth.enabled
+Default: off
+
+Controls whether the Bluetooth module (Raspberry Pi 3 and later, and the
+Raspberry Pi Zero W), is enabled (which it is by default).
+
+Note that disabling the module can affect the default state of serial.enabled
+and serial.uart.
 """

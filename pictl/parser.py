@@ -187,6 +187,9 @@ class BootFilter:
                 pass
         elif section.startswith('pi'):
             self.pi = section in get_board_types()
+        else:
+            warnings.warn(
+                BootInvalid('unrecognized conditional: {}'.format(section)))
 
     @property
     def enabled(self):
@@ -371,9 +374,7 @@ class BootParser:
         Otherwise, the content of the file is assumed to be text and will be
         returned as a :class:`list` of :class:`str`.
         """
-        if not isinstance(filename, Path):
-            filename = Path(filename)
-        return self._open(filename, encoding, errors)
+        return self._open(Path(filename), encoding, errors)
 
     def _parse(self, filename):
         overlay = 'base'
@@ -494,7 +495,7 @@ class BootParser:
             except KeyError:
                 file = None
         else:
-            assert False
+            assert False  # pragma: no cover
 
         if file is None:
             # It is *not* an error if filename doesn't exist under path; e.g.

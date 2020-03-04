@@ -213,6 +213,21 @@ dtparam=audio=on
         ]
 
 
+def test_parse_unknown_section(tmpdir, recwarn):
+    tmpdir.join('config.txt').write("""# This is a comment
+[foo]
+dtparam=audio=on
+""")
+    p = BootParser(Path(str(tmpdir)))
+    p.parse()
+    assert p.config == [
+        BootSection(Path('config.txt'), 2, 'foo'),
+        BootParam(Path('config.txt'), 3, 'base', 'audio', 'on'),
+    ]
+    assert len(recwarn) == 1
+    assert recwarn.pop(BootInvalid)
+
+
 def test_parse_serial_section_match(tmpdir):
     with mock.patch('pictl.parser.get_board_serial') as get_board_serial:
         get_board_serial.return_value = 0xdeadd00d

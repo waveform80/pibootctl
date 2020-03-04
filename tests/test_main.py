@@ -342,3 +342,24 @@ def test_permission_error(store):
             msg = permission_error(*sys.exc_info())
             assert len(msg) == 2
             assert msg[0] == 'permission denied'
+            assert 'root' in msg[1]
+
+        geteuid.return_value = 0
+        try:
+            raise PermissionError('permission denied')
+        except PermissionError:
+            msg = permission_error(*sys.exc_info())
+            assert len(msg) == 1
+            assert msg[0] == 'permission denied'
+
+
+def test_debug_run(capsys):
+    sys.excepthook = sys.__excepthook__
+    os.environ['DEBUG'] = '1'
+    with pytest.raises(SystemExit):
+        main(['help'])
+    assert not isinstance(sys.excepthook, ErrorHandler)
+    del os.environ['DEBUG']
+    with pytest.raises(SystemExit):
+        main(['help'])
+    assert isinstance(sys.excepthook, ErrorHandler)

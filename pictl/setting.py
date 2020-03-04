@@ -842,10 +842,9 @@ class CommandDisplayTimings(Command):
     """
     def __init__(self, name, *, command=None, commands=None, default=None,
                  doc='', index=0):
-        if default is None:
-            default = []
         super().__init__(name, command=command, commands=commands,
-                         default=default, doc=doc, index=index)
+                         default=[] if default is None else default,
+                         doc=doc, index=index)
 
     def extract(self, config):
         for item, value in super().extract(config):
@@ -1062,6 +1061,7 @@ class CommandKernelAddress(CommandIntHex):
                 if item.command == 'kernel_address':
                     yield item, to_int(item.params)
                 elif item.command == 'kernel_old':
+                    # TODO What does kernel_old=0 mean? Similar to start_x=0?
                     if to_int(item.params):
                         yield item, 0
 
@@ -1105,7 +1105,7 @@ class CommandKernelCmdline(CommandIncludedFile):
     # TODO modification/tracking of external file
 
 
-Firmware = namedtuple('Firmware', ('default', 'camera', 'debug', 'lite'))
+Firmware = namedtuple('Firmware', ('default', 'camera', 'debug', 'cutdown'))
 FW_START = {
     # pi4:           default       camera         debug(+camera)  lite
     False: Firmware('start.elf',  'start_x.elf', 'start_db.elf', 'start_cd.elf'),
@@ -1120,6 +1120,54 @@ FW_FIXUP = {
 }
 
 
+# Some notes on start_x, start_debug, start_file, and fixup_file for the
+# setting classes below.
+#
+# The interaction between these settings is both simple and horribly
+# complicated (at least from the perspective of this application). Each of
+# these is effectively a separate setting within the firmware, and is evaluated
+# in order, so only the final value of each setting matters. However, there are
+# rules of precedence regarding those final values:
+#
+# 1. non-blank start_file and fixup_file values trump everything; if these are
+#    set they are acted upon.
+# 2. if start_file and fixup_file aren't set then gpu_mem=16 wins next; if this
+#    is set then start_file is effectively "start_cd.elf" ("start4cd.elf" on
+#    the pi4)
+# 3. Otherwise, start_debug=1 wins; if this is set then start_file is
+#    effectively "start_db.elf" ("start4db.elf" on the pi4), and fixup_file is
+#    "fixup_db.dat" or "fixup4db.dat"
+# 4. Otherwise, start_x=1 wins; if this is set then start_file is "start_x.elf"
+#    ("start4x.elf" on the pi4), and fixup_file is "fixup_x.dat" or
+#    "fixup4x.dat".
+# 5. If no values are specified for these, then start_file is effectively
+#    "start.elf" or ("start4.elf" on the pi4) and fixup_file is "fixup.dat" (or
+#    "fixup4.dat").
+# 6. The debug firmware incorporates the camera firmware.
+#
+# Some consequences of the above rules; consider the following (silly, but
+# valid) configuration:
+#
+# start_debug=1
+# start_x=1
+# start_x=0
+#
+# This results in the debug firmware being loaded because at the end of parsing
+# the configuration, start_file hasn't been explicitly set, gpu_mem defaults to
+# 64, and start_debug is 1 (so start_x is irrelevant; whether it's 0 or 1 the
+# debug firmware would be loaded). Likewise, consider:
+#
+# start_x=1
+# start_debug=1
+# start_debug=0
+#
+# This results in the camera firmware being loaded as start_debug is 0 by the
+# end of parsing and start_x is still 1. In turn, this implies that the
+# "start_x=0" and "start_debug=0" states are fairly meaningless statements. If
+# a configuration explicitly sets them to zero (ultimately) we should simply
+# treat them as "unset".
+
+
 class CommandFirmwareCamera(CommandBool):
     """
     Handles the ``start_x`` and ``start_debug`` settings.
@@ -1127,7 +1175,7 @@ class CommandFirmwareCamera(CommandBool):
     @property
     def default(self):
         pi4 = 'pi4' in get_board_types()
-        return (
+        return (self._query('gpu.mem').value >= 64) and (
             self._query('boot.firmware.filename').value,
             self._query('boot.firmware.fixup').value
         ) in {
@@ -1141,12 +1189,14 @@ class CommandFirmwareCamera(CommandBool):
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'start_x':
-                    yield item, bool(to_int(item.params))
-                elif item.command == 'start_debug':
                     if to_int(item.params):
+                        yield item, True
+                    else:
                         yield item, None
-                elif item.command in ('start_file', 'fixup_file'):
-                    yield item, None
+
+    def output(self):
+        if self.modified and self.value:
+            yield 'start_x=1'
 
     def validate(self):
         if self.value and self._query('gpu.mem').value < 64:
@@ -1161,7 +1211,7 @@ class CommandFirmwareDebug(CommandBool):
     @property
     def default(self):
         pi4 = 'pi4' in get_board_types()
-        return (
+        return (self._query('gpu.mem').value > 16) and (
             self._query('boot.firmware.filename').value,
             self._query('boot.firmware.fixup').value
         ) == (FW_START[pi4].debug, FW_FIXUP[pi4].debug)
@@ -1170,12 +1220,14 @@ class CommandFirmwareDebug(CommandBool):
         for item in config:
             if isinstance(item, BootCommand):
                 if item.command == 'start_debug':
-                    yield item, bool(to_int(item.params))
-                elif item.command == 'start_x':
                     if to_int(item.params):
+                        yield item, True
+                    else:
                         yield item, None
-                elif item.command in ('start_file', 'fixup_file'):
-                    yield item, None
+
+    def output(self):
+        if self.modified and self.value:
+            yield 'start_debug=1'
 
 
 class CommandFirmwareFilename(CommandFilename):
@@ -1189,10 +1241,10 @@ class CommandFirmwareFilename(CommandFilename):
         camera = self._query('camera.enabled')
         # The "modified" tests below appear extraneous but aren't; they guard
         # against a circular reference in the case where everything is default.
-        # Furthermore, the hard-coded False is also deliberate; there's no
-        # special handling for the pi4 with start_debug
-        if debug.modified and debug.value:
-            return FW_START[False].debug
+        if self._query('gpu.mem').value <= 16:
+            return FW_START[pi4].cutdown
+        elif debug.modified and debug.value:
+            return FW_START[pi4].debug
         elif camera.modified and camera.value:
             return FW_START[pi4].camera
         else:
@@ -1211,8 +1263,10 @@ class CommandFirmwareFixup(CommandFilename):
         debug = self._query('boot.debug.enabled')
         camera = self._query('camera.enabled')
         # See notes above
-        if debug.modified and debug.value:
-            return FW_FIXUP[False].debug
+        if self._query('gpu.mem').value <= 16:
+            return FW_FIXUP[pi4].cutdown
+        elif debug.modified and debug.value:
+            return FW_FIXUP[pi4].debug
         elif camera.modified and camera.value:
             return FW_FIXUP[pi4].camera
         else:
