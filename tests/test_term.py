@@ -72,7 +72,7 @@ def test_error_handler_call(capsys):
                    argparse.ArgumentError(None, 'Invalid option'), None) == 2
     captured = capsys.readouterr()
     assert not captured.out
-    assert captured.err == 'None\nTry the --help option for more information.\n'
+    assert captured.err == 'Invalid option\nTry the --help option for more information.\n'
     with mock.patch('traceback.format_exception') as m:
         del handler[Exception]
         m.return_value = ['Traceback lines\n', 'from some file\n', 'with some context\n']
