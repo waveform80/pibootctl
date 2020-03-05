@@ -64,6 +64,7 @@ class Application:
             interpolation=None)
         config.read(
             [
+                '/lib/pictl/pictl.conf',
                 '/etc/pictl.conf',
                 '{xdg_config}/pictl.conf'.format(
                     xdg_config=os.environ.get(
