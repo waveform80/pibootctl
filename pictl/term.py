@@ -88,13 +88,16 @@ def pager():
                       file=sys.stderr)
                 print(str(exc), file=sys.stderr)
             else:
-                with io.TextIOWrapper(p.stdin, encoding=sys.stdout.encoding,
-                                      write_through=True) as w:
-                    with redirect_stdout(w):
-                        yield
-                p.stdin.close()
-                p.wait()
-                break
+                try:
+                    with io.TextIOWrapper(p.stdin,
+                                          encoding=sys.stdout.encoding,
+                                          write_through=True) as w:
+                        with redirect_stdout(w):
+                            yield
+                finally:
+                    p.stdin.close()
+                    p.wait()
+                    break
         else:
             yield
 
