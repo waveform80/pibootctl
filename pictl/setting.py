@@ -73,7 +73,7 @@ class Setting:
         Returns a tuple of strings which will be used to order the output of
         :meth:`output` in the generated configuration.
         """
-        return ()
+        raise NotImplementedError
 
     @property
     def modified(self):
@@ -1385,6 +1385,10 @@ class OverlaySerialUART(Setting):
             return 0
 
     @property
+    def key(self):
+        return ('overlays', 'miniuart-bt')
+
+    @property
     def hint(self):
         if self.value == 0:
             return '/dev/ttyAMA0; PL011'
@@ -1418,6 +1422,10 @@ class OverlayBluetoothEnabled(Setting):
     @property
     def default(self):
         return bool({'pi3', 'pi4', 'pi0w'} & get_board_types())
+
+    @property
+    def key(self):
+        return ('overlays', 'disable-bt')
 
     def extract(self, config):
         for item in config:

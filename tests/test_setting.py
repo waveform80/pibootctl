@@ -32,12 +32,13 @@ def test_setting_init():
     s = Setting('foo.bar', default='baz')
 
     assert s.update('quux') == 'quux'
-    assert s.key == ()
     assert repr(s) == "<Setting name='foo.bar' default='baz' value='baz' modified=False>"
     with pytest.raises(NotImplementedError):
         s.extract(None)
     with pytest.raises(NotImplementedError):
         s.output()
+    with pytest.raises(NotImplementedError):
+        s.key
 
 
 def test_setting_override():
@@ -1364,3 +1365,19 @@ def test_gpu_mem():
         mem._value = 256
         with pytest.raises(ValueError):
             mem.validate()
+
+
+def test_output_order():
+    settings = Settings()
+    settings['spi.enabled']._value = True
+    settings['i2c.enabled']._value = True
+    settings['bluetooth.enabled']._value = False
+    assert list(chain(*(
+        setting.output()
+        for setting in sorted(settings.values(), key=attrgetter('key'))
+    ))) == [
+        # base overlay params must come first
+        'dtparam=i2c_arm=on',
+        'dtparam=spi=on',
+        'dtoverlay=disable-bt',
+    ]
