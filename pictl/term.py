@@ -97,7 +97,7 @@ def pager():
                 finally:
                     p.stdin.close()
                     p.wait()
-                    break
+                break
         else:
             yield
 
