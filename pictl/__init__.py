@@ -24,7 +24,7 @@ _ = gettext.gettext
 
 
 def permission_error(exc_type, exc_value, exc_tb):
-    msg = [str(exc_value.args[0])]
+    msg = [str(exc_value)]
     if os.geteuid() != 0:
         msg.append(_(
             "You need root permissions to modify the boot configuration or "
