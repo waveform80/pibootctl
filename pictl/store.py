@@ -1,3 +1,43 @@
+"""
+The :mod:`pictl.store` module defines classes which control a store of
+Raspberry Pi boot configurations, or the active boot configuration.
+
+The main class of interest is :class:`Store`. From an instance of this, one can
+access derivatives of :class:`BootConfiguration` for the purposes of
+manipulating the store of configurations, or the active boot configuration
+itself. Each :class:`BootConfiguration` contains an instance of
+:class:`Settings` which maps setting names to :class:`~pictl.setting.Setting`
+instances.
+
+.. data:: Current
+
+    The key of the active boot configuration in instances of :class:`Store`.
+
+.. data:: Default
+
+    The key of the default (empty) boot configuration in instances of
+    :class:`Store`.
+
+.. autoclass:: Store
+    :members:
+
+.. autoclass:: BootConfiguration
+    :members:
+
+.. autoclass:: StoredConfiguration
+    :members:
+
+.. autoclass:: MutableConfiguration
+    :members:
+
+.. autoclass:: Settings
+    :members:
+
+.. autoexception:: InvalidConfiguration
+
+.. autoexception:: IneffectiveConfiguration
+"""
+
 import os
 import gettext
 import tempfile
@@ -31,9 +71,8 @@ class Store(Mapping):
     Acts as a mapping keyed by the name of the stored configuration, or the
     special values :data:`Current` for the current boot configuration, or
     :data:`Default` for the default (empty) configuration. The values of the
-    mapping are objects which provide the parsed :class:`Settings`, an
-    identifying :attr:`~StoredSettings.hash`, and a dictionary mapping
-    filenames to contents.
+    mapping are derivatives of :class:`BootConfiguration` which provide the
+    parsed :class:`Settings`, along with some other attributes.
 
     The mapping is mutable and this can be used to manipulate stored boot
     configurations. For instance, to store the current boot configuration under
@@ -271,8 +310,9 @@ class BootConfiguration:
     @property
     def files(self):
         """
-        A mapping of :class:`~pathlib.Path` to :class:`BootFile` instances
-        representing all the files that make up the boot configuration.
+        A mapping of :class:`~pathlib.Path` to :class:`~pictl.parser.BootFile`
+        instances representing all the files that make up the boot
+        configuration.
         """
         if self._files is None:
             self._parse()
@@ -443,7 +483,7 @@ class MutableConfiguration(BootConfiguration):
 class Settings(Mapping):
     """
     Represents all settings in a boot configuration; acts like an ordered
-    mapping of names to :class:`Setting` objects.
+    mapping of names to :class:`~pictl.setting.Setting` objects.
     """
     def __init__(self, items=None):
         if items is None:

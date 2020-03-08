@@ -1,3 +1,25 @@
+"""
+The :mod:`pictl.parser` module provides the :class:`BootParser` class for
+parsing the boot configuration of the Raspberry Pi.
+
+The output of this class consists of derivatives of :class:`BootLine`
+(:class:`BootSection`, :class:`BootCommand`, etc.) and :class:`BootFile`
+instances.
+
+.. autoclass:: BootParser
+    :members:
+
+.. autoclass:: BootLine
+
+.. autoclass:: BootSection
+
+.. autoclass:: BootCommand
+
+.. autoclass:: BootInclude
+
+.. autoclass:: BootFile
+"""
+
 import io
 import os
 import hashlib
@@ -15,6 +37,18 @@ class BootInvalid(Warning):
 
 
 class BootLine:
+    """
+    Represents a line in a boot configuration. Provides two simple attributes:
+
+    .. attribute:: path
+
+        A :class:`~pathlib.Path` indicating the path of the file containing the
+        line.
+
+    .. attribute:: lineno
+
+        The 1-based line number of the line.
+    """
     def __init__(self, path, lineno):
         assert isinstance(path, Path)
         self.path = path
@@ -34,6 +68,14 @@ class BootLine:
 
 
 class BootSection(BootLine):
+    """
+    A derivative of :class:`BootLine` for ``[conditional sections]`` in a boot
+    configuration. Adds a single attribute:
+
+    .. attribute:: section
+
+        The criteria of the section (everything between the square brackets).
+    """
     def __init__(self, path, lineno, section):
         super().__init__(path, lineno)
         self.section = section
@@ -55,6 +97,27 @@ class BootSection(BootLine):
 
 
 class BootCommand(BootLine):
+    """
+    A derivative of :class:`BootLine` which represents a command in a boot
+    configuration, e.g. "disable_overscan=1". Adds several attributes:
+
+    .. attribute:: command
+
+        The title of the command; characters before the first "=" in the line.
+
+    .. attribute:: params
+
+        The value of the command; characters after the first "=" in the line.
+        As a special case, the "initramfs" command has two values and thus if
+        :attr:`command` is "initramfs" then this attribute will be a 2-tuple.
+
+    .. attribute:: hdmi
+
+        The HDMI display that the command applies to. This is usually 0 unless
+        the command has an explicit hdmi suffix (":" separated after the
+        :attr:`command` title but before the "="), or unless the command
+        appears in an [HDMI:1] section.
+    """
     def __init__(self, path, lineno, command, params, hdmi=None):
         super().__init__(path, lineno)
         self.command = command
@@ -87,6 +150,14 @@ class BootCommand(BootLine):
 
 
 class BootInclude(BootLine):
+    """
+    A derivative of :class:`BootLine` representing an "include" command in a
+    boot configuration. Adds a single attribute:
+
+    .. attribute:: include
+
+        The :class:`~pathlib.Path` of the file to be included.
+    """
     def __init__(self, path, lineno, include):
         super().__init__(path, lineno)
         assert isinstance(include, Path)
@@ -109,6 +180,14 @@ class BootInclude(BootLine):
 
 
 class BootOverlay(BootLine):
+    """
+    A derivative of :class:`BootLine` representing a device-tree overlay
+    ("dtoverlay=") command in a boot configuration. Adds a single attribute:
+
+    .. attribute:: overlay
+
+        The name of the device-tree overlay to load.
+    """
     def __init__(self, path, lineno, overlay):
         super().__init__(path, lineno)
         self.overlay = overlay
@@ -130,6 +209,23 @@ class BootOverlay(BootLine):
 
 
 class BootParam(BootLine):
+    """
+    A derivative of :class:`BootLine` representing a parameter to a loaded
+    device-tree overlay ("dtparam=") command in a boot configuration. Adds
+    several attributes:
+
+    .. attribute:: overlay
+
+        The device-tree overlay that the parameter applies to.
+
+    .. attribute:: param
+
+        The name of the parameter affected by the command.
+
+    .. attribute:: value
+
+        The new value to assign to the overlay parameter.
+    """
     def __init__(self, path, lineno, overlay, param, value):
         super().__init__(path, lineno)
         self.overlay = overlay
@@ -220,7 +316,7 @@ class BootFile(namedtuple('Content', (
             .. note::
 
                 This is rounded down to a 2-second precision as that is all
-                that ZIP archives support.
+                that `PKZIP`_ archives support.
 
     .. attribute:: content
 
@@ -236,6 +332,8 @@ class BootFile(namedtuple('Content', (
         :data:`None` if the file is a binary file. Otherwise, specifies the
         character replacement strategy to be used with erroneous characters
         encountered when reading the file.
+
+    .. _PKZIP: https://en.wikipedia.org/wiki/Zip_(file_format)
     """
     __slots__ = ()
 
@@ -293,7 +391,7 @@ class BootParser:
 
     * a :class:`dict` mapping filenames to sequences of :class:`str` (for
       configuration files), or :class:`bytes` strings for auxilliary binary
-      files; effectively the output of :attr:`content` after parsing
+      files; effectively the output of :attr:`files` after parsing
     """
     def __init__(self, path):
         assert isinstance(path, (Path, ZipFile, dict))
@@ -363,8 +461,8 @@ class BootParser:
     def add(self, filename, encoding=None, errors=None):
         """
         Adds the auxilliary *filename* under :attr:`path` to the configuration.
-        This is used to update the :attr:`hash` and :attr:`content` of the
-        parsed configuration to include files which are referenced by the boot
+        This is used to update the :attr:`hash` and :attr:`files` of the parsed
+        configuration to include files which are referenced by the boot
         configuration but aren't themselves configuration files (e.g. EDID
         data, and the kernel cmdline.txt).
 

@@ -9,7 +9,7 @@ from operator import itemgetter
 
 import pytest
 
-from pictl import *
+from pictl.main import *
 
 
 @pytest.fixture()
@@ -203,7 +203,7 @@ def test_load(store):
     store['foo'] = current
 
     assert not store[Current].settings['video.hdmi0.group'].modified
-    with mock.patch('pictl.datetime') as dt:
+    with mock.patch('pictl.main.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
         main(['load', 'foo'])
     assert store[Current].settings['video.hdmi0.group'].modified
@@ -284,7 +284,7 @@ def test_rename(store):
 
 
 def test_backup_fallback(store):
-    with mock.patch('pictl.datetime') as dt:
+    with mock.patch('pictl.main.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
 
         current = store[Current].mutable("config.txt")
@@ -334,7 +334,7 @@ def test_reboot_required(tmpdir):
 
 
 def test_permission_error(store):
-    with mock.patch('pictl.os.geteuid') as geteuid:
+    with mock.patch('pictl.main.os.geteuid') as geteuid:
         geteuid.return_value = 1000
         try:
             raise PermissionError('permission denied')

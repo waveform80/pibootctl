@@ -1,3 +1,63 @@
+"""
+The :mod:`pictl.setting` module defines all the classes used to represent
+boot configuration settings:
+
+.. image:: images/setting_hierarchy.*
+    :align: center
+
+The base of the hierarchy is :class:`Setting` but this is effectively an
+abstract class and it is rare that anyone will need to use it directly. Rather
+you should derive from one of the concrete implementations below it like
+:class:`OverlayParam`, :class:`Command`, or one of the type-specializations
+like :class:`CommandBool`, :class:`CommandInt`, etc.
+
+.. note::
+
+    For the sake of brevity, only the generic classes define in
+    :mod:`pictl.setting` are documented here. There are also specialization
+    classes specific to individual settings define (for cases of complex
+    inter-dependencies, e.g. how the Bluetooth enabled status affects the
+    default serial UART).
+
+    Developers are advised to familiarize themselves with the full range of
+    classes in this module before defining additional ones.
+
+.. autoclass:: Setting
+    :members:
+
+.. autoclass:: Overlay
+    :members: overlay
+
+.. autoclass:: OverlayParam
+    :members: param
+
+.. autoclass:: OverlayParamInt
+
+.. autoclass:: OverlayParamBool
+
+.. autoclass:: Command
+    :members: commands, index
+
+.. autoclass:: CommandInt
+
+.. autoclass:: CommandIntHex
+
+.. autoclass:: CommandBool
+
+.. autoclass:: CommandBoolInv
+
+.. autoclass:: CommandForceIgnore
+    :members: force, ignore
+
+.. autoclass:: CommandMaskMaster
+
+.. autoclass:: CommandMaskDummy
+
+.. autoclass:: CommandFilename
+
+.. autoclass:: CommandIncludedFile
+"""
+
 import gettext
 from operator import or_
 from textwrap import dedent
@@ -25,8 +85,9 @@ class Setting:
     Represents a configuration setting.
 
     Each setting has a *name* which uniquely identifies the setting, a
-    *default* value, and an optional *doc* string. The specification is used
-    to:
+    *default* value, and an optional *doc* string. The life-cycle of a typical
+    setting in the scenario where the active boot configuration is being
+    changed is:
 
     * :meth:`extract` the value of a setting from parsed configuration lines
     * :meth:`update` the value of a setting from user-provided values
@@ -117,10 +178,11 @@ class Setting:
 
     def extract(self, config):
         """
-        Given a *config* which must be a sequence of :class:`BootLine` items,
-        yields each line that affects the setting's value, and the new value
-        that the line produces (or :data:`None` indicating that the value is
-        now, or is still, the default state).
+        Given a *config* which must be a sequence of
+        :class:`~pictl.parser.BootLine` items, yields each line that affects
+        the setting's value, and the new value that the line produces (or
+        :data:`None` indicating that the value is now, or is still, the default
+        state).
 
         .. note::
 

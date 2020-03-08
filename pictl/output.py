@@ -3,7 +3,7 @@ import json
 import shlex
 import gettext
 import argparse
-from operator import attrgetter
+from operator import attrgetter, itemgetter
 from collections import OrderedDict
 
 import yaml
@@ -91,7 +91,7 @@ class Output:
             ] + [
                 (name, self._check_mark if active else '',
                  timestamp.strftime('%Y-%m-%d %H:%M:%S'))
-                for name, active, timestamp in store
+                for name, active, timestamp in sorted(store, key=itemgetter(0))
             ], fp)
 
     def _dump_store_json(self, store, fp):

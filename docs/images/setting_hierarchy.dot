@@ -1,0 +1,28 @@
+digraph classes {
+    graph [rankdir=RL, splines=ortho];
+    node [shape=rect, style=filled, fontname=Sans, fontsize=10];
+    edge [];
+
+    /* Abstract classes */
+    node [color="#9ec6e0", fontcolor="#000000"]
+
+    Setting;
+
+    /* Concrete classes */
+    node [color="#2980b9", fontcolor="#ffffff"];
+
+    Overlay->Setting;
+    OverlayParam->Overlay;
+    OverlayParamInt->OverlayParam;
+    OverlayParamBool->OverlayParam;
+    Command->Setting;
+    CommandInt->Command;
+    CommandIntHex->CommandInt;
+    CommandBool->Command;
+    CommandBoolInv->CommandBool;
+    CommandForceIgnore->CommandBool;
+    CommandMaskMaster->CommandInt;
+    CommandMaskDummy->CommandMaskMaster;
+    CommandFilename->Command;
+    CommandIncludedFile->CommandFilename;
+}
