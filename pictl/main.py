@@ -53,7 +53,9 @@ class Application:
                 self.config.boot_path / self.config.store_path)
             self.output = Output(
                 self.config.style if 'style' in self.config else 'user')
-            self.store = Store(self.config)
+            self.store = Store(
+                self.config.boot_path, self.config.store_path,
+                self.config.config_read, self.config.config_write)
             self.config.func()
 
     def get_config(self, section='defaults'):
@@ -385,7 +387,7 @@ class Application:
         """
         Implementation of the "set" command.
         """
-        mutable = self.store[Current].mutable(self.config.config_write)
+        mutable = self.store[Current].mutable()
         if self.config.style == 'user':
             settings = {}
             for var in self.config.set_vars:

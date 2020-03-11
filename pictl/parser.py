@@ -451,8 +451,7 @@ class BootParser:
         specifies the "root" of the configuration, and defaults to
         :file:`config.txt`.
         """
-        if not isinstance(filename, Path):
-            filename = Path(filename)
+        filename = Path(filename)
         self._files.clear()
         self._hash = hashlib.sha1()
         self._timestamp = datetime.fromtimestamp(0)  # UNIX epoch

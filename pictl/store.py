@@ -78,7 +78,7 @@ class Store(Mapping):
     configurations. For instance, to store the current boot configuration under
     the name "foo"::
 
-        >>> store = Store(config)
+        >>> store = Store(Path('/boot'), Path('pictl'))
         >>> store["foo"] = store[Current]
 
     Setting the item with the key :data:`Current` overwrites the current boot
@@ -92,13 +92,13 @@ class Store(Mapping):
     configuration (specifying which file to re-write within it), modify it, and
     assign it back::
 
-        >>> foo = store["foo"].mutable("config.txt")
+        >>> foo = store["foo"].mutable()
         >>> foo.update({"serial.enabled": True})
         >>> store["serial"] = foo
 
     The same applies to the current boot configuration item::
 
-        >>> current = store[Current].mutable("syscfg.txt")
+        >>> current = store[Current].mutable()
         >>> current.update({"camera.enabled": True, "gpu.mem": 128})
         >>> store[Current] = current
 
@@ -107,11 +107,12 @@ class Store(Mapping):
     which cannot be removed. Furthermore, the item with the key :data:`Default`
     cannot be modified either.
     """
-    def __init__(self, config):
-        self._store_path = Path(config.store_path)
-        self._boot_path = Path(config.boot_path)
-        self._config_read = config.config_read
-        self._config_write = config.config_write
+    def __init__(self, boot_path, store_path, config_read='config.txt',
+                 config_write='config.txt'):
+        self._boot_path = Path(boot_path)
+        self._store_path = Path(store_path)
+        self._config_read = config_read
+        self._config_write = config_write
 
     def _path_of(self, name):
         return (self._store_path / name).with_suffix('.zip')
@@ -149,9 +150,11 @@ class Store(Mapping):
         if key is Default:
             return DefaultConfiguration()
         elif key is Current:
-            return BootConfiguration(self._boot_path, self._config_read)
+            return BootConfiguration(self._boot_path, self._config_read,
+                                     self._config_write)
         elif key in self:
-            return StoredConfiguration(self._path_of(key), self._config_read)
+            return StoredConfiguration(self._path_of(key), self._config_read,
+                                       self._config_write)
         else:
             raise KeyError(_(
                 "No stored configuration named {key}").format(key=key))
@@ -236,14 +239,19 @@ class BootConfiguration:
     Represents the current boot configuration, as parsed from *filename*
     (default "config.txt") on the boot partition (presumably mounted at
     *path*, a :class:`~pathlib.Path` instance).
+
+    The file named by *rewrite* (default "config.txt") is the file within the
+    configuration that should be considered mutable, i.e. this is the file that
+    gets re-written within a :meth:`mutable` configuration.
     """
-    def __init__(self, path, filename='config.txt'):
+    def __init__(self, path, filename='config.txt', rewrite='config.txt'):
         self._path = path
         self._filename = filename
         self._settings = None
         self._files = None
         self._hash = None
         self._timestamp = None
+        self._rewrite = rewrite
 
     def _parse(self):
         assert self._settings is None
@@ -318,19 +326,16 @@ class BootConfiguration:
             self._parse()
         return self._files
 
-    def mutable(self, rewrite):
+    def mutable(self):
         """
         Return a :class:`MutableConfiguration` based on the parsed content of
         this configuration.
 
-        The :class:`~pathlib.Path` named by *rewrite* is the file within the
-        configuration that should be considered mutable, i.e. this is the file
-        that gets re-written after the configuration is changed. Note that
-        mutable configurations are not backed by any files on disk, so nothing
-        is actually re-written until the updated mutable configuration is
-        assigned back to something in the :class:`Store`.
+        Note that mutable configurations are not backed by any files on disk,
+        so nothing is actually re-written until the updated mutable
+        configuration is assigned back to something in the :class:`Store`.
         """
-        return MutableConfiguration(self, Path(rewrite))
+        return MutableConfiguration(self, Path(self._rewrite))
 
 
 class StoredConfiguration(BootConfiguration):
@@ -338,8 +343,8 @@ class StoredConfiguration(BootConfiguration):
     Represents a boot configuration stored in a zip file specified by *path*.
     The starting file of the configuration is given by *filename*.
     """
-    def __init__(self, path, filename='config.txt'):
-        super().__init__(ZipFile(str(path), 'r'), filename)
+    def __init__(self, path, filename='config.txt', rewrite='config.txt'):
+        super().__init__(ZipFile(str(path), 'r'), filename, rewrite)
         # We can grab the hash and timestamp from the arc's meta-data without
         # any decompression work (it's all in the uncompressed footer)
         comment = self.path.comment

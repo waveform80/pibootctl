@@ -13,7 +13,7 @@ like :class:`CommandBool`, :class:`CommandInt`, etc.
 
 .. note::
 
-    For the sake of brevity, only the generic classes define in
+    For the sake of brevity, only the generic classes defined in
     :mod:`pictl.setting` are documented here. There are also specialization
     classes specific to individual settings define (for cases of complex
     inter-dependencies, e.g. how the Bluetooth enabled status affects the
@@ -148,9 +148,9 @@ class Setting:
     @property
     def default(self):
         """
-        The default value of this setting. The collection of *settings* is
-        provided for calculation of the default in the case of settings that
-        are context-dependent.
+        The default value of this setting. The default may be sensitive to the
+        wider context of :class:`Settings` (i.e. the default of one setting
+        can change depending on the current value of other settings).
         """
         return self._default
 
@@ -212,17 +212,17 @@ class Setting:
 
     def validate(self):
         """
-        Validates the setting within the context of the other *settings*.
-        Raises :exc:`ValueError` in the event that the current value is
-        invalid. May optionally use :exc:`ValueWarning` to warn about dangerous
-        or inappropriate configurations.
+        Validates the setting within the context of the other
+        :class:`Settings`. Raises :exc:`ValueError` in the event that the
+        current value is invalid. May optionally use :exc:`ValueWarning` to
+        warn about dangerous or inappropriate configurations.
         """
         pass
 
     def output(self):
         """
-        Given the overall *settings* context, yields lines of configuration to
-        represent the state of the setting.
+        Yields lines of configuration to represent the current state of the
+        setting, within the context of other :class:`Settings`.
         """
         raise NotImplementedError
 
@@ -230,8 +230,8 @@ class Setting:
     def _override(self, value):
         """
         Used as a context manager, temporarily overrides the *value* of this
-        setting within *settings* until the contextual block ends. Note that
-        *value* does **not** pass through :meth:`update` via this route.
+        setting until the contextual block ends. Note that *value* does **not**
+        pass through :meth:`update` via this route.
         """
         old_value = self._value
         self._value = value

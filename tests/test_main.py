@@ -23,9 +23,7 @@ def store(request, tmpdir):
         self['defaults']['reboot_required'] = ''
         self['defaults']['reboot_required_pkgs'] = ''
     with mock.patch('configparser.ConfigParser.read', my_read):
-        yield Store(mock.Mock(
-            boot_path=boot_path, store_path=store_path,
-            config_read='config.txt', config_write='config.txt'))
+        yield Store(boot_path, store_path)
 
 
 def test_help(capsys):
@@ -87,7 +85,7 @@ def test_help_config_multi(capsys):
 
 
 def test_dump_show(capsys, store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
 
@@ -98,7 +96,7 @@ def test_dump_show(capsys, store):
 
 
 def test_dump_show_name(capsys, store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
     current.update({'camera.enabled': True, 'gpu.mem': 128})
@@ -112,7 +110,7 @@ def test_dump_show_name(capsys, store):
 
 
 def test_dump_show_filters(capsys, store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
 
@@ -126,7 +124,7 @@ def test_dump_show_filters(capsys, store):
 
 
 def test_get(capsys, store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
 
@@ -139,7 +137,7 @@ def test_get(capsys, store):
 
 
 def test_get_multi(capsys, store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
 
@@ -152,7 +150,7 @@ def test_get_multi(capsys, store):
 
 
 def test_set(store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
 
@@ -165,7 +163,7 @@ def test_set(store):
 
 
 def test_set_user(store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
 
@@ -184,7 +182,7 @@ def test_set_user(store):
 
 
 def test_save(store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
 
@@ -198,7 +196,7 @@ def test_save(store):
 
 
 def test_load(store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
 
@@ -211,7 +209,7 @@ def test_load(store):
 
 
 def test_load_no_backup(store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
 
@@ -222,7 +220,7 @@ def test_load_no_backup(store):
 
 
 def test_diff(capsys, store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
     current.update({'video.hdmi0.mode': 5, 'spi.enabled': True})
@@ -239,7 +237,7 @@ def test_diff(capsys, store):
 def test_list(capsys, store):
     with mock.patch('pictl.store.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
-        current = store[Current].mutable("config.txt")
+        current = store[Current].mutable()
         current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
         store['foo'] = current
         current.update({'video.hdmi0.mode': 5, 'spi.enabled': True})
@@ -255,7 +253,7 @@ def test_list(capsys, store):
 
 
 def test_remove(store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
 
@@ -268,7 +266,7 @@ def test_remove(store):
 
 
 def test_rename(store):
-    current = store[Current].mutable("config.txt")
+    current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
     store['bar'] = current
@@ -287,7 +285,7 @@ def test_backup_fallback(store):
     with mock.patch('pictl.main.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
 
-        current = store[Current].mutable("config.txt")
+        current = store[Current].mutable()
         current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
         store['foo'] = current
 
@@ -298,7 +296,7 @@ def test_backup_fallback(store):
 
         # Modify the current and cause another backup to be taken without
         # advancing our fake timestamp
-        current = store[Current].mutable("config.txt")
+        current = store[Current].mutable()
         current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 5})
         store[Current] = current
         main(['load', 'foo'])
@@ -319,10 +317,8 @@ def test_reboot_required(tmpdir):
         self['defaults']['reboot_required'] = str(var_run_path / 'reboot-required')
         self['defaults']['reboot_required_pkgs'] = str(var_run_path / 'reboot-required.pkgs')
     with mock.patch('configparser.ConfigParser.read', my_read):
-        store = Store(mock.Mock(
-            boot_path=boot_path, store_path=store_path,
-            config_read='config.txt', config_write='config.txt'))
-        current = store[Current].mutable("config.txt")
+        store = Store(boot_path, store_path)
+        current = store[Current].mutable()
         current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
         store['foo'] = current
 

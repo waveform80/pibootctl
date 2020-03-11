@@ -11,27 +11,27 @@ from pictl.store import *
 
 
 @pytest.fixture()
-def store_config(request, tmpdir):
-    return mock.Mock(
-        boot_path=Path(str(tmpdir)),
-        store_path=Path(str(tmpdir)) / 'pictl',
-        config_read='config.txt',
-        config_write='config.txt',
-    )
+def boot_path(request, tmpdir):
+    return Path(str(tmpdir))
 
 
-def test_store_container(store_config):
-    store = Store(store_config)
-    (store_config.boot_path / 'config.txt').write_text("""\
+@pytest.fixture()
+def store_path(request, boot_path):
+    return boot_path / 'pictl'
+
+
+def test_store_container(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 """)
-    store_config.store_path.mkdir()
-    with (store_config.store_path / 'foo.zip').open('wb') as f:
+    store_path.mkdir()
+    with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = ('pictl:0:' + store[Current].hash).encode('ascii')
             store[Current].files[Path('config.txt')].add_to_zip(z)
-    with (store_config.store_path / 'invalid.zip').open('wb') as f:
+    with (store_path / 'invalid.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = ('pictl:999:' + store[Current].hash).encode('ascii')
             store[Current].files[Path('config.txt')].add_to_zip(z)
@@ -45,26 +45,26 @@ dtparam=spi=on
         store['bar']
 
 
-def test_store_bad_arc(store_config):
-    store = Store(store_config)
-    (store_config.boot_path / 'config.txt').write_text("""\
+def test_store_bad_arc(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 """)
-    store_config.store_path.mkdir()
-    with (store_config.store_path / 'foo.zip').open('wb') as f:
+    store_path.mkdir()
+    with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = b'pictl:badver:'
             z.writestr('config.txt', b'')
     with pytest.raises(KeyError):
         store['foo']
-    with (store_config.store_path / 'foo.zip').open('wb') as f:
+    with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = b'pictl:0:badhash'
             z.writestr('config.txt', b'')
     with pytest.raises(ValueError):
         store['foo']
-    with (store_config.store_path / 'foo.zip').open('wb') as f:
+    with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = b'pictl:0:' + b'h' * 40
             z.writestr('config.txt', b'')
@@ -72,20 +72,20 @@ dtparam=spi=on
         store['foo']
 
 
-def test_store_getitem(store_config):
-    store = Store(store_config)
+def test_store_getitem(boot_path, store_path):
+    store = Store(boot_path, store_path)
     content = b"""\
 dtparam=i2c=on
 dtparam=spi=on
 hdmi_group=1
 hdmi_mode=4
 """
-    (store_config.boot_path / 'config.txt').write_bytes(content)
+    (boot_path / 'config.txt').write_bytes(content)
     current = store[Current]
-    assert current.path == store_config.boot_path
+    assert current.path == boot_path
     assert current.filename == 'config.txt'
     d = datetime.fromtimestamp(
-        (store_config.boot_path / 'config.txt').stat().st_mtime)
+        (boot_path / 'config.txt').stat().st_mtime)
     d = d.replace(
         year=max(1980, d.year),
         second=d.second // 2 * 2, microsecond=0)
@@ -101,24 +101,24 @@ hdmi_mode=4
     assert current.files[Path('config.txt')].content == content
 
 
-def test_store_setitem(store_config):
-    store = Store(store_config)
+def test_store_setitem(boot_path, store_path):
+    store = Store(boot_path, store_path)
     content = [
         'dtparam=i2c=on\n',
         'dtparam=spi=on\n',
     ]
-    (store_config.boot_path / 'config.txt').write_text(''.join(content))
-    (store_config.boot_path / 'edid.dat').write_bytes(b'\x00\x00\x00\xFF')
+    (boot_path / 'config.txt').write_text(''.join(content))
+    (boot_path / 'edid.dat').write_bytes(b'\x00\x00\x00\xFF')
     assert len(store) == 2
     assert 'foo' not in store
     store['foo'] = store[Current]
-    assert store_config.store_path.is_dir()
-    assert (store_config.store_path / 'foo.zip').is_file()
+    assert store_path.is_dir()
+    assert (store_path / 'foo.zip').is_file()
     assert len(store) == 3
     assert 'foo' in store
     assert store['foo'].hash == store[Current].hash
     assert store['foo'].files == store[Current].files
-    (store_config.boot_path / 'config.txt').write_text('')
+    (boot_path / 'config.txt').write_text('')
     assert store['foo'].hash != store[Current].hash
     assert store['foo'].files != store[Current].files
     store[Current] = store['foo']
@@ -128,9 +128,9 @@ def test_store_setitem(store_config):
         store[Default] = store[Current]
 
 
-def test_store_delitem(store_config):
-    store = Store(store_config)
-    (store_config.boot_path / 'config.txt').write_text("""\
+def test_store_delitem(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 """)
@@ -140,7 +140,7 @@ dtparam=spi=on
     del store['foo']
     assert len(store) == 2
     assert 'foo' not in store
-    assert not (store_config.store_path / 'foo.zip').exists()
+    assert not (store_path / 'foo.zip').exists()
     with pytest.raises(KeyError):
         del store['bar']
     with pytest.raises(KeyError):
@@ -149,16 +149,16 @@ dtparam=spi=on
         del store[Default]
 
 
-def test_store_active(store_config):
-    store = Store(store_config)
-    (store_config.boot_path / 'config.txt').write_text("""\
+def test_store_active(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 """)
     assert len(store) == 2
     assert store.active is None
-    store_config.store_path.mkdir()
-    with (store_config.store_path / 'foo.zip').open('wb') as f:
+    store_path.mkdir()
+    with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = ('pictl:0:' + store[Current].hash).encode('ascii')
             store[Current].files[Path('config.txt')].add_to_zip(z)
@@ -166,14 +166,14 @@ dtparam=spi=on
     assert store.active == 'foo'
 
 
-def test_store_mutable_update(store_config):
-    store = Store(store_config)
-    (store_config.boot_path / 'config.txt').write_text("""\
+def test_store_mutable_update(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 """)
     current = store[Current]
-    mutable = current.mutable(Path('config.txt'))
+    mutable = current.mutable()
     mutable.update({'i2c.enabled': None, 'camera.enabled': True})
     assert mutable.files[Path('config.txt')].content == b"""\
 # This file is intended to contain system-made configuration changes. User
@@ -186,14 +186,14 @@ dtparam=spi=on
 """
 
 
-def test_store_mutable_invalid(store_config):
-    store = Store(store_config)
-    (store_config.boot_path / 'config.txt').write_text("""\
+def test_store_mutable_invalid(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 """)
     current = store[Current]
-    mutable = current.mutable(Path('config.txt'))
+    mutable = current.mutable()
     with pytest.raises(InvalidConfiguration) as exc_info:
         mutable.update({'video.hdmi0.mode': 1})
     assert len(exc_info.value.errors) == 1
@@ -203,21 +203,21 @@ Configuration failed to validate with 1 error(s):
 video.hdmi0.mode must be between 0 and 0 when video.hdmi0.group is 0"""
 
 
-def test_store_mutable_ineffective(store_config):
-    store = Store(store_config)
-    (store_config.boot_path / 'config.txt').write_text("""\
+def test_store_mutable_ineffective(boot_path, store_path):
+    store = Store(boot_path, store_path, config_write='syscfg.txt')
+    (boot_path / 'config.txt').write_text("""\
 include syscfg.txt
 include usercfg.txt
 """)
-    (store_config.boot_path / 'syscfg.txt').write_text("""\
+    (boot_path / 'syscfg.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 """)
-    (store_config.boot_path / 'usercfg.txt').write_text("""\
+    (boot_path / 'usercfg.txt').write_text("""\
 dtparam=i2c=on
 """)
     current = store[Current]
-    mutable = current.mutable(Path('syscfg.txt'))
+    mutable = current.mutable()
     with pytest.raises(IneffectiveConfiguration) as exc_info:
         mutable.update({'i2c.enabled': None})
     assert len(exc_info.value.settings) == 1
@@ -233,8 +233,8 @@ def test_settings_container():
     assert isinstance(settings['video.hdmi0.mode'], CommandDisplayMode)
 
 
-def test_default_config(store_config):
-    store = Store(store_config)
+def test_default_config(boot_path, store_path):
+    store = Store(boot_path, store_path)
     default = store[Default]
     assert default.files == {}
     assert default.hash == 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
@@ -250,9 +250,9 @@ def test_settings_copy():
     assert all(settings[name] is not copy[name] for name in settings)
 
 
-def test_settings_diff(store_config):
-    store = Store(store_config)
-    (store_config.boot_path / 'config.txt').write_text("""\
+def test_settings_diff(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 hdmi_group=1
@@ -271,9 +271,9 @@ hdmi_mode=4
     }
 
 
-def test_settings_filter(store_config):
-    store = Store(store_config)
-    (store_config.boot_path / 'config.txt').write_text("""\
+def test_settings_filter(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 """)
