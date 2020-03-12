@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+export PYBUILD_NAME=pibootctl
+export PYBUILD_DESTDIR_python3=debian/$(PYBUILD_NAME)
+export PYBUILD_BEFORE_TEST=cp setup.* {build_dir}/
+export PYBUILD_AFTER_TEST=rm -f {build_dir}/.coverage {build_dir}/setup.*
+#export PYBUILD_VERBOSE=1
+#export DH_VERBOSE=1
+export DH_OPTIONS
+
+%:
+	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_installdocs:
+	PYTHONPATH=. python3 -m sphinx -bhtml docs/ debian/$(PYBUILD_NAME)-doc/usr/share/doc/$(PYBUILD_NAME)-doc/html
+	PYTHONPATH=. python3 -m sphinx -bman docs/ debian/$(PYBUILD_NAME)/usr/share/man/man1
+	rm -fr debian/$(PYBUILD_NAME)/usr/share/man/man1/.doctrees
+	dh_installdocs
+
+override_dh_sphinxdoc:
+	dh_sphinxdoc -Xmathjax

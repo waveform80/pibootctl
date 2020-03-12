@@ -1,0 +1,10 @@
+diff-ignore
+tar-ignore
+tar-ignore = dist
+tar-ignore = .eggs
+tar-ignore = .cache
+tar-ignore = .coverage
+tar-ignore = .tox
+tar-ignore = .github
+tar-ignore = .pytest_cache
+tar-ignore = tags
