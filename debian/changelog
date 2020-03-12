@@ -1,0 +1,19 @@
+pibootctl (0.3-1) focal; urgency=medium
+
+  * Added full bash completions
+
+ -- Dave Jones <dave.jones@canonical.com>  Fri, 27 Mar 2020 17:16:45 +0000
+
+pibootctl (0.2-1) focal; urgency=medium
+
+  * Completed tracking and reporting of overridden lines in configurations
+  * Started work on bash completions
+  * Added a few more settings (max_framebuffers, etc.)
+
+ -- Dave Jones <dave.jones@canonical.com>  Thu, 26 Mar 2020 13:56:35 +0000
+
+pibootctl (0.1-1) focal; urgency=medium
+
+  * Initial release. (Closes: #XXXXXX)
+
+ -- Dave Jones <dave.jones@canonical.com>  Thu, 12 Mar 2020 18:20:44 +0000

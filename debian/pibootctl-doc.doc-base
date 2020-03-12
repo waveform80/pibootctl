@@ -1,0 +1,10 @@
+Document: pibootctl
+Title: pibootctl Reference
+Author: Dave Jones <dave.jones@canonical.com>
+Abstract: Documentation for the pibootctl utility for querying and manipulating
+ the boot configuration the Raspberry Pi.
+Section: System/Administration
+
+Format: HTML
+Index: /usr/share/doc/pibootctl-doc/html/index.html
+Files: /usr/share/doc/pibootctl-doc/html/*

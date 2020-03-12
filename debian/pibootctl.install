@@ -1,0 +1,2 @@
+debian/etc/pibootctl.conf etc
+debian/completions/pibootctl usr/share/bash-completion/completions
