@@ -3,7 +3,7 @@
 # External utilities
 PYTHON=python3
 PIP=pip
-PYTEST=py.test
+PYTEST=pytest
 COVERAGE=coverage
 TWINE=twine
 PYFLAGS=
@@ -121,8 +121,7 @@ develop: tags
 	$(PIP) install -e .[doc,test]
 
 test:
-	$(COVERAGE) run --rcfile coverage.cfg -m $(PYTEST) -v tests
-	$(COVERAGE) report --rcfile coverage.cfg
+	$(PYTHON) -m $(PYTEST)
 
 clean:
 	dh_clean
