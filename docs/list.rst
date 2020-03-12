@@ -42,7 +42,7 @@ Options
 Usage
 =====
 
-The ``list`` command is used to display the content of the store of boot
+The :command:`list` command is used to display the content of the store of boot
 configurations:
 
 .. code-block:: console

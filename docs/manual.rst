@@ -2,8 +2,8 @@
 User Manual
 ===========
 
-The ``pictl`` utility defines several commands which can be used to query and
-manipulate the boot configuration of the Raspberry Pi:
+The :command:`pictl` utility defines several commands which can be used to
+query and manipulate the boot configuration of the Raspberry Pi:
 
 .. include:: commands.rst
 

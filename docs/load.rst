@@ -39,9 +39,9 @@ Options
 Usage
 =====
 
-The ``load`` command is used to replace the current boot configuration with one
-previously stored. Effectively this simply unpacks the `PKZIP`_ of the stored
-boot configuration into the boot partition, overwriting existing files.
+The :command:`load` command is used to replace the current boot configuration
+with one previously stored. Effectively this simply unpacks the `PKZIP`_ of the
+stored boot configuration into the boot partition, overwriting existing files.
 
 If the current boot configuration has not been stored (with the :doc:`save`
 command), an automatically named backup will be saved first:

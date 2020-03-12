@@ -415,8 +415,9 @@ class BootParser:
     @property
     def config(self):
         """
-        The parsed configuration; a sequence of :class:`BootLine` items, after
-        :meth:`parse` has been successfully called.
+        The parsed configuration; a sequence of :class:`BootLine` instances (or
+        derivatives of :class:`BootLine`), after :meth:`parse` has been
+        successfully called.
         """
         return self._config
 
@@ -450,6 +451,9 @@ class BootParser:
         Parse the boot configuration on :attr:`path`. The optional *filename*
         specifies the "root" of the configuration, and defaults to
         :file:`config.txt`.
+
+        If parsing is successful, this will update the :attr:`files`,
+        :attr:`hash`, :attr:`timestamp`, and :attr:`config` attributes.
         """
         filename = Path(filename)
         self._files.clear()

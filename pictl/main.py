@@ -1,3 +1,33 @@
+"""
+The :mod:`pictl.main` module defines the :class:`Application` class, and an
+instance of this called :data:`main`. Instances of :class:`Application` are
+callable and thus :data:`main` is the entry-point for the :doc:`pictl <manual>`
+script.
+
+This module is primarily useful for obtaining the necessary configuration for
+constructing a :class:`~pictl.store.Store`::
+
+    from pictl.main import Application
+    from pictl.store import Store, Current, Default
+
+    config = Application.get_config()
+    store = Store(
+        config.boot_path, config.store_path,
+        config.config_read, config.config_write)
+    store[Current] = store['foo']
+
+Note that :meth:`Application.get_config` is static, so it can be called on the
+:class:`Application` class or the :data:`main` instance.
+
+.. data:: main
+
+    The instance of :class:`Application` which is the entry-point for the
+    :doc:`pictl <manual>` script.
+
+.. autoclass:: Application
+    :members:
+"""
+
 import io
 import os
 import sys
@@ -36,10 +66,30 @@ def permission_error(exc_type, exc_value, exc_tb):
 
 class Application:
     """
-    An instance of this class is the entry point for the application. The
-    instance is callable, accepting the command line arguments as its single
-    (optional) argument. The arguments will be derived from sys.argv if not
-    provided.
+    An instance of this class (:data:`main`) is the entry point for the
+    application. The instance is callable, accepting the command line arguments
+    as its single (optional) argument. The arguments will be derived from
+    :data:`sys.argv` if not provided::
+
+        >>> from pictl.main import main
+        >>> try:
+        ...     main(['-h'])
+        ... except SystemExit:
+        ...     pass
+        usage:  [-h] [--version]
+        {help,?,status,dump,get,set,save,load,diff,show,cat,list,ls,remove,rm,rename,mv}
+        ...
+
+    .. warning::
+
+        Calling :data:`main` will raise :exc:`SystemExit` in several cases
+        (usually when requesting help output). It will also replace the system
+        exception hook (:func:`sys.excepthook`).
+
+        This is intended and by design. If you wish to use :doc:`pictl
+        <manual>` as an API, you are better off investigating the
+        :class:`~pictl.store.Store` class, or treating :doc:`pictl <manual>` as
+        a self-contained script and calling it with :mod:`subprocess`.
     """
     def __call__(self, args=None):
         if not int(os.environ.get('DEBUG', '0')):
@@ -58,12 +108,12 @@ class Application:
                 self.config.config_read, self.config.config_write)
             self.config.func()
 
-    def get_config(self, section='defaults'):
+    @staticmethod
+    def get_config():
         """
         Constructs a configuration parser, and attempts to read the script's
-        configuration from the three pre-defined locations.
-
-        Returns the content of the ``[defaults]`` section.
+        configuration from the three pre-defined locations. Returns the content
+        of the ``[defaults]`` section.
         """
         config = configparser.ConfigParser(
             defaults={
@@ -89,7 +139,7 @@ class Application:
                         'XDG_CONFIG_HOME', os.path.expanduser('~/.config'))),
             ],
             encoding='ascii')
-        return config[section]
+        return config['defaults']
 
     def get_parser(self):
         """
@@ -308,7 +358,7 @@ class Application:
 
     def do_help(self):
         """
-        Implementation of the "help" command.
+        Implementation of the :doc:`help` command.
         """
         default = self.store[Default].settings
         if 'cmd' in self.config and self.config.cmd is not None:
@@ -346,14 +396,14 @@ class Application:
 
     def do_status(self):
         """
-        Implementation of the "status" command.
+        Implementation of the :doc:`status` command.
         """
         self.config.name = Current
         self.do_show()
 
     def do_show(self):
         """
-        Implementation of the "show" command.
+        Implementation of the :doc:`show` command.
         """
         settings = self.store[self.config.name].settings
         if self.config.vars:
@@ -364,7 +414,7 @@ class Application:
 
     def do_get(self):
         """
-        Implementation of the "get" command.
+        Implementation of the :doc:`get` command.
         """
         current = self.store[Current]
         if len(self.config.get_vars) == 1:
@@ -385,7 +435,7 @@ class Application:
 
     def do_set(self):
         """
-        Implementation of the "set" command.
+        Implementation of the :doc:`set` command.
         """
         mutable = self.store[Current].mutable()
         if self.config.style == 'user':
@@ -404,7 +454,7 @@ class Application:
 
     def do_save(self):
         """
-        Implementation of the "save" command.
+        Implementation of the :doc:`save` command.
         """
         try:
             self.store[self.config.name] = self.store[Current]
@@ -416,7 +466,7 @@ class Application:
 
     def do_load(self):
         """
-        Implementation of the "load" command.
+        Implementation of the :doc:`load` command.
         """
         # Look up the config to load before we do any backups, just in case the
         # user's made a mistake and the config doesn't exist
@@ -427,7 +477,7 @@ class Application:
 
     def do_diff(self):
         """
-        Implementation of the "diff" command.
+        Implementation of the :doc:`diff` command.
         """
         # Keep references to the settings lying around while we dump the diff
         # as otherwise the settings lose their weak-ref during the dump
@@ -439,7 +489,7 @@ class Application:
 
     def do_list(self):
         """
-        Implementation of the "list" command.
+        Implementation of the :doc:`list` command.
         """
         current = self.store[Current]
         table = [
@@ -451,7 +501,7 @@ class Application:
 
     def do_remove(self):
         """
-        Implementation of the "remove" command.
+        Implementation of the :doc:`remove` command.
         """
         try:
             del self.store[self.config.name]
@@ -462,7 +512,7 @@ class Application:
 
     def do_rename(self):
         """
-        Implementation of the "rename" command.
+        Implementation of the :doc:`rename` command.
         """
         try:
             self.store[self.config.to] = self.store[self.config.name]
@@ -516,4 +566,3 @@ class Application:
 
 
 main = Application()
-

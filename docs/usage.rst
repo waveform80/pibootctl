@@ -24,8 +24,8 @@ configuration before editing it with the :doc:`set` command:
 .. note::
 
     Note that commands which modify the content of the boot partition (e.g.
-    :doc:`save` and :doc:`set`) are executed with ``sudo`` as root privileges
-    are typically required.
+    :doc:`save` and :doc:`set`) are executed with :command:`sudo` as root
+    privileges are typically required.
 
 The :doc:`diff` command can be used to discover the differences between
 configurations:

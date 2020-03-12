@@ -42,7 +42,7 @@ Options
 Usage
 =====
 
-The ``rename`` command can be used to change the name of a stored boot
+The :command:`rename` command can be used to change the name of a stored boot
 configuration:
 
 .. code-block:: console

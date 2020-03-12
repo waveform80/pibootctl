@@ -36,7 +36,9 @@ vast majority of users the configuration should be provided by their
 distribution in one of the first two locations.
 
 The configuration file is a straight-forward INI-style containing a single
-section titled "defaults". A typical configuration file might look like this::
+section titled "defaults". A typical configuration file might look like this:
+
+.. code-block:: ini
 
     [defaults]
     boot_path=/boot

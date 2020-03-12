@@ -58,9 +58,9 @@ Options
 Usage
 =====
 
-The ``show`` command is the equivalent of the :doc:`status` command for stored
-boot configurations. By default it displays only the settings in the specified
-configuration that have been modified from their default:
+The :command:`show` command is the equivalent of the :doc:`status` command for
+stored boot configurations. By default it displays only the settings in the
+specified configuration that have been modified from their default:
 
 .. code-block:: console
 

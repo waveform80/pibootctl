@@ -54,7 +54,7 @@ Options
 Usage
 =====
 
-The ``set`` command can be used at the command line to update the boot
+The :command:`set` command can be used at the command line to update the boot
 configuration:
 
 .. code-block:: console
@@ -72,8 +72,8 @@ value by omitting the new value after the "=" sign:
     $ sudo pictl set --no-backup serial.enabled=on serial.uart=
 
 For those wishing to build an interface on top of pictl, JSON, YAML, and
-shell-friendly formats can also be used to feed new values to the ``set``
-command:
+shell-friendly formats can also be used to feed new values to the
+:command:`set` command:
 
 .. code-block:: console
 

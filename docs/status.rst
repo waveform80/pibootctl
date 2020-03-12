@@ -56,8 +56,8 @@ Options
 Usage
 =====
 
-By default, the ``status`` command only outputs boot time settings which have
-been modified:
+By default, the :command:`status` command only outputs boot time settings which
+have been modified:
 
 .. code-block:: console
 

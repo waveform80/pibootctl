@@ -39,7 +39,7 @@ Options
 Usage
 =====
 
-The ``save`` command is used to take a backup of the current boot
+The :command:`save` command is used to take a backup of the current boot
 configuration. In practice this creates a `PKZIP`_ of the files that make up
 the boot configuration (:file:`config.txt` et al.), and places it under the
 configured directory on the boot partition (usually :file:`pictl`):

@@ -38,7 +38,7 @@ Options
 Usage
 =====
 
-The ``remove`` command is used to delete a stored boot configuration:
+The :command:`remove` command is used to delete a stored boot configuration:
 
 .. code-block:: console
 

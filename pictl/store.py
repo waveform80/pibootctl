@@ -9,6 +9,9 @@ itself. Each :class:`BootConfiguration` contains an instance of
 :class:`Settings` which maps setting names to :class:`~pictl.setting.Setting`
 instances.
 
+See :class:`pictl.main` for information on obtaining the necessary
+configuration parameters for constructing a :class:`Store`.
+
 .. data:: Current
 
     The key of the active boot configuration in instances of :class:`Store`.
@@ -407,10 +410,14 @@ class IneffectiveConfiguration(ValueError):
 
 class MutableConfiguration(BootConfiguration):
     """
-    Represents a changeable boot configuration. This is constructed from a
-    *base* :class:`BootConfiguration`. Only one file in the configuration,
-    specified by *rewrite* (a :class:`~pathlib.Path`), is permitted to be
-    re-written.
+    Represents a changeable boot configuration.
+
+    Do not construct instances of this class directly; they are typically
+    constructed from a *base* :class:`BootConfiguration`, by calling
+    :meth:`~BootConfiguration.mutable`.
+
+    Only one file in the configuration, specified by *rewrite* (a
+    :class:`~pathlib.Path`), is permitted to be re-written.
 
     Mutable configurations can be changed with the :meth:`update` method which
     will also validate the new configuration, and check that the settings were

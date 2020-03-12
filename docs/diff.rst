@@ -52,7 +52,7 @@ Options
 Usage
 =====
 
-The ``diff`` command is used to display the differences between two boot
+The :command:`diff` command is used to display the differences between two boot
 configurations; either two stored configurations (if two names are supplied on
 the command line), or between the current boot configuration and a stored one
 (if one name is supplied on the command line):

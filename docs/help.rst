@@ -16,9 +16,10 @@ Synopsis
 Description
 ===========
 
-With no arguments, displays the list of pictl commands. If a command name is
-given, displays the description and options for the named command. If a setting
-name is given, displays the description and default value for that setting.
+With no arguments, displays the list of :command:`pictl` commands. If a command
+name is given, displays the description and options for the named command. If a
+setting name is given, displays the description and default value for that
+setting.
 
 
 Options
@@ -46,9 +47,9 @@ Options
 Usage
 =====
 
-The ``help`` command is the default command, and thus will be invoked if
-``pictl`` is called with no other arguments. However it can also be used to
-retrieve help for specific commands:
+The :command:`help` command is the default command, and thus will be invoked if
+:command:`pictl` is called with no other arguments. However it can also be used
+to retrieve help for specific commands:
 
 .. code-block:: console
 
@@ -84,8 +85,8 @@ Alternatively, it can be used to describe settings:
     required.
 
 Finally, if you are more familiar with the "classic" boot configuration
-commands, it can be used to discover which pictl settings correspond to those
-commands:
+commands, it can be used to discover which :command:`pictl` settings correspond
+to those commands:
 
 .. code-block:: console
 

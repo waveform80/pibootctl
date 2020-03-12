@@ -25,9 +25,9 @@ of the boot configuration:
     reboot_required_pkgs=
     EOF
 
-At this point you should be able to call the ``pictl`` utility, and have it
-store the (empty) boot configuration as a `PKZIP`_ file under the working
-directory:
+At this point you should be able to call the :doc:`pictl <manual>` utility, and
+have it store the (empty) boot configuration as a `PKZIP`_ file under the
+working directory:
 
 .. code-block:: console
 
@@ -40,7 +40,7 @@ directory:
     +------+--------+---------------------+
 
 To work on the clone in future simply enter the directory and use the
-``workon`` command:
+:command:`workon` command:
 
 .. code-block:: console
 
@@ -96,7 +96,7 @@ The HTML output is written to :file:`build/html` while the PDF output goes to
 Test suite
 ==========
 
-If you wish to run the pictl test suite, follow the instructions in
+If you wish to run the test suite, follow the instructions in
 :ref:`dev_install` above and then make the "test" target within the sandbox:
 
 .. code-block:: console
@@ -105,7 +105,7 @@ If you wish to run the pictl test suite, follow the instructions in
     $ workon pictl
     (pictl) $ make test
 
-A tox configuration is also provided that will test the utility against all
+A `tox`_ configuration is also provided that will test the utility against all
 supported Python versions:
 
 .. code-block:: console
@@ -122,4 +122,5 @@ supported Python versions:
     for obtaining additional Python installations for testing.
 
 .. _PKZIP: https://en.wikipedia.org/wiki/Zip_(file_format)
+.. _tox: https://tox.readthedocs.io/en/latest/
 .. _Dead Snakes PPA: https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa

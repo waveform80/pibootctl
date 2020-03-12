@@ -51,11 +51,11 @@ Options
 Usage
 =====
 
-This command is primarily of use to those wishing to build something on top of
-pictl; for end users wishing to query the current boot configuration the
-:doc:`status` command is of more use. When given a single setting to query the
-value of that setting is output on its own, in whatever output style is
-selected:
+The :command:`get` command is primarily of use to those wishing to build
+something on top of :command:`pictl`; for end users wishing to query the
+current boot configuration the :doc:`status` command is of more use. When given
+a single setting to query the value of that setting is output on its own, in
+whatever output style is selected:
 
 .. code-block:: console
 
