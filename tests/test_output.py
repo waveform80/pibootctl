@@ -341,11 +341,11 @@ The baud-rate of the ARM I2C bus.
         output.dump_setting(default['bluetooth.enabled'], buf)
         assert buf.getvalue() == """\
    Name: bluetooth.enabled
-Default: off
+Default: {value}
 
 Controls whether the Bluetooth module (Raspberry Pi 3 and later, and the
 Raspberry Pi Zero W), is enabled (which it is by default).
 
 Note that disabling the module can affect the default state of serial.enabled
 and serial.uart.
-"""
+""".format(value='on' if default['bluetooth.enabled'].default else 'off')

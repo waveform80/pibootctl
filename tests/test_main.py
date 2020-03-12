@@ -26,7 +26,17 @@ def store(request, tmpdir):
         yield Store(boot_path, store_path)
 
 
-def test_help(capsys):
+@pytest.fixture()
+def distro(request):
+    # Fake pkg_resources.require; this is only required when running tests in
+    # an environment in which the package isn't actually installed (such as
+    # when building a deb)
+    with mock.patch('pibootctl.main.pkg_resources.require') as require:
+        require.return_value = (mock.Mock(version='0.1'),)
+        yield
+
+
+def test_help(capsys, distro):
     with pytest.raises(SystemExit) as exc_info:
         main(['-h'])
     assert exc_info.value.args[0] == 0
@@ -44,7 +54,7 @@ def test_help(capsys):
     assert {'status', 'get', 'set', 'load', 'save', 'diff'} <= set(captured.out.split())
 
 
-def test_help_command(capsys):
+def test_help_command(capsys, distro):
     with pytest.raises(SystemExit) as exc_info:
         main(['help', 'status'])
     assert exc_info.value.args[0] == 0
@@ -53,7 +63,7 @@ def test_help_command(capsys):
     assert {'--all', '--json', '--yaml', '--shell'} <= set(captured.out.split())
 
 
-def test_help_setting(capsys):
+def test_help_setting(capsys, distro):
     with pytest.raises(SystemExit) as exc_info:
         main(['help', 'camera.enabled'])
     assert exc_info.value.args[0] == 0
@@ -66,7 +76,7 @@ def test_help_setting(capsys):
         main(['help', 'foo.bar'])
 
 
-def test_help_config_command(capsys):
+def test_help_config_command(capsys, distro):
     with pytest.raises(SystemExit) as exc_info:
         main(['help', 'start_x'])
     assert exc_info.value.args[0] == 0
@@ -76,7 +86,7 @@ def test_help_config_command(capsys):
         captured.out.replace(',', '').split())
 
 
-def test_help_config_multi(capsys):
+def test_help_config_multi(capsys, distro):
     with pytest.raises(SystemExit) as exc_info:
         main(['help', 'start_file'])
     assert exc_info.value.args[0] == 0
@@ -84,7 +94,7 @@ def test_help_config_multi(capsys):
     assert captured.out.lstrip().startswith('start_file is affected by')
 
 
-def test_dump_show(capsys, store):
+def test_dump_show(capsys, store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
@@ -95,7 +105,7 @@ def test_dump_show(capsys, store):
         'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}
 
 
-def test_dump_show_name(capsys, store):
+def test_dump_show_name(capsys, store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
@@ -109,7 +119,7 @@ def test_dump_show_name(capsys, store):
         'camera.enabled': True, 'gpu.mem': 128}
 
 
-def test_dump_show_filters(capsys, store):
+def test_dump_show_filters(capsys, store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
@@ -123,7 +133,7 @@ def test_dump_show_filters(capsys, store):
     assert json.loads(captured.out) == {'video.hdmi0.group': 1}
 
 
-def test_get(capsys, store):
+def test_get(capsys, store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
@@ -136,7 +146,7 @@ def test_get(capsys, store):
         main(['get', 'foo.bar'])
 
 
-def test_get_multi(capsys, store):
+def test_get_multi(capsys, store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
@@ -149,7 +159,7 @@ def test_get_multi(capsys, store):
         main(['get', '--json', 'video.hdmi0.group', 'foo.bar'])
 
 
-def test_set(store):
+def test_set(store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
@@ -162,7 +172,7 @@ def test_set(store):
     assert current.settings['video.hdmi0.mode'].value == 3
 
 
-def test_set_user(store):
+def test_set_user(store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
@@ -181,7 +191,7 @@ def test_set_user(store):
         main(['set', 'video.hdmi0.mode'])
 
 
-def test_save(store):
+def test_save(store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store[Current] = current
@@ -195,7 +205,7 @@ def test_save(store):
     assert 'foo' in store
 
 
-def test_load(store):
+def test_load(store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
@@ -208,7 +218,7 @@ def test_load(store):
     assert store.keys() == {Current, Default, 'foo', 'backup-20000101-000000'}
 
 
-def test_load_no_backup(store):
+def test_load_no_backup(store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
@@ -219,7 +229,7 @@ def test_load_no_backup(store):
     assert store.keys() == {Current, Default, 'foo'}
 
 
-def test_diff(capsys, store):
+def test_diff(capsys, store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
@@ -234,7 +244,7 @@ def test_diff(capsys, store):
     }
 
 
-def test_list(capsys, store):
+def test_list(capsys, store, distro):
     with mock.patch('pibootctl.store.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
         current = store[Current].mutable()
@@ -252,7 +262,7 @@ def test_list(capsys, store):
     ], key=itemgetter('name'))
 
 
-def test_remove(store):
+def test_remove(store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
@@ -265,7 +275,7 @@ def test_remove(store):
     main(['rm', '-f', 'bar'])
 
 
-def test_rename(store):
+def test_rename(store, distro):
     current = store[Current].mutable()
     current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
     store['foo'] = current
@@ -281,7 +291,7 @@ def test_rename(store):
     assert store.keys() == {Current, Default, 'baz'}
 
 
-def test_backup_fallback(store):
+def test_backup_fallback(store, distro):
     with mock.patch('pibootctl.main.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
 
@@ -305,7 +315,7 @@ def test_backup_fallback(store):
             'backup-20000101-000000-1'}
 
 
-def test_reboot_required(tmpdir):
+def test_reboot_required(tmpdir, distro):
     boot_path = Path(str(tmpdir))
     store_path = boot_path / 'pibootctl'
     var_run_path = boot_path / 'run'
@@ -349,7 +359,7 @@ def test_permission_error(store):
             assert msg[0] == 'permission denied'
 
 
-def test_debug_run(capsys):
+def test_debug_run(capsys, distro):
     sys.excepthook = sys.__excepthook__
     os.environ['DEBUG'] = '1'
     with pytest.raises(SystemExit):
