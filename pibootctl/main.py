@@ -1,14 +1,14 @@
 """
-The :mod:`pictl.main` module defines the :class:`Application` class, and an
+The :mod:`pibootctl.main` module defines the :class:`Application` class, and an
 instance of this called :data:`main`. Instances of :class:`Application` are
-callable and thus :data:`main` is the entry-point for the :doc:`pictl <manual>`
-script.
+callable and thus :data:`main` is the entry-point for the :doc:`pibootctl
+<manual>` script.
 
 This module is primarily useful for obtaining the necessary configuration for
-constructing a :class:`~pictl.store.Store`::
+constructing a :class:`~pibootctl.store.Store`::
 
-    from pictl.main import Application
-    from pictl.store import Store, Current, Default
+    from pibootctl.main import Application
+    from pibootctl.store import Store, Current, Default
 
     config = Application.get_config()
     store = Store(
@@ -22,7 +22,7 @@ Note that :meth:`Application.get_config` is static, so it can be called on the
 .. data:: main
 
     The instance of :class:`Application` which is the entry-point for the
-    :doc:`pictl <manual>` script.
+    :doc:`pibootctl <manual>` script.
 
 .. autoclass:: Application
     :members:
@@ -70,7 +70,7 @@ class Application:
     as its single (optional) argument. The arguments will be derived from
     :data:`sys.argv` if not provided::
 
-        >>> from pictl.main import main
+        >>> from pibootctl.main import main
         >>> try:
         ...     main(['-h'])
         ... except SystemExit:
@@ -85,10 +85,11 @@ class Application:
         (usually when requesting help output). It will also replace the system
         exception hook (:func:`sys.excepthook`).
 
-        This is intended and by design. If you wish to use :doc:`pictl
+        This is intended and by design. If you wish to use :doc:`pibootctl
         <manual>` as an API, you are better off investigating the
-        :class:`~pictl.store.Store` class, or treating :doc:`pictl <manual>` as
-        a self-contained script and calling it with :mod:`subprocess`.
+        :class:`~pibootctl.store.Store` class, or treating :doc:`pibootctl
+        <manual>` as a self-contained script and calling it with
+        :mod:`subprocess`.
     """
     def __call__(self, args=None):
         if not int(os.environ.get('DEBUG', '0')):
@@ -115,11 +116,11 @@ class Application:
         config = configparser.ConfigParser(
             defaults={
                 'boot_path':             '/boot',
-                'store_path':            'pictl',
+                'store_path':            'pibootctl',
                 'config_read':           'config.txt',
                 'config_write':          'config.txt',
                 'backup':                'on',
-                'package_name':          'pictl',
+                'package_name':          'pibootctl',
                 'reboot_required':       '/var/run/reboot-required',
                 'reboot_required_pkgs':  '/var/run/reboot-required.pkgs',
             },
@@ -129,9 +130,9 @@ class Application:
             interpolation=None)
         config.read(
             [
-                '/lib/pictl/pictl.conf',
-                '/etc/pictl.conf',
-                '{xdg_config}/pictl.conf'.format(
+                '/lib/pibootctl/pibootctl.conf',
+                '/etc/pibootctl.conf',
+                '{xdg_config}/pibootctl.conf'.format(
                     xdg_config=os.environ.get(
                         'XDG_CONFIG_HOME', os.path.expanduser('~/.config'))),
             ],
@@ -146,7 +147,7 @@ class Application:
         defaults for the various command line options). Returns the newly
         constructed argument parser.
         """
-        pkg = pkg_resources.require('pictl')[0]
+        pkg = pkg_resources.require('pibootctl')[0]
         config = self.get_config()
 
         parser = argparse.ArgumentParser(
@@ -170,10 +171,11 @@ class Application:
         help_cmd = commands.add_parser(
             "help", aliases=["?"],
             description=_(
-                "With no arguments, displays the list of pictl commands. If a "
-                "command name is given, displays the description and options "
-                "for the named command. If a setting name is given, displays "
-                "the description and default value for that setting."),
+                "With no arguments, displays the list of pibootctl commands. "
+                "If a command name is given, displays the description and "
+                "options for the named command. If a setting name is given, "
+                "displays the description and default value for that "
+                "setting."),
             help=_("Displays help about the specified command or setting"))
         help_cmd.add_argument(
             "cmd", metavar="command-or-setting", nargs='?',

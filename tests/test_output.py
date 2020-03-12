@@ -6,8 +6,8 @@ from unittest import mock
 import yaml
 import pytest
 
-from pictl.store import *
-from pictl.output import *
+from pibootctl.store import *
+from pibootctl.output import *
 
 
 # Because pyyaml doesn't include these ... ?!
@@ -308,7 +308,7 @@ def test_format_value_shell():
 
 
 def test_dump_setting_user():
-    with mock.patch('pictl.output.term_size') as term_size:
+    with mock.patch('pibootctl.output.term_size') as term_size:
         term_size.return_value = (80, 24)
         default = Settings()
 

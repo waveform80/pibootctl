@@ -10,4 +10,3 @@ setup(
         'setuptools_scm >= 1.7.0'
     ],
 )
-

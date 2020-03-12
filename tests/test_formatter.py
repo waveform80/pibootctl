@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 import pytest
 
-from pictl.formatter import *
+from pibootctl.formatter import *
 
 
 @pytest.fixture()

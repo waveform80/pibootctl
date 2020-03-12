@@ -7,7 +7,7 @@ from datetime import datetime
 
 import pytest
 
-from pictl.parser import *
+from pibootctl.parser import *
 
 
 def test_str():
@@ -200,7 +200,7 @@ dtparam=audio=on
 
 
 def test_parse_serial_bad_section(tmpdir):
-    with mock.patch('pictl.parser.get_board_serial') as get_board_serial:
+    with mock.patch('pibootctl.parser.get_board_serial') as get_board_serial:
         tmpdir.join('config.txt').write("""# This is a comment
 [0xwtf]
 dtparam=audio=on
@@ -229,7 +229,7 @@ dtparam=audio=on
 
 
 def test_parse_serial_section_match(tmpdir):
-    with mock.patch('pictl.parser.get_board_serial') as get_board_serial:
+    with mock.patch('pibootctl.parser.get_board_serial') as get_board_serial:
         get_board_serial.return_value = 0xdeadd00d
         tmpdir.join('config.txt').write("""# This is a comment
 [0xdeadd00d]
@@ -245,7 +245,7 @@ dtparam=audio=on
 
 
 def test_parse_serial_section_mismatch(tmpdir):
-    with mock.patch('pictl.parser.get_board_serial') as get_board_serial:
+    with mock.patch('pibootctl.parser.get_board_serial') as get_board_serial:
         tmpdir.join('config.txt').write("""# This is a comment
 [0x12345678]
 dtparam=audio=on
@@ -258,7 +258,7 @@ dtparam=audio=on
 
 
 def test_parse_pi_section(tmpdir):
-    with mock.patch('pictl.parser.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.parser.get_board_types') as get_board_types:
         get_board_types.return_value = {'pi3', 'pi3+'}
         tmpdir.join('config.txt').write("""# This is a comment
 [pi2]
@@ -288,7 +288,7 @@ kernel=uboot_3_32b.bin
 [pi4]
 kernel=uboot_4_32b.bin
 """
-    with mock.patch('pictl.parser.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.parser.get_board_types') as get_board_types:
         get_board_types.return_value = {'pi3', 'pi3+'}
         (tmpdir / 'config.txt').write_bytes(content)
         p = BootParser(tmpdir)

@@ -2,7 +2,7 @@
 get
 ===
 
-.. program:: pictl-get
+.. program:: pibootctl-get
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl get [-h] [--json | --yaml | --shell] setting [setting ...]
+    pibootctl get [-h] [--json | --yaml | --shell] setting [setting ...]
 
 
 Description
@@ -52,16 +52,16 @@ Usage
 =====
 
 The :command:`get` command is primarily of use to those wishing to build
-something on top of :command:`pictl`; for end users wishing to query the
+something on top of :command:`pibootctl`; for end users wishing to query the
 current boot configuration the :doc:`status` command is of more use. When given
 a single setting to query the value of that setting is output on its own, in
 whatever output style is selected:
 
 .. code-block:: console
 
-    $ pictl get video.overscan.enabled
+    $ pibootctl get video.overscan.enabled
     on
-    $ pictl get --json video.overscan.enabled
+    $ pibootctl get --json video.overscan.enabled
     true
 
 When given multiple settings, names and values of those settings are both
@@ -69,7 +69,7 @@ output:
 
 .. code-block:: console
 
-    $ pictl get serial.enabled serial.baud serial.uart
+    $ pibootctl get serial.enabled serial.baud serial.uart
     +----------------+-------------------------+
     | Name           | Value                   |
     |----------------+-------------------------|
@@ -77,7 +77,7 @@ output:
     | serial.enabled | on                      |
     | serial.uart    | 0 (/dev/ttyAMA0; PL011) |
     +----------------+-------------------------+
-    $ pictl get --json serial.enabled serial.baud serial.uart
+    $ pibootctl get --json serial.enabled serial.baud serial.uart
     {"serial.enabled": true, "serial.baud": 115200, "serial.uart": 0}
 
 Note that wildcards are not permitted with this command, unlike with the

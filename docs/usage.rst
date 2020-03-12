@@ -3,7 +3,7 @@ current boot configuration:
 
 .. code-block:: console
 
-    $ pictl status
+    $ pibootctl status
     +------------------------+-------+
     | Name                   | Value |
     |------------------------+-------|
@@ -17,9 +17,9 @@ configuration before editing it with the :doc:`set` command:
 
 .. code-block:: console
 
-    $ sudo pictl save default
-    $ sudo pictl set camera.enabled=on gpu.mem=128
-    $ sudo pictl save cam
+    $ sudo pibootctl save default
+    $ sudo pibootctl set camera.enabled=on gpu.mem=128
+    $ sudo pibootctl save cam
 
 .. note::
 
@@ -32,7 +32,7 @@ configurations:
 
 .. code-block:: console
 
-    $ pictl diff default
+    $ pibootctl diff default
     +------------------------+---------------+-------------+
     | Name                   | <Current>     | default     |
     |------------------------+---------------+-------------|
@@ -54,8 +54,8 @@ about the defaults and underlying commands each setting represents:
 
 .. code-block:: console
 
-    $ pictl help save
-    usage: pictl save [-h] [-f] name
+    $ pibootctl help save
+    usage: pibootctl save [-h] [-f] name
 
     Store the current boot configuration under a given name.
 
@@ -67,7 +67,7 @@ about the defaults and underlying commands each setting represents:
       -h, --help   show this help message and exit
       -f, --force  Overwrite an existing configuration, if one exists
 
-    $ pictl help camera.enabled
+    $ pibootctl help camera.enabled
           Name: camera.enabled
        Default: off
     Command(s): start_x, start_debug, start_file, fixup_file
@@ -85,11 +85,11 @@ store, and :doc:`load` to restore previously saved configurations:
 
 .. code-block:: console
 
-    $ pictl list
+    $ pibootctl list
     +---------+--------+---------------------+
     | Name    | Active | Timestamp           |
     |---------+--------+---------------------|
     | cam     | x      | 2020-03-11 21:29:56 |
     | default |        | 2020-03-11 21:29:13 |
     +---------+--------+---------------------+
-    $ sudo pictl load default
+    $ sudo pibootctl load default

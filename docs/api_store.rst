@@ -1,5 +1,5 @@
-===========
-pictl.store
-===========
+===============
+pibootctl.store
+===============
 
-.. automodule:: pictl.store
+.. automodule:: pibootctl.store

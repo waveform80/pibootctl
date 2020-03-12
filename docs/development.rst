@@ -4,20 +4,20 @@
 Development
 ===========
 
-If you wish to install a copy of pictl for development purposes, clone the git
-repository and set up a configuration to use the cloned directory as the source
-of the boot configuration:
+If you wish to install a copy of pibootctl for development purposes, clone the
+git repository and set up a configuration to use the cloned directory as the
+source of the boot configuration:
 
 .. code-block:: console
 
     $ sudo apt install python3-dev git virtualenvwrapper
     $ cd
-    $ git clone https://github.com/waveform80/pictl.git
-    $ mkvirtualenv -p /usr/bin/python3 pictl
-    $ cd pictl
-    $ workon pictl
-    (pictl) $ make develop
-    (pictl) $ cat > ~/.config/pictl.conf << EOF
+    $ git clone https://github.com/waveform80/pibootctl.git
+    $ mkvirtualenv -p /usr/bin/python3 pibootctl
+    $ cd pibootctl
+    $ workon pibootctl
+    (pibootctl) $ make develop
+    (pibootctl) $ cat > ~/.config/pibootctl.conf << EOF
     [defaults]
     boot_path=.
     store_path=store
@@ -25,14 +25,14 @@ of the boot configuration:
     reboot_required_pkgs=
     EOF
 
-At this point you should be able to call the :doc:`pictl <manual>` utility, and
-have it store the (empty) boot configuration as a `PKZIP`_ file under the
+At this point you should be able to call the :doc:`pibootctl <manual>` utility,
+and have it store the (empty) boot configuration as a `PKZIP`_ file under the
 working directory:
 
 .. code-block:: console
 
-    $ pictl save foo
-    $ pictl ls
+    $ pibootctl save foo
+    $ pibootctl ls
     +------+--------+---------------------+
     | Name | Active | Timestamp           |
     |------+--------+---------------------|
@@ -44,27 +44,27 @@ To work on the clone in future simply enter the directory and use the
 
 .. code-block:: console
 
-    $ cd ~/pictl
-    $ workon pictl
+    $ cd ~/pibootctl
+    $ workon pibootctl
 
 To pull the latest changes from git into your clone and update your
 installation:
 
 .. code-block:: console
 
-    $ cd ~/pictl
-    $ workon pictl
-    (pictl) $ git pull
-    (pictl) $ make develop
+    $ cd ~/pibootctl
+    $ workon pibootctl
+    (pibootctl) $ git pull
+    (pibootctl) $ make develop
 
 To remove your installation, destroy the sandbox and the clone:
 
 .. code-block:: console
 
-    (pictl) $ cd
-    (pictl) $ deactivate
-    $ rmvirtualenv pictl
-    $ rm -fr ~/pictl
+    (pibootctl) $ cd
+    (pibootctl) $ deactivate
+    $ rmvirtualenv pibootctl
+    $ rm -fr ~/pibootctl
 
 
 Building the docs
@@ -85,9 +85,9 @@ documentation:
 
 .. code-block:: console
 
-    $ cd ~/pictl
-    $ workon pictl
-    (pictl) $ make doc
+    $ cd ~/pibootctl
+    $ workon pibootctl
+    (pibootctl) $ make doc
 
 The HTML output is written to :file:`build/html` while the PDF output goes to
 :file:`build/latex`.
@@ -101,20 +101,20 @@ If you wish to run the test suite, follow the instructions in
 
 .. code-block:: console
 
-    $ cd ~/pictl
-    $ workon pictl
-    (pictl) $ make test
+    $ cd ~/pibootctl
+    $ workon pibootctl
+    (pibootctl) $ make test
 
 A `tox`_ configuration is also provided that will test the utility against all
 supported Python versions:
 
 .. code-block:: console
 
-    $ cd ~/pictl
-    $ workon pictl
-    (pictl) $ pip install tox
+    $ cd ~/pibootctl
+    $ workon pibootctl
+    (pibootctl) $ pip install tox
     ...
-    (pictl) $ tox -p auto
+    (pibootctl) $ tox -p auto
 
 .. note::
 

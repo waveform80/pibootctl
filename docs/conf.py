@@ -7,7 +7,7 @@ import pkginfo
 from datetime import datetime
 
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
-info = pkginfo.Installed('pictl')
+info = pkginfo.Installed('pibootctl')
 
 # -- General configuration ------------------------------------------------
 
@@ -122,7 +122,7 @@ epub_basename = project
 #epub_theme = 'epub'
 #epub_title = html_title
 epub_author = info.author
-epub_identifier = 'https://pictl.readthedocs.io/'
+epub_identifier = 'https://pibootctl.readthedocs.io/'
 #epub_tocdepth = 3
 epub_show_urls = 'no'
 #epub_use_index = True
@@ -130,18 +130,18 @@ epub_show_urls = 'no'
 # -- Options for manual page output ---------------------------------------
 
 man_pages = [
-    ('pictl',  'pictl',        'pictl manual', [info.author], 1),
-    ('help',   'pictl-help',   'pictl manual', [info.author], 1),
-    ('status', 'pictl-status', 'pictl manual', [info.author], 1),
-    ('get',    'pictl-get',    'pictl manual', [info.author], 1),
-    ('set',    'pictl-set',    'pictl manual', [info.author], 1),
-    ('save',   'pictl-save',   'pictl manual', [info.author], 1),
-    ('load',   'pictl-load',   'pictl manual', [info.author], 1),
-    ('diff',   'pictl-diff',   'pictl manual', [info.author], 1),
-    ('show',   'pictl-show',   'pictl manual', [info.author], 1),
-    ('list',   'pictl-list',   'pictl manual', [info.author], 1),
-    ('remove', 'pictl-remove', 'pictl manual', [info.author], 1),
-    ('rename', 'pictl-rename', 'pictl manual', [info.author], 1),
+    ('pibootctl',  'pibootctl',        'pibootctl manual', [info.author], 1),
+    ('help',   'pibootctl-help',   'pibootctl manual', [info.author], 1),
+    ('status', 'pibootctl-status', 'pibootctl manual', [info.author], 1),
+    ('get',    'pibootctl-get',    'pibootctl manual', [info.author], 1),
+    ('set',    'pibootctl-set',    'pibootctl manual', [info.author], 1),
+    ('save',   'pibootctl-save',   'pibootctl manual', [info.author], 1),
+    ('load',   'pibootctl-load',   'pibootctl manual', [info.author], 1),
+    ('diff',   'pibootctl-diff',   'pibootctl manual', [info.author], 1),
+    ('show',   'pibootctl-show',   'pibootctl manual', [info.author], 1),
+    ('list',   'pibootctl-list',   'pibootctl manual', [info.author], 1),
+    ('remove', 'pibootctl-remove', 'pibootctl manual', [info.author], 1),
+    ('rename', 'pibootctl-rename', 'pibootctl manual', [info.author], 1),
 ]
 
 man_show_urls = True

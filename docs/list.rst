@@ -2,7 +2,7 @@
 list
 ====
 
-.. program:: pictl-list
+.. program:: pibootctl-list
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl list [-h] [--json | --yaml | --shell]
+    pibootctl list [-h] [--json | --yaml | --shell]
 
 
 Description
@@ -47,7 +47,7 @@ configurations:
 
 .. code-block:: console
 
-    $ pictl list
+    $ pibootctl list
     +---------+--------+---------------------+
     | Name    | Active | Timestamp           |
     |---------+--------+---------------------|
@@ -68,14 +68,14 @@ The "timestamp" of a stored configuration is the last modification date of that
 configuration (calculated as the latest modification date of all files within
 the configuration).
 
-For developers wishing to build on top of pictl, options are provided to
+For developers wishing to build on top of pibootctl, options are provided to
 produce the output in JSON (:option:`--json`), YAML (:option:`--yaml`), and
 shell-friendly (:option:`--shell`). These combine with all aforementioned
 options as expected:
 
 .. code-block:: console
 
-    $ pictl list --json
+    $ pibootctl list --json
     [{"timestamp": "2020-02-01T15:46:48", "active": false, "name": "dpi"},
     {"timestamp": "2020-03-10T11:32:12", "active": false, "name": "default"},
     {"timestamp": "2020-02-01T16:13:02", "active": false, "name": "gpi"},

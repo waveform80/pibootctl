@@ -1,5 +1,5 @@
-============
-pictl.parser
-============
+================
+pibootctl.parser
+================
 
-.. automodule:: pictl.parser
+.. automodule:: pibootctl.parser

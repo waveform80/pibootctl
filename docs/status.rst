@@ -2,7 +2,7 @@
 status
 ======
 
-.. program:: pictl-status
+.. program:: pibootctl-status
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl status [-h] [-a] [--json | --yaml | --shell] [pattern]
+    pibootctl status [-h] [-a] [--json | --yaml | --shell] [pattern]
 
 
 Description
@@ -61,7 +61,7 @@ have been modified:
 
 .. code-block:: console
 
-    $ pictl status
+    $ pibootctl status
     +-------------+-------+
     | Name        | Value |
     |-------------+-------|
@@ -75,7 +75,7 @@ implicitly invoke the system's pager) can be displayed with the
 
 .. code-block:: console
 
-    $ pictl status --all
+    $ pibootctl status --all
     +------------------------------+----------+--------------------------+
     | Name                         | Modified | Value                    |
     |------------------------------+----------+--------------------------|
@@ -106,7 +106,7 @@ For example:
 
 .. code-block:: console
 
-    $ pictl status --all i2c.*
+    $ pibootctl status --all i2c.*
     +-------------+----------+--------+
     | Name        | Modified | Value  |
     |-------------+----------+--------|
@@ -114,12 +114,12 @@ For example:
     | i2c.enabled | x        | on     |
     +-------------+----------+--------+
 
-For developers wishing to build on top of pictl, options are provided to
+For developers wishing to build on top of pibootctl, options are provided to
 produce the output in JSON (:option:`--json`), YAML (:option:`--yaml`), and
 shell-friendly (:option:`--shell`). These combine with all aforementioned
 options as expected:
 
 .. code-block:: console
 
-    $ pictl status --json --all i2c.*
+    $ pibootctl status --json --all i2c.*
     {"i2c.baud": 100000, "i2c.enabled": true}

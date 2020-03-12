@@ -1,5 +1,5 @@
-=============
-pictl.setting
-=============
+=================
+pibootctl.setting
+=================
 
-.. automodule:: pictl.setting
+.. automodule:: pibootctl.setting

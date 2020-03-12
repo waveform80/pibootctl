@@ -2,7 +2,7 @@
 save
 ====
 
-.. program:: pictl-save
+.. program:: pibootctl-save
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl save [-h] [-f] name
+    pibootctl save [-h] [-f] name
 
 
 Description
@@ -42,13 +42,13 @@ Usage
 The :command:`save` command is used to take a backup of the current boot
 configuration. In practice this creates a `PKZIP`_ of the files that make up
 the boot configuration (:file:`config.txt` et al.), and places it under the
-configured directory on the boot partition (usually :file:`pictl`):
+configured directory on the boot partition (usually :file:`pibootctl`):
 
 .. code-block:: console
 
-    $ ls /boot/pictl
-    $ sudo pictl save foo
-    $ ls /boot/pictl
+    $ ls /boot/pibootctl
+    $ sudo pibootctl save foo
+    $ ls /boot/pibootctl
     foo.zip
 
 Note that by default, you cannot overwrite saved configurations, but this can
@@ -56,9 +56,9 @@ be overridden with the :option:`--force` option:
 
 .. code-block:: console
 
-    $ sudo pictl save foo
+    $ sudo pibootctl save foo
     [Errno 17] File exists: 'foo.zip'
-    $ sudo pictl save -f foo
+    $ sudo pibootctl save -f foo
 
 In the event that your system is rendered un-bootable, a boot configuration can
 be easily restored by extracting the PKZIP of a saved configuration into the

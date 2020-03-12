@@ -63,18 +63,18 @@ DIST_DSC=dist/$(NAME)_$(VER)$(DEB_SUFFIX).tar.xz \
 	dist/$(NAME)_$(VER)$(DEB_SUFFIX)_source.build \
 	dist/$(NAME)_$(VER)$(DEB_SUFFIX)_source.buildinfo \
 	dist/$(NAME)_$(VER)$(DEB_SUFFIX)_source.changes
-MAN_PAGES=man/pictl.1 \
-	man/pictl-help.1 \
-	man/pictl-status.1 \
-	man/pictl-get.1 \
-	man/pictl-set.1 \
-	man/pictl-save.1 \
-	man/pictl-load.1 \
-	man/pictl-diff.1 \
-	man/pictl-show.1 \
-	man/pictl-list.1 \
-	man/pictl-remove.1 \
-	man/pictl-rename.1
+MAN_PAGES=man/pibootctl.1 \
+	man/pibootctl-help.1 \
+	man/pibootctl-status.1 \
+	man/pibootctl-get.1 \
+	man/pibootctl-set.1 \
+	man/pibootctl-save.1 \
+	man/pibootctl-load.1 \
+	man/pibootctl-diff.1 \
+	man/pibootctl-show.1 \
+	man/pibootctl-list.1 \
+	man/pibootctl-remove.1 \
+	man/pibootctl-rename.1
 
 
 # Default target
@@ -118,6 +118,7 @@ develop: tags
 	@# These have to be done separately to avoid a cockup...
 	$(PIP) install -U setuptools
 	$(PIP) install -U pip
+	$(PIP) install tox
 	$(PIP) install -e .[doc,test]
 
 test:

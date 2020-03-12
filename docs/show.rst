@@ -2,7 +2,7 @@
 show
 ====
 
-.. program:: pictl-show
+.. program:: pibootctl-show
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl show [-h] [-a] [--json | --yaml | --shell] name [pattern]
+    pibootctl show [-h] [-a] [--json | --yaml | --shell] name [pattern]
 
 
 Description
@@ -64,7 +64,7 @@ specified configuration that have been modified from their default:
 
 .. code-block:: console
 
-    $ pictl show 720p
+    $ pibootctl show 720p
     +------------------------+----------------+
     | Name                   | Value          |
     |------------------------+----------------|
@@ -78,7 +78,7 @@ and thus will implicitly invoke the system's pager) can be displayed with the
 
 .. code-block:: console
 
-    $ pictl show 720p --all
+    $ pibootctl show 720p --all
     +------------------------------+----------+--------------------------------+
     | Name                         | Modified | Value                          |
     |------------------------------+----------+--------------------------------|
@@ -111,7 +111,7 @@ For example:
 
 .. code-block:: console
 
-    $ pictl show --all 720p i2c.*
+    $ pibootctl show --all 720p i2c.*
     +-------------+----------+--------+
     | Name        | Modified | Value  |
     |-------------+----------+--------|
@@ -119,12 +119,12 @@ For example:
     | i2c.enabled |          | off    |
     +-------------+----------+--------+
 
-For developers wishing to build on top of pictl, options are provided to
+For developers wishing to build on top of pibootctl, options are provided to
 produce the output in JSON (:option:`--json`), YAML (:option:`--yaml`), and
 shell-friendly (:option:`--shell`). These combine with all aforementioned
 options as expected:
 
 .. code-block:: console
 
-    $ pictl show --json --all 720p i2c.*
+    $ pibootctl show --json --all 720p i2c.*
     {"i2c.baud": 100000, "i2c.enabled": false}

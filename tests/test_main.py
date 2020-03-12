@@ -9,13 +9,13 @@ from operator import itemgetter
 
 import pytest
 
-from pictl.main import *
+from pibootctl.main import *
 
 
 @pytest.fixture()
 def store(request, tmpdir):
     boot_path = Path(str(tmpdir))
-    store_path = boot_path / 'pictl'
+    store_path = boot_path / 'pibootctl'
     store_path.mkdir()
     def my_read(self, *args, **kwargs):
         self['defaults']['boot_path'] = str(boot_path)
@@ -201,7 +201,7 @@ def test_load(store):
     store['foo'] = current
 
     assert not store[Current].settings['video.hdmi0.group'].modified
-    with mock.patch('pictl.main.datetime') as dt:
+    with mock.patch('pibootctl.main.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
         main(['load', 'foo'])
     assert store[Current].settings['video.hdmi0.group'].modified
@@ -235,7 +235,7 @@ def test_diff(capsys, store):
 
 
 def test_list(capsys, store):
-    with mock.patch('pictl.store.datetime') as dt:
+    with mock.patch('pibootctl.store.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
         current = store[Current].mutable()
         current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
@@ -282,7 +282,7 @@ def test_rename(store):
 
 
 def test_backup_fallback(store):
-    with mock.patch('pictl.main.datetime') as dt:
+    with mock.patch('pibootctl.main.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
 
         current = store[Current].mutable()
@@ -307,7 +307,7 @@ def test_backup_fallback(store):
 
 def test_reboot_required(tmpdir):
     boot_path = Path(str(tmpdir))
-    store_path = boot_path / 'pictl'
+    store_path = boot_path / 'pibootctl'
     var_run_path = boot_path / 'run'
     store_path.mkdir()
     var_run_path.mkdir()
@@ -330,7 +330,7 @@ def test_reboot_required(tmpdir):
 
 
 def test_permission_error(store):
-    with mock.patch('pictl.main.os.geteuid') as geteuid:
+    with mock.patch('pibootctl.main.os.geteuid') as geteuid:
         geteuid.return_value = 1000
         try:
             raise PermissionError('permission denied')

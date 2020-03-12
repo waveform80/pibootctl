@@ -2,7 +2,7 @@
 remove
 ======
 
-.. program:: pictl-remove
+.. program:: pibootctl-remove
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl remove [-h] [-f] name
+    pibootctl remove [-h] [-f] name
 
 
 Description
@@ -42,7 +42,7 @@ The :command:`remove` command is used to delete a stored boot configuration:
 
 .. code-block:: console
 
-    $ pictl list
+    $ pibootctl list
     +---------+--------+---------------------+
     | Name    | Active | Timestamp           |
     |---------+--------+---------------------|
@@ -51,8 +51,8 @@ The :command:`remove` command is used to delete a stored boot configuration:
     | dpi     |        | 2020-02-01 15:46:48 |
     | gpi     |        | 2020-02-01 16:13:02 |
     +---------+--------+---------------------+
-    $ sudo pictl remove gpi
-    $ pictl list
+    $ sudo pibootctl remove gpi
+    $ pibootctl list
     +---------+--------+---------------------+
     | Name    | Active | Timestamp           |
     |---------+--------+---------------------|
@@ -67,6 +67,6 @@ option:
 
 .. code-block:: console
 
-    $ pictl rm foo
+    $ pibootctl rm foo
     unknown configuration foo
-    $ pictl rm -f foo
+    $ pibootctl rm -f foo

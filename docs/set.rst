@@ -2,7 +2,7 @@
 set
 ===
 
-.. program:: pictl-set
+.. program:: pibootctl-set
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl set [-h] [--no-backup] [--json] [--yaml] [--shell]
+    pibootctl set [-h] [--no-backup] [--json] [--yaml] [--shell]
                    [name=[value] [name=[value] ...]]
 
 
@@ -59,7 +59,7 @@ configuration:
 
 .. code-block:: console
 
-    $ sudo pictl set video.overscan.enabled=off
+    $ sudo pibootctl set video.overscan.enabled=off
     Backed up current configuration in backup-20200309-230959
 
 Note that, if no backup of the current boot configuration exists, a backup is
@@ -69,14 +69,14 @@ value by omitting the new value after the "=" sign:
 
 .. code-block:: console
 
-    $ sudo pictl set --no-backup serial.enabled=on serial.uart=
+    $ sudo pibootctl set --no-backup serial.enabled=on serial.uart=
 
-For those wishing to build an interface on top of pictl, JSON, YAML, and
+For those wishing to build an interface on top of pibootctl, JSON, YAML, and
 shell-friendly formats can also be used to feed new values to the
 :command:`set` command:
 
 .. code-block:: console
 
-    $ cat << EOF | sudo pictl set --json --no-backup
+    $ cat << EOF | sudo pibootctl set --json --no-backup
     {"serial.enabled": true, "serial.uart": null}
     EOF

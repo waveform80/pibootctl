@@ -2,7 +2,7 @@
 rename
 ======
 
-.. program:: pictl-rename
+.. program:: pibootctl-rename
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl rename [-h] [-f] name to
+    pibootctl rename [-h] [-f] name to
 
 
 Description
@@ -47,7 +47,7 @@ configuration:
 
 .. code-block:: console
 
-    $ pictl ls
+    $ pibootctl ls
     +---------+--------+---------------------+
     | Name    | Active | Timestamp           |
     |---------+--------+---------------------|
@@ -55,8 +55,8 @@ configuration:
     | default |        | 2020-03-10 11:32:12 |
     | dpi     |        | 2020-02-01 15:46:48 |
     +---------+--------+---------------------+
-    $ sudo pictl rename default foo
-    $ pictl ls
+    $ sudo pibootctl rename default foo
+    $ pibootctl ls
     +------+--------+---------------------+
     | Name | Active | Timestamp           |
     |------+--------+---------------------|
@@ -73,9 +73,9 @@ configuration you will need to use the :option:`--force` option:
 
 .. code-block:: console
 
-    $ sudo pictl load default
-    $ sudo pictl save foo
-    $ pictl ls
+    $ sudo pibootctl load default
+    $ sudo pibootctl save foo
+    $ pibootctl ls
     +---------+--------+---------------------+
     | Name    | Active | Timestamp           |
     |---------+--------+---------------------|
@@ -84,6 +84,6 @@ configuration you will need to use the :option:`--force` option:
     | dpi     |        | 2020-02-01 15:46:48 |
     | foo     | x      | 2020-03-10 11:32:12 |
     +---------+--------+---------------------+
-    $ sudo pictl mv foo default
+    $ sudo pibootctl mv foo default
     [Errno 17] File exists: 'default.zip'
-    $ sudo pictl mv -f foo default
+    $ sudo pibootctl mv -f foo default

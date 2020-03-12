@@ -4,10 +4,10 @@ from operator import attrgetter
 
 import pytest
 
-from pictl.userstr import UserStr
-from pictl.store import Settings
-from pictl.parser import *
-from pictl.setting import *
+from pibootctl.userstr import UserStr
+from pibootctl.store import Settings
+from pibootctl.parser import *
+from pibootctl.setting import *
 
 
 def make_settings(*specs):
@@ -710,7 +710,7 @@ def test_kernel_address():
 
 
 def test_kernel_filename():
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         settings = make_settings(
             CommandKernel64('kernel.64bit', commands=('arm_64bit', 'arm_control')),
             CommandKernelFilename('kernel.filename', command='kernel_filename'))
@@ -729,7 +729,7 @@ def test_kernel_filename():
 
 
 def test_camera_firmware(fw_settings):
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         cam = fw_settings['camera.enabled']
         mem = fw_settings['gpu.mem']
         start = fw_settings['boot.firmware.filename']
@@ -784,7 +784,7 @@ def test_camera_firmware_extract(fw_settings):
 
 
 def test_debug_firmware(fw_settings):
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         debug = fw_settings['boot.debug.enabled']
         start = fw_settings['boot.firmware.filename']
         fixup = fw_settings['boot.firmware.fixup']
@@ -830,7 +830,7 @@ def test_debug_firmware_extract(fw_settings):
 
 
 def test_firmware_filename(fw_settings):
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         cam = fw_settings['camera.enabled']
         debug = fw_settings['boot.debug.enabled']
         start = fw_settings['boot.firmware.filename']
@@ -972,7 +972,7 @@ def test_initrd_filename_output():
 
 
 def test_serial_bt():
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         settings = make_settings(
             CommandSerialEnabled('serial.enabled', command='enable_uart'),
             OverlayBluetoothEnabled('bluetooth.enabled'),
@@ -1051,7 +1051,7 @@ def test_serial_bt_extract():
 
 
 def test_serial_bt_output():
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         settings = make_settings(
             CommandSerialEnabled('serial.enabled', command='enable_uart'),
             OverlayBluetoothEnabled('bluetooth.enabled'),
@@ -1081,7 +1081,7 @@ def test_serial_bt_output():
 
 
 def test_l2_cache():
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         cache = CommandCPUL2Cache('l2.enabled', command='disable_l2_cache')
 
         get_board_types.return_value = set()
@@ -1094,7 +1094,7 @@ def test_l2_cache():
 
 
 def test_cpu_freq():
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         settings = make_settings(
             CommandCPUFreqMax('cpu.max', command='arm_freq'),
             CommandCPUFreqMin('cpu.min', command='arm_freq_min'),
@@ -1152,7 +1152,7 @@ def test_cpu_freq():
 
 
 def test_gpu_freq():
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         # There are an absolute ton of cross-dependencies on GPU frequencies:
         # between the different blocks, the enabled video-outs (on the 4), and
         # whether or not mini-UART serial is enabled (which in turn depends on
@@ -1275,7 +1275,7 @@ def test_gpu_freq():
 
 
 def test_gpu_freq_output():
-    with mock.patch('pictl.setting.get_board_types') as get_board_types:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         settings = make_settings(
             CommandCoreFreqMax('gpu.core.frequency.max', commands=('core_freq', 'gpu_freq')),
             CommandCoreFreqMin('gpu.core.frequency.min', commands=('core_freq_min', 'gpu_freq_min')),
@@ -1336,7 +1336,7 @@ def test_gpu_freq_output():
 
 
 def test_gpu_mem():
-    with mock.patch('pictl.setting.get_board_mem') as get_board_mem:
+    with mock.patch('pibootctl.setting.get_board_mem') as get_board_mem:
         mem = CommandGPUMem(
             'gpu.mem', default=64,
             commands=('gpu_mem', 'gpu_mem_256', 'gpu_mem_512', 'gpu_mem_1024'))

@@ -1,5 +1,5 @@
-==========
-pictl.main
-==========
+==============
+pibootctl.main
+==============
 
-.. automodule:: pictl.main
+.. automodule:: pibootctl.main

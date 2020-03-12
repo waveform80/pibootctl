@@ -1,15 +1,15 @@
 """
-The :mod:`pictl.store` module defines classes which control a store of
+The :mod:`pibootctl.store` module defines classes which control a store of
 Raspberry Pi boot configurations, or the active boot configuration.
 
 The main class of interest is :class:`Store`. From an instance of this, one can
 access derivatives of :class:`BootConfiguration` for the purposes of
 manipulating the store of configurations, or the active boot configuration
 itself. Each :class:`BootConfiguration` contains an instance of
-:class:`Settings` which maps setting names to :class:`~pictl.setting.Setting`
-instances.
+:class:`Settings` which maps setting names to
+:class:`~pibootctl.setting.Setting` instances.
 
-See :class:`pictl.main` for information on obtaining the necessary
+See :class:`pibootctl.main` for information on obtaining the necessary
 configuration parameters for constructing a :class:`Store`.
 
 .. data:: Current
@@ -89,7 +89,7 @@ class Store(Mapping):
     configurations. For instance, to store the current boot configuration under
     the name "foo"::
 
-        >>> store = Store('/boot', 'pictl')
+        >>> store = Store('/boot', 'pibootctl')
         >>> store["foo"] = store[Current]
 
     Setting the item with the key :data:`Current` overwrites the current boot
@@ -132,7 +132,7 @@ class Store(Mapping):
     def _enumerate(self):
         for p in self._store_path.glob('*.zip'):
             with ZipFile(str(p), 'r') as arc:
-                if arc.comment.startswith(b'pictl:0:'):
+                if arc.comment.startswith(b'pibootctl:0:'):
                     yield p.stem
 
     def __len__(self):
@@ -153,7 +153,7 @@ class Store(Mapping):
         else:
             try:
                 with ZipFile(str(self._path_of(key)), 'r') as arc:
-                    if arc.comment.startswith(b'pictl:0:'):
+                    if arc.comment.startswith(b'pibootctl:0:'):
                         return True
             except (FileNotFoundError, BadZipFile):
                 return False
@@ -188,12 +188,12 @@ class Store(Mapping):
             self._store_path.mkdir(parents=True, exist_ok=True)
             with ZipFile(str(self._path_of(key)), 'x',
                          compression=ZIP_DEFLATED) as arc:
-                arc.comment = 'pictl:0:{hash}\n\n{warning}'.format(
+                arc.comment = 'pibootctl:0:{hash}\n\n{warning}'.format(
                     hash=item.hash, warning=_(
                         'Do not edit the content of this archive; the line '
                         'above is a hash of the content which will not match '
-                        'after manual editing. Please use the pictl tool to '
-                        'manipulate stored boot configurations'),
+                        'after manual editing. Please use the pibootctl tool '
+                        'to manipulate stored boot configurations'),
                 ).encode('ascii')
                 for file in item.files.values():
                     file.add_to_zip(arc)
@@ -330,7 +330,7 @@ class BootConfiguration:
     @property
     def files(self):
         """
-        A mapping of filenames to :class:`~pictl.parser.BootFile` instances
+        A mapping of filenames to :class:`~pibootctl.parser.BootFile` instances
         representing all the files that make up the boot configuration.
         """
         if self._files is None:
@@ -360,8 +360,9 @@ class StoredConfiguration(BootConfiguration):
         # We can grab the hash and timestamp from the arc's meta-data without
         # any decompression work (it's all in the uncompressed footer)
         comment = self.path.comment
-        if comment.startswith(b'pictl:0:'):
-            h = comment[8:48].decode('ascii')
+        if comment.startswith(b'pibootctl:0:'):
+            i = len('pibootctl:0:')
+            h = comment[i:40 + i].decode('ascii')
             if len(h) != 40:
                 raise ValueError(_(
                     'Invalid stored configuration: invalid length'))
@@ -374,9 +375,9 @@ class StoredConfiguration(BootConfiguration):
                 (datetime(*info.date_time) for info in self.path.infolist()),
                 default=datetime.fromtimestamp(0))
         else:
-            # TODO Should we allow "self-made" archives without a pictl
+            # TODO Should we allow "self-made" archives without a pibootctl
             # header comment? We can't currently reach here because the
-            # enumerate and contains tests check for pictl:0: but that
+            # enumerate and contains tests check for pibootctl:0: but that
             # could be relaxed...
             assert False, 'Invalid stored configuration: missing hash'
 
@@ -500,7 +501,7 @@ class MutableConfiguration(BootConfiguration):
 class Settings(Mapping):
     """
     Represents all settings in a boot configuration; acts like an ordered
-    mapping of names to :class:`~pictl.setting.Setting` objects.
+    mapping of names to :class:`~pibootctl.setting.Setting` objects.
     """
     def __init__(self, items=None):
         if items is None:

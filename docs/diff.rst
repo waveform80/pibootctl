@@ -2,7 +2,7 @@
 diff
 ====
 
-.. program:: pictl-diff
+.. program:: pibootctl-diff
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl diff [-h] [--json | --yaml | --shell] [left] right
+    pibootctl diff [-h] [--json | --yaml | --shell] [left] right
 
 
 Description
@@ -59,17 +59,17 @@ the command line), or between the current boot configuration and a stored one
 
 .. code-block:: console
 
-    $ sudo pictl save default
-    $ sudo pictl set video.hdmi0.group=1 video.hdmi0.mode=4
-    $ pictl diff default
+    $ sudo pibootctl save default
+    $ sudo pibootctl set video.hdmi0.group=1 video.hdmi0.mode=4
+    $ pibootctl diff default
     +-------------------+----------------+--------------------+
     | Name              | <Current>      | default            |
     |-------------------+----------------+--------------------|
     | video.hdmi0.group | 1 (CEA)        | 0 (auto from EDID) |
     | video.hdmi0.mode  | 4 (720p @60Hz) | 0 (auto from EDID) |
     +-------------------+----------------+--------------------+
-    $ sudo pictl save 720p
-    $ pictl diff default 720p
+    $ sudo pibootctl save 720p
+    $ pibootctl diff default 720p
     +-------------------+--------------------+----------------+
     | Name              | default            | 720p           |
     |-------------------+--------------------+----------------|
@@ -77,12 +77,12 @@ the command line), or between the current boot configuration and a stored one
     | video.hdmi0.mode  | 0 (auto from EDID) | 4 (720p @60Hz) |
     +-------------------+--------------------+----------------+
 
-For developers wishing to build on top of pictl, options are provided to
+For developers wishing to build on top of pibootctl, options are provided to
 produce the output in JSON (:option:`--json`), YAML (:option:`--yaml`), and
 shell-friendly (:option:`--shell`):
 
 .. code-block:: console
 
-    $ pictl diff --json default 720p
+    $ pibootctl diff --json default 720p
     {"video.hdmi0.mode": {"right": 4, "left": 0}, "video.hdmi0.group":
     {"right": 1, "left": 0}}

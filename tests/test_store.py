@@ -5,9 +5,9 @@ from datetime import datetime
 
 import pytest
 
-from pictl.parser import *
-from pictl.setting import *
-from pictl.store import *
+from pibootctl.parser import *
+from pibootctl.setting import *
+from pibootctl.store import *
 
 
 @pytest.fixture()
@@ -17,7 +17,7 @@ def boot_path(request, tmpdir):
 
 @pytest.fixture()
 def store_path(request, boot_path):
-    return boot_path / 'pictl'
+    return boot_path / 'pibootctl'
 
 
 def test_store_container(boot_path, store_path):
@@ -29,11 +29,11 @@ dtparam=spi=on
     store_path.mkdir()
     with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
-            z.comment = ('pictl:0:' + store[Current].hash).encode('ascii')
+            z.comment = ('pibootctl:0:' + store[Current].hash).encode('ascii')
             store[Current].files['config.txt'].add_to_zip(z)
     with (store_path / 'invalid.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
-            z.comment = ('pictl:999:' + store[Current].hash).encode('ascii')
+            z.comment = ('pibootctl:999:' + store[Current].hash).encode('ascii')
             store[Current].files['config.txt'].add_to_zip(z)
     assert len(store) == 3
     assert Current in store
@@ -54,19 +54,19 @@ dtparam=spi=on
     store_path.mkdir()
     with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
-            z.comment = b'pictl:badver:'
+            z.comment = b'pibootctl:badver:'
             z.writestr('config.txt', b'')
     with pytest.raises(KeyError):
         store['foo']
     with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
-            z.comment = b'pictl:0:badhash'
+            z.comment = b'pibootctl:0:badhash'
             z.writestr('config.txt', b'')
     with pytest.raises(ValueError):
         store['foo']
     with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
-            z.comment = b'pictl:0:' + b'h' * 40
+            z.comment = b'pibootctl:0:' + b'h' * 40
             z.writestr('config.txt', b'')
     with pytest.raises(ValueError):
         store['foo']
@@ -160,7 +160,7 @@ dtparam=spi=on
     store_path.mkdir()
     with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
-            z.comment = ('pictl:0:' + store[Current].hash).encode('ascii')
+            z.comment = ('pibootctl:0:' + store[Current].hash).encode('ascii')
             store[Current].files['config.txt'].add_to_zip(z)
     assert len(store) == 3
     assert store.active == 'foo'

@@ -2,7 +2,7 @@
 load
 ====
 
-.. program:: pictl-load
+.. program:: pibootctl-load
 
 
 Synopsis
@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-    pictl load [-h] [--no-backup] name
+    pibootctl load [-h] [--no-backup] name
 
 
 Description
@@ -48,9 +48,9 @@ command), an automatically named backup will be saved first:
 
 .. code-block:: console
 
-    $ sudo pictl save default
-    $ sudo pictl set video.hdmi0.group=1 video.hdmi0.mode=4
-    $ sudo pictl load default
+    $ sudo pibootctl save default
+    $ sudo pibootctl set video.hdmi0.group=1 video.hdmi0.mode=4
+    $ sudo pibootctl load default
     Backed up current configuration in backup-20200310-095646
 
 This can be avoided with the :option:`--no-backup` option.

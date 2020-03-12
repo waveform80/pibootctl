@@ -1,5 +1,5 @@
 """
-The :mod:`pictl.setting` module defines all the classes used to represent
+The :mod:`pibootctl.setting` module defines all the classes used to represent
 boot configuration settings:
 
 .. image:: images/setting_hierarchy.*
@@ -14,7 +14,7 @@ like :class:`CommandBool`, :class:`CommandInt`, etc.
 .. note::
 
     For the sake of brevity, only the generic classes defined in
-    :mod:`pictl.setting` are documented here. There are also specialization
+    :mod:`pibootctl.setting` are documented here. There are also specialization
     classes specific to individual settings define (for cases of complex
     inter-dependencies, e.g. how the Bluetooth enabled status affects the
     default serial UART).
@@ -179,10 +179,10 @@ class Setting:
     def extract(self, config):
         """
         Given a *config* which must be a sequence of
-        :class:`~pictl.parser.BootLine` items, yields each line that affects
-        the setting's value, and the new value that the line produces (or
-        :data:`None` indicating that the value is now, or is still, the default
-        state).
+        :class:`~pibootctl.parser.BootLine` items, yields each line that
+        affects the setting's value, and the new value that the line produces
+        (or :data:`None` indicating that the value is now, or is still, the
+        default state).
 
         .. note::
 

@@ -1,6 +1,6 @@
 import pytest
 
-from pictl.userstr import *
+from pibootctl.userstr import *
 
 
 def test_to_bool():

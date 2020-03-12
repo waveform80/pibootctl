@@ -2,13 +2,13 @@
 Installation
 ============
 
-If your distribution provides pictl then you should either find the utility
+If your distribution provides pibootctl then you should either find the utility
 is installed by default, or it should be installable via your package manager.
 For example:
 
 .. code-block:: console
 
-    $ sudo apt install pictl
+    $ sudo apt install pibootctl
 
 It is strongly recommended to use a provided package rather than installing
 from PyPI as this will include configuration specific to your distribution. The
@@ -17,22 +17,22 @@ instance:
 
 .. code-block:: console
 
-    $ sudo apt purge pictl
+    $ sudo apt purge pibootctl
 
 
 Configuration
 =============
 
-pictl looks for its configuration in three locations:
+pibootctl looks for its configuration in three locations:
 
-#. :file:`/lib/pictl/pictl.conf`
+#. :file:`/lib/pibootctl/pibootctl.conf`
 
-#. :file:`/etc/pictl.conf`
+#. :file:`/etc/pibootctl.conf`
 
-#. :file:`~/.config/pictl.conf`
+#. :file:`~/.config/pibootctl.conf`
 
-The last location is only intended for use by people developing pictl; for the
-vast majority of users the configuration should be provided by their
+The last location is only intended for use by people developing pibootctl; for
+the vast majority of users the configuration should be provided by their
 distribution in one of the first two locations.
 
 The configuration file is a straight-forward INI-style containing a single
@@ -42,12 +42,12 @@ section titled "defaults". A typical configuration file might look like this:
 
     [defaults]
     boot_path=/boot
-    store_path=pictl
+    store_path=pibootctl
     config_read=config.txt
     config_write=config.txt
     reboot_required=/var/run/reboot-required
     reboot_required_pkgs=/var/run/reboot-required.pkgs
-    package_name=pictl
+    package_name=pibootctl
     backup=on
 
 The configuration specifies several settings, but the most important are:
@@ -57,16 +57,16 @@ The configuration specifies several settings, but the most important are:
 
 ``store_path``
     The path under which to store saved boot configurations, relative to
-    ``boot_path`` (defaults to :file:`pictl`).
+    ``boot_path`` (defaults to :file:`pibootctl`).
 
 ``config_read``
     The "root" configuration file which is read first, relative to
     ``boot_path`` (defaults to :file:`config.txt`).
 
 ``config_write``
-    The configuration file which pictl is permitted to re-write (also defaults
-    to :file:`config.txt`). This is used in cases where the default
-    configuration includes several files. In this case, pictl needs to know
+    The configuration file which pibootctl is permitted to re-write (also
+    defaults to :file:`config.txt`). This is used in cases where the default
+    configuration includes several files. In this case, pibootctl needs to know
     which file it is allowed to re-write, and assume all other files are
     distribution maintained. This is also relative to ``boot_path``.
 

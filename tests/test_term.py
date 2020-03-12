@@ -2,7 +2,7 @@ import io
 import argparse
 from unittest import mock
 
-from pictl.term import *
+from pibootctl.term import *
 
 
 def test_term_is_dumb():
@@ -83,7 +83,7 @@ def test_error_handler_call(capsys):
 
 
 def test_term_pager(capsys, tmpdir):
-    with mock.patch('pictl.term.term_is_dumb') as dumb, \
+    with mock.patch('pibootctl.term.term_is_dumb') as dumb, \
             mock.patch('subprocess.Popen') as popen:
         dumb.return_value = True
         with pager():

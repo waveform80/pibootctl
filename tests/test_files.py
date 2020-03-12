@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from pictl.files import *
+from pibootctl.files import *
 
 
 def test_atomic_write_success(tmpdir):

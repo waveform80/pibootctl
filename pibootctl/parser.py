@@ -1,5 +1,5 @@
 """
-The :mod:`pictl.parser` module provides the :class:`BootParser` class for
+The :mod:`pibootctl.parser` module provides the :class:`BootParser` class for
 parsing the boot configuration of the Raspberry Pi.
 
 The output of this class consists of derivatives of :class:`BootLine`

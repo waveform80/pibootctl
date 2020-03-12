@@ -2,7 +2,7 @@
 Change log
 ==========
 
-.. currentmodule:: pictl
+.. currentmodule:: pibootctl
 
 
 Release 0.1 (2020-03-??)

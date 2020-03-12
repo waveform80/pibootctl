@@ -1,9 +1,9 @@
-=====
-pictl
-=====
+=========
+pibootctl
+=========
 
-pictl is a utility for querying and manipulating the boot configuration of a
-`Raspberry Pi`_. It is a relatively low level utility, and not intended to be
+pibootctl is a utility for querying and manipulating the boot configuration of
+a `Raspberry Pi`_. It is a relatively low level utility, and not intended to be
 as friendly (or as widely applicable) as ``raspi-config``. It provides a
 command line interface only, but does attempt to be useful as a basis for more
 advanced interfaces (by providing input and output in human-readable,
@@ -41,7 +41,7 @@ Links
 
 .. _Raspberry Pi: https://raspberrypi.org/
 .. _GPL v2: https://www.gnu.org/licenses/gpl-2.0.html
-.. _source code: https://github.com/waveform80/pictl
-.. _bug tracker: https://github.com/waveform80/pictl/issues
-.. _documentation: https://pictl.readthedocs.io/
-.. _downloaded: https://pypi.org/project/pictl
+.. _source code: https://github.com/waveform80/pibootctl
+.. _bug tracker: https://github.com/waveform80/pibootctl/issues
+.. _documentation: https://pibootctl.readthedocs.io/
+.. _downloaded: https://pypi.org/project/pibootctl

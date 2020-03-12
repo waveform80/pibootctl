@@ -2,7 +2,7 @@
 help
 ====
 
-.. program:: pictl-help
+.. program:: pibootctl-help
 
 
 Synopsis
@@ -10,16 +10,16 @@ Synopsis
 
 .. code-block:: text
 
-    pictl help [-h] [command | setting]
+    pibootctl help [-h] [command | setting]
 
 
 Description
 ===========
 
-With no arguments, displays the list of :command:`pictl` commands. If a command
-name is given, displays the description and options for the named command. If a
-setting name is given, displays the description and default value for that
-setting.
+With no arguments, displays the list of :command:`pibootctl` commands. If a
+command name is given, displays the description and options for the named
+command. If a setting name is given, displays the description and default value
+for that setting.
 
 
 Options
@@ -48,13 +48,13 @@ Usage
 =====
 
 The :command:`help` command is the default command, and thus will be invoked if
-:command:`pictl` is called with no other arguments. However it can also be used
-to retrieve help for specific commands:
+:command:`pibootctl` is called with no other arguments. However it can also be
+used to retrieve help for specific commands:
 
 .. code-block:: console
 
-    $ pictl help ls
-    usage: pictl list [-h] [--json | --yaml | --shell]
+    $ pibootctl help ls
+    usage: pibootctl list [-h] [--json | --yaml | --shell]
 
     List all stored boot configurations.
 
@@ -69,7 +69,7 @@ Alternatively, it can be used to describe settings:
 
 .. code-block:: console
 
-    $ pictl help boot.debug.enabled
+    $ pibootctl help boot.debug.enabled
           Name: boot.debug.enabled
        Default: off
     Command(s): start_debug, start_file, fixup_file
@@ -85,12 +85,12 @@ Alternatively, it can be used to describe settings:
     required.
 
 Finally, if you are more familiar with the "classic" boot configuration
-commands, it can be used to discover which :command:`pictl` settings correspond
-to those commands:
+commands, it can be used to discover which :command:`pibootctl` settings
+correspond to those commands:
 
 .. code-block:: console
 
-    $ pictl help start_file
+    $ pibootctl help start_file
     start_file is affected by the following settings:
 
     camera.enabled

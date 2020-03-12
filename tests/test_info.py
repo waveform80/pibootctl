@@ -1,6 +1,6 @@
 from unittest import mock
 
-from pictl.info import *
+from pibootctl.info import *
 
 
 def test_get_board_revision():

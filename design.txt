@@ -1,13 +1,13 @@
-pictl set <var=value>...
-pictl get
-pictl get --json
+pibootctl set <var=value>...
+pibootctl get
+pibootctl get --json
 
-pictl set i2c=on spi=on
-pictl get i2c
+pibootctl set i2c=on spi=on
+pibootctl get i2c
 
 Example output:
 
-$ pictl get
+$ pibootctl get
   Setting                        Value             Config
   =================              =====             ======
 x audio.enabled                  off               dtparam=audio
