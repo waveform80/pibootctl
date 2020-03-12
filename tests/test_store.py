@@ -238,7 +238,7 @@ def test_default_config(boot_path, store_path):
     default = store[Default]
     assert default.files == {}
     assert default.hash == 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
-    assert default.timestamp == datetime(1970, 1, 1, 1)
+    assert default.timestamp == datetime(1970, 1, 1)
 
 
 def test_settings_copy():

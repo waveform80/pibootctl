@@ -239,7 +239,7 @@ class DefaultConfiguration:
 
     @property
     def timestamp(self):
-        return datetime.fromtimestamp(0)  # UNIX epoch
+        return datetime(1970, 1, 1)  # UNIX epoch
 
     @property
     def settings(self):
@@ -373,7 +373,7 @@ class StoredConfiguration(BootConfiguration):
             # A stored archive can be empty, hence default= is required
             self._timestamp = max(
                 (datetime(*info.date_time) for info in self.path.infolist()),
-                default=datetime.fromtimestamp(0))
+                default=datetime(1970, 1, 1))
         else:
             # TODO Should we allow "self-made" archives without a pibootctl
             # header comment? We can't currently reach here because the

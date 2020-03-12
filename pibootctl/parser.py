@@ -352,7 +352,7 @@ class BootFile(namedtuple('Content', (
         """
         Class method for constructing an apparently empty :class:`BootFile`.
         """
-        return cls(filename, datetime.fromtimestamp(0), b'', encoding, errors)
+        return cls(filename, datetime(1970, 1, 1), b'', encoding, errors)
 
     def lines(self):
         """
@@ -457,7 +457,7 @@ class BootParser:
         """
         self._files.clear()
         self._hash = hashlib.sha1()
-        self._timestamp = datetime.fromtimestamp(0)  # UNIX epoch
+        self._timestamp = datetime(1970, 1, 1)  # UNIX epoch
         self._config = list(self._parse(filename))
 
     def add(self, filename, encoding=None, errors=None):
