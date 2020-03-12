@@ -30,11 +30,11 @@ dtparam=spi=on
     with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = ('pictl:0:' + store[Current].hash).encode('ascii')
-            store[Current].files[Path('config.txt')].add_to_zip(z)
+            store[Current].files['config.txt'].add_to_zip(z)
     with (store_path / 'invalid.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = ('pictl:999:' + store[Current].hash).encode('ascii')
-            store[Current].files[Path('config.txt')].add_to_zip(z)
+            store[Current].files['config.txt'].add_to_zip(z)
     assert len(store) == 3
     assert Current in store
     assert Default in store
@@ -98,7 +98,7 @@ hdmi_mode=4
     assert current.settings['video.hdmi0.mode'].value == 4
     assert current.settings['video.hdmi1.group'].value == 0
     assert current.settings['video.hdmi1.mode'].value == 0
-    assert current.files[Path('config.txt')].content == content
+    assert current.files['config.txt'].content == content
 
 
 def test_store_setitem(boot_path, store_path):
@@ -161,7 +161,7 @@ dtparam=spi=on
     with (store_path / 'foo.zip').open('wb') as f:
         with ZipFile(f, 'w') as z:
             z.comment = ('pictl:0:' + store[Current].hash).encode('ascii')
-            store[Current].files[Path('config.txt')].add_to_zip(z)
+            store[Current].files['config.txt'].add_to_zip(z)
     assert len(store) == 3
     assert store.active == 'foo'
 
@@ -175,7 +175,7 @@ dtparam=spi=on
     current = store[Current]
     mutable = current.mutable()
     mutable.update({'i2c.enabled': None, 'camera.enabled': True})
-    assert mutable.files[Path('config.txt')].content == b"""\
+    assert mutable.files['config.txt'].content == b"""\
 # This file is intended to contain system-made configuration changes. User
 # configuration changes should be placed in "usercfg.txt". Please refer to the
 # README file for a description of the various configuration files on the boot

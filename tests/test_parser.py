@@ -11,42 +11,42 @@ from pictl.parser import *
 
 
 def test_str():
-    assert str(BootSection(Path('config.txt'), 1, 'all')) == '[all]'
+    assert str(BootSection('config.txt', 1, 'all')) == '[all]'
     assert str(BootCommand(
-        Path('config.txt'), 1, 'initramfs', ('initrd.img', 'followkernel')
+        'config.txt', 1, 'initramfs', ('initrd.img', 'followkernel')
     )) == 'initramfs initrd.img followkernel'
-    assert str(BootCommand(Path('config.txt'), 1, 'hdmi_group', '1')) == 'hdmi_group=1'
-    assert str(BootCommand(Path('config.txt'), 1, 'hdmi_group', '2', 1)) == 'hdmi_group:1=2'
-    assert str(BootInclude(Path('config.txt'), 1, Path('syscfg.txt'))) == 'include syscfg.txt'
-    assert str(BootOverlay(Path('config.txt'), 1, 'foo')) == 'dtoverlay=foo'
-    assert str(BootParam(Path('config.txt'), 1, 'base', 'spi', 'on')) == 'dtparam=spi=on'
+    assert str(BootCommand('config.txt', 1, 'hdmi_group', '1')) == 'hdmi_group=1'
+    assert str(BootCommand('config.txt', 1, 'hdmi_group', '2', 1)) == 'hdmi_group:1=2'
+    assert str(BootInclude('config.txt', 1, 'syscfg.txt')) == 'include syscfg.txt'
+    assert str(BootOverlay('config.txt', 1, 'foo')) == 'dtoverlay=foo'
+    assert str(BootParam('config.txt', 1, 'base', 'spi', 'on')) == 'dtparam=spi=on'
 
 
 def test_repr():
-    assert repr(BootLine(Path('config.txt'), 2)) == (
-        "BootLine(path=PosixPath('config.txt'), lineno=2)")
-    assert repr(BootSection(Path('config.txt'), 1, 'all')) == (
-        "BootSection(path=PosixPath('config.txt'), lineno=1, section='all')")
+    assert repr(BootLine('config.txt', 2)) == (
+        "BootLine(path='config.txt', lineno=2)")
+    assert repr(BootSection('config.txt', 1, 'all')) == (
+        "BootSection(path='config.txt', lineno=1, section='all')")
     assert repr(BootCommand(
-        Path('config.txt'), 1, 'initramfs', ('initrd.img', 'followkernel')
+        'config.txt', 1, 'initramfs', ('initrd.img', 'followkernel')
     )) == (
-        "BootCommand(path=PosixPath('config.txt'), lineno=1, "
+        "BootCommand(path='config.txt', lineno=1, "
         "command='initramfs', params=('initrd.img', 'followkernel'), "
         "hdmi=None)"
     )
-    assert repr(BootCommand(Path('config.txt'), 1, 'hdmi_group', '1')) == (
-        "BootCommand(path=PosixPath('config.txt'), lineno=1, "
+    assert repr(BootCommand('config.txt', 1, 'hdmi_group', '1')) == (
+        "BootCommand(path='config.txt', lineno=1, "
         "command='hdmi_group', params='1', hdmi=None)")
-    assert repr(BootCommand(Path('config.txt'), 1, 'hdmi_group', '2', 1)) == (
-        "BootCommand(path=PosixPath('config.txt'), lineno=1, "
+    assert repr(BootCommand('config.txt', 1, 'hdmi_group', '2', 1)) == (
+        "BootCommand(path='config.txt', lineno=1, "
         "command='hdmi_group', params='2', hdmi=1)")
-    assert repr(BootInclude(Path('config.txt'), 1, Path('syscfg.txt'))) == (
-        "BootInclude(path=PosixPath('config.txt'), lineno=1, "
-        "include=PosixPath('syscfg.txt'))")
-    assert repr(BootOverlay(Path('config.txt'), 1, 'foo')) == (
-        "BootOverlay(path=PosixPath('config.txt'), lineno=1, overlay='foo')")
-    assert repr(BootParam(Path('config.txt'), 1, 'base', 'spi', 'on')) == (
-        "BootParam(path=PosixPath('config.txt'), lineno=1, overlay='base', "
+    assert repr(BootInclude('config.txt', 1, 'syscfg.txt')) == (
+        "BootInclude(path='config.txt', lineno=1, "
+        "include='syscfg.txt')")
+    assert repr(BootOverlay('config.txt', 1, 'foo')) == (
+        "BootOverlay(path='config.txt', lineno=1, overlay='foo')")
+    assert repr(BootParam('config.txt', 1, 'base', 'spi', 'on')) == (
+        "BootParam(path='config.txt', lineno=1, overlay='base', "
         "param='spi', value='on')")
 
 
@@ -60,10 +60,10 @@ dtoverlay=vc4-fkms-v3d
     p = BootParser(Path(str(tmpdir)))
     p.parse()
     assert p.config == [
-        BootCommand(Path('config.txt'), 2, 'kernel', 'vmlinuz', 0),
-        BootCommand(Path('config.txt'), 3, 'initramfs', ('initrd.img', 'followkernel')),
-        BootCommand(Path('config.txt'), 4, 'device_tree_address', '0x3000000', 0),
-        BootOverlay(Path('config.txt'), 5, 'vc4-fkms-v3d'),
+        BootCommand('config.txt', 2, 'kernel', 'vmlinuz', 0),
+        BootCommand('config.txt', 3, 'initramfs', ('initrd.img', 'followkernel')),
+        BootCommand('config.txt', 4, 'device_tree_address', '0x3000000', 0),
+        BootOverlay('config.txt', 5, 'vc4-fkms-v3d'),
     ]
 
 
@@ -88,15 +88,15 @@ dtoverlay=lirc-rpi:gpio_out_pin=16,gpio_in_pin=17,gpio_in_pull=down
     p = BootParser(Path(str(tmpdir)))
     p.parse()
     assert p.config == [
-        BootParam(Path('config.txt'), 1, 'base', 'audio', 'on'),
-        BootParam(Path('config.txt'), 1, 'base', 'i2c_arm', 'on'),
-        BootParam(Path('config.txt'), 1, 'base', 'i2c_arm_baudrate', '400000'),
-        BootParam(Path('config.txt'), 2, 'base', 'spi', 'on'),
-        BootParam(Path('config.txt'), 2, 'base', 'i2c_vc', 'on'),
-        BootOverlay(Path('config.txt'), 3, 'lirc-rpi'),
-        BootParam(Path('config.txt'), 3, 'lirc-rpi', 'gpio_out_pin', '16'),
-        BootParam(Path('config.txt'), 3, 'lirc-rpi', 'gpio_in_pin', '17'),
-        BootParam(Path('config.txt'), 3, 'lirc-rpi', 'gpio_in_pull', 'down'),
+        BootParam('config.txt', 1, 'base', 'audio', 'on'),
+        BootParam('config.txt', 1, 'base', 'i2c_arm', 'on'),
+        BootParam('config.txt', 1, 'base', 'i2c_arm_baudrate', '400000'),
+        BootParam('config.txt', 2, 'base', 'spi', 'on'),
+        BootParam('config.txt', 2, 'base', 'i2c_vc', 'on'),
+        BootOverlay('config.txt', 3, 'lirc-rpi'),
+        BootParam('config.txt', 3, 'lirc-rpi', 'gpio_out_pin', '16'),
+        BootParam('config.txt', 3, 'lirc-rpi', 'gpio_in_pin', '17'),
+        BootParam('config.txt', 3, 'lirc-rpi', 'gpio_in_pull', 'down'),
     ]
 
 
@@ -118,14 +118,14 @@ hdmi_mode=4
     p = BootParser(Path(str(tmpdir)))
     p.parse()
     assert p.config == [
-        BootSection(Path('config.txt'), 2, 'none'),
-        BootSection(Path('config.txt'), 5, 'all'),
-        BootOverlay(Path('config.txt'), 6, 'foo'),
-        BootInclude(Path('config.txt'), 7, Path('syscfg.txt')),
-        BootParam(Path('syscfg.txt'), 1, 'base', 'i2c_arm', 'on'),
-        BootParam(Path('syscfg.txt'), 2, 'base', 'spi', 'on'),
-        BootCommand(Path('syscfg.txt'), 4, 'hdmi_group', '1', 0),
-        BootCommand(Path('syscfg.txt'), 5, 'hdmi_mode', '4', 0),
+        BootSection('config.txt', 2, 'none'),
+        BootSection('config.txt', 5, 'all'),
+        BootOverlay('config.txt', 6, 'foo'),
+        BootInclude('config.txt', 7, 'syscfg.txt'),
+        BootParam('syscfg.txt', 1, 'base', 'i2c_arm', 'on'),
+        BootParam('syscfg.txt', 2, 'base', 'spi', 'on'),
+        BootCommand('syscfg.txt', 4, 'hdmi_group', '1', 0),
+        BootCommand('syscfg.txt', 5, 'hdmi_mode', '4', 0),
     ]
 
 
@@ -141,11 +141,11 @@ hdmi_mode=28
     p = BootParser(Path(str(tmpdir)))
     p.parse()
     assert p.config == [
-        BootCommand(Path('config.txt'), 2, 'hdmi_group', '1', 0),
-        BootCommand(Path('config.txt'), 3, 'hdmi_mode', '4', 0),
-        BootSection(Path('config.txt'), 5, 'HDMI:1'),
-        BootCommand(Path('config.txt'), 6, 'hdmi_group', '2', 1),
-        BootCommand(Path('config.txt'), 7, 'hdmi_mode', '28', 1),
+        BootCommand('config.txt', 2, 'hdmi_group', '1', 0),
+        BootCommand('config.txt', 3, 'hdmi_mode', '4', 0),
+        BootSection('config.txt', 5, 'HDMI:1'),
+        BootCommand('config.txt', 6, 'hdmi_group', '2', 1),
+        BootCommand('config.txt', 7, 'hdmi_mode', '28', 1),
     ]
 
 
@@ -158,9 +158,9 @@ hdmi_mode:a=4
     p = BootParser(Path(str(tmpdir)))
     p.parse()
     assert p.config == [
-        BootCommand(Path('config.txt'), 1, 'hdmi_group', '1', 0),
-        BootCommand(Path('config.txt'), 2, 'hdmi_mode', '4', 1),
-        BootCommand(Path('config.txt'), 3, 'hdmi_mode', '4', 0),
+        BootCommand('config.txt', 1, 'hdmi_group', '1', 0),
+        BootCommand('config.txt', 2, 'hdmi_mode', '4', 1),
+        BootCommand('config.txt', 3, 'hdmi_mode', '4', 0),
     ]
 
 
@@ -177,12 +177,12 @@ hdmi_mode=4
     p = BootParser(Path(str(tmpdir)))
     p.parse()
     assert p.config == [
-        BootSection(Path('config.txt'), 2, 'EDID=BNQ-BenQ_GW2270'),
-        BootCommand(Path('config.txt'), 3, 'hdmi_group', '1', 0),
-        BootCommand(Path('config.txt'), 4, 'hdmi_mode', '16', 0),
-        BootSection(Path('config.txt'), 6, 'EDID=VSC-TD2220'),
-        BootCommand(Path('config.txt'), 7, 'hdmi_group', '1', 0),
-        BootCommand(Path('config.txt'), 8, 'hdmi_mode', '4', 0),
+        BootSection('config.txt', 2, 'EDID=BNQ-BenQ_GW2270'),
+        BootCommand('config.txt', 3, 'hdmi_group', '1', 0),
+        BootCommand('config.txt', 4, 'hdmi_mode', '16', 0),
+        BootSection('config.txt', 6, 'EDID=VSC-TD2220'),
+        BootCommand('config.txt', 7, 'hdmi_group', '1', 0),
+        BootCommand('config.txt', 8, 'hdmi_mode', '4', 0),
     ]
 
 
@@ -194,8 +194,8 @@ dtparam=audio=on
     p = BootParser(Path(str(tmpdir)))
     p.parse()
     assert p.config == [
-        BootSection(Path('config.txt'), 2, 'gpio4=1'),
-        BootParam(Path('config.txt'), 3, 'base', 'audio', 'on'),
+        BootSection('config.txt', 2, 'gpio4=1'),
+        BootParam('config.txt', 3, 'base', 'audio', 'on'),
     ]
 
 
@@ -208,8 +208,8 @@ dtparam=audio=on
         p = BootParser(Path(str(tmpdir)))
         p.parse()
         assert p.config == [
-            BootSection(Path('config.txt'), 2, '0xwtf'),
-            BootParam(Path('config.txt'), 3, 'base', 'audio', 'on'),
+            BootSection('config.txt', 2, '0xwtf'),
+            BootParam('config.txt', 3, 'base', 'audio', 'on'),
         ]
 
 
@@ -221,8 +221,8 @@ dtparam=audio=on
     p = BootParser(Path(str(tmpdir)))
     p.parse()
     assert p.config == [
-        BootSection(Path('config.txt'), 2, 'foo'),
-        BootParam(Path('config.txt'), 3, 'base', 'audio', 'on'),
+        BootSection('config.txt', 2, 'foo'),
+        BootParam('config.txt', 3, 'base', 'audio', 'on'),
     ]
     assert len(recwarn) == 1
     assert recwarn.pop(BootInvalid)
@@ -238,8 +238,8 @@ dtparam=audio=on
         p = BootParser(Path(str(tmpdir)))
         p.parse()
         assert p.config == [
-            BootSection(Path('config.txt'), 2, '0xdeadd00d'),
-            BootParam(Path('config.txt'), 3, 'base', 'audio', 'on'),
+            BootSection('config.txt', 2, '0xdeadd00d'),
+            BootParam('config.txt', 3, 'base', 'audio', 'on'),
         ]
         get_board_serial.return_value = 0xdeadd00d
 
@@ -253,7 +253,7 @@ dtparam=audio=on
         p = BootParser(Path(str(tmpdir)))
         p.parse()
         assert p.config == [
-            BootSection(Path('config.txt'), 2, '0x12345678'),
+            BootSection('config.txt', 2, '0x12345678'),
         ]
 
 
@@ -271,10 +271,10 @@ kernel=uboot_4_32b.bin
         p = BootParser(Path(str(tmpdir)))
         p.parse()
         assert p.config == [
-            BootSection(Path('config.txt'), 2, 'pi2'),
-            BootSection(Path('config.txt'), 4, 'pi3'),
-            BootCommand(Path('config.txt'), 5, 'kernel', 'uboot_3_32b.bin', 0),
-            BootSection(Path('config.txt'), 6, 'pi4'),
+            BootSection('config.txt', 2, 'pi2'),
+            BootSection('config.txt', 4, 'pi3'),
+            BootCommand('config.txt', 5, 'kernel', 'uboot_3_32b.bin', 0),
+            BootSection('config.txt', 6, 'pi4'),
         ]
 
 
@@ -294,8 +294,8 @@ kernel=uboot_4_32b.bin
         p = BootParser(tmpdir)
         p.parse()
         assert p.files == {
-            Path('config.txt'): BootFile(
-                Path('config.txt'),
+            'config.txt': BootFile(
+                'config.txt',
                 datetime.fromtimestamp((tmpdir / 'config.txt').stat().st_mtime),
                 content, 'ascii', 'replace'
             )
@@ -323,9 +323,9 @@ dtoverlay=vc4-fkms-v3d
         p.parse()
         p.add('cmdline.txt')
         assert p.config == [
-            BootCommand(Path('config.txt'), 2, 'kernel', 'vmlinuz', 0),
-            BootCommand(Path('config.txt'), 3, 'device_tree_address', '0x3000000', 0),
-            BootOverlay(Path('config.txt'), 4, 'vc4-fkms-v3d'),
+            BootCommand('config.txt', 2, 'kernel', 'vmlinuz', 0),
+            BootCommand('config.txt', 3, 'device_tree_address', '0x3000000', 0),
+            BootOverlay('config.txt', 4, 'vc4-fkms-v3d'),
         ]
         assert p.hash == h.hexdigest().lower()
 
@@ -347,14 +347,14 @@ hdmi_mode=4
     p1.parse()
     p1.add('edid.dat')
     masked = p1.files.copy()
-    del masked[Path('syscfg.txt')]
+    del masked['syscfg.txt']
     p2 = BootParser(masked)
     p2.parse()
     p2.add('edid.dat')
     assert p2.config == [
-        BootSection(Path('config.txt'), 2, 'all'),
-        BootOverlay(Path('config.txt'), 3, 'foo'),
-        BootInclude(Path('config.txt'), 4, Path('syscfg.txt')),
+        BootSection('config.txt', 2, 'all'),
+        BootOverlay('config.txt', 3, 'foo'),
+        BootInclude('config.txt', 4, 'syscfg.txt'),
     ]
 
 

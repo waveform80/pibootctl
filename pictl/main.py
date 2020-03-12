@@ -35,7 +35,6 @@ import gettext
 import argparse
 import subprocess
 import configparser
-from pathlib import Path
 from datetime import datetime
 
 import pkg_resources
@@ -99,8 +98,6 @@ class Application:
         with pager():
             self.parser = self.get_parser()
             self.config = self.parser.parse_args(args)
-            self.config.store_path = (
-                self.config.boot_path / self.config.store_path)
             self.output = Output(
                 self.config.style if 'style' in self.config else 'user')
             self.store = Store(
@@ -160,10 +157,10 @@ class Application:
             '--version', action='version', version=pkg.version)
         parser.set_defaults(
             func=self.do_help,
-            boot_path=Path(config['boot_path']),
-            store_path=Path(config['store_path']),
-            config_read=Path(config['config_read']),
-            config_write=Path(config['config_write']),
+            boot_path=config['boot_path'],
+            store_path=config['store_path'],
+            config_read=config['config_read'],
+            config_write=config['config_write'],
             backup=config.getboolean('backup'),
             package_name=config['package_name'],
             reboot_required=config['reboot_required'],

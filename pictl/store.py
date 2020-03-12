@@ -81,7 +81,7 @@ class Store(Mapping):
     configurations. For instance, to store the current boot configuration under
     the name "foo"::
 
-        >>> store = Store(Path('/boot'), Path('pictl'))
+        >>> store = Store('/boot', 'pictl')
         >>> store["foo"] = store[Current]
 
     Setting the item with the key :data:`Current` overwrites the current boot
@@ -89,10 +89,10 @@ class Store(Mapping):
 
         >>> store[Current] = store["serial"]
 
-    Note that items retrieved from the store are ephemeral and modifying them
-    does *not* modify the content of the store. To modify the content of the
-    store, you must request a :meth:`~BootConfiguration.mutable` version of a
-    configuration (specifying which file to re-write within it), modify it, and
+    Note that items retrieved from the store are effectively immutable;
+    modifying them (even internally) does *not* modify the content of the
+    store. To modify the content of the store, you must request a
+    :meth:`~BootConfiguration.mutable` copy of a configuration, modify it, and
     assign it back::
 
         >>> foo = store["foo"].mutable()
@@ -107,13 +107,14 @@ class Store(Mapping):
 
     Items can be deleted to remove them from the store, with the obvious
     exception of the items with the keys :data:`Current` and :data:`Default`
-    which cannot be removed. Furthermore, the item with the key :data:`Default`
-    cannot be modified either.
+    which cannot be removed (attempting to do so will raise a :exc:`KeyError`).
+    Furthermore, the item with the key :data:`Default` cannot be modified
+    either.
     """
     def __init__(self, boot_path, store_path, config_read='config.txt',
                  config_write='config.txt'):
         self._boot_path = Path(boot_path)
-        self._store_path = Path(store_path)
+        self._store_path = self._boot_path / store_path
         self._config_read = config_read
         self._config_write = config_write
 
@@ -321,9 +322,8 @@ class BootConfiguration:
     @property
     def files(self):
         """
-        A mapping of :class:`~pathlib.Path` to :class:`~pictl.parser.BootFile`
-        instances representing all the files that make up the boot
-        configuration.
+        A mapping of filenames to :class:`~pictl.parser.BootFile` instances
+        representing all the files that make up the boot configuration.
         """
         if self._files is None:
             self._parse()
@@ -338,7 +338,8 @@ class BootConfiguration:
         so nothing is actually re-written until the updated mutable
         configuration is assigned back to something in the :class:`Store`.
         """
-        return MutableConfiguration(self, Path(self._rewrite))
+        return MutableConfiguration(self.files.copy(), self._filename,
+                                    self._rewrite)
 
 
 class StoredConfiguration(BootConfiguration):
@@ -416,8 +417,8 @@ class MutableConfiguration(BootConfiguration):
     constructed from a *base* :class:`BootConfiguration`, by calling
     :meth:`~BootConfiguration.mutable`.
 
-    Only one file in the configuration, specified by *rewrite* (a
-    :class:`~pathlib.Path`), is permitted to be re-written.
+    Only one file in the configuration, specified by *rewrite*, is permitted to
+    be re-written.
 
     Mutable configurations can be changed with the :meth:`update` method which
     will also validate the new configuration, and check that the settings were
@@ -427,10 +428,6 @@ class MutableConfiguration(BootConfiguration):
     resulting configuration must be assigned back to something in the
     :class:`Store` in order to re-write disk files.
     """
-    def __init__(self, base, rewrite):
-        super().__init__(base.files.copy(), base.filename)
-        self._rewrite = rewrite
-
     def update(self, values):
         """
         Given a mapping of setting names to new values, updates the values of

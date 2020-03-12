@@ -42,15 +42,13 @@ class BootLine:
 
     .. attribute:: path
 
-        A :class:`~pathlib.Path` indicating the path of the file containing the
-        line.
+        A :class:`str` indicating the path of the file containing the line.
 
     .. attribute:: lineno
 
         The 1-based line number of the line.
     """
     def __init__(self, path, lineno):
-        assert isinstance(path, Path)
         self.path = path
         self.lineno = lineno
 
@@ -156,11 +154,10 @@ class BootInclude(BootLine):
 
     .. attribute:: include
 
-        The :class:`~pathlib.Path` of the file to be included.
+        The name of the file to be included.
     """
     def __init__(self, path, lineno, include):
         super().__init__(path, lineno)
-        assert isinstance(include, Path)
         self.include = include
 
     def __eq__(self, other):
@@ -304,9 +301,9 @@ class BootFile(namedtuple('Content', (
 
     .. attribute:: filename
 
-        The :class:`~pathlib.Path` containing the file's path relative to
-        the boot configuration's container (whatever that may be: a path, a
-        zip archive, etc.)
+        A :class:`str` representing the file's path relative to the boot
+        configuration's container (whatever that may be: a path, a zip archive,
+        etc.)
 
     .. attribute:: timestamp
 
@@ -385,7 +382,8 @@ class BootParser:
     The *path* specifies the container of all files that make up the
     configuration. It be one of:
 
-    * a :class:`~pathlib.Path` in which case the path must be a directory
+    * a :class:`str` or a :class:`~pathlib.Path` in which case the path
+      specified must be a directory
 
     * a :class:`~zipfile.ZipFile`
 
@@ -394,6 +392,8 @@ class BootParser:
       files; effectively the output of :attr:`files` after parsing
     """
     def __init__(self, path):
+        if isinstance(path, str):
+            path = Path(path)
         assert isinstance(path, (Path, ZipFile, dict))
         if isinstance(path, Path):
             assert path.is_dir()
@@ -455,7 +455,6 @@ class BootParser:
         If parsing is successful, this will update the :attr:`files`,
         :attr:`hash`, :attr:`timestamp`, and :attr:`config` attributes.
         """
-        filename = Path(filename)
         self._files.clear()
         self._hash = hashlib.sha1()
         self._timestamp = datetime.fromtimestamp(0)  # UNIX epoch
@@ -475,7 +474,7 @@ class BootParser:
         Otherwise, the content of the file is assumed to be text and will be
         returned as a :class:`list` of :class:`str`.
         """
-        return self._open(Path(filename), encoding, errors)
+        return self._open(filename, encoding, errors)
 
     def _parse(self, filename):
         overlay = 'base'
@@ -518,7 +517,6 @@ class BootParser:
                             filename, lineno, cmd, value, hdmi=hdmi)
                 elif content.startswith('include'):
                     command, included = content.split(None, 1)
-                    included = Path(included)
                     yield BootInclude(filename, lineno, included)
                     yield from self._parse(included)
                 elif content.startswith('initramfs'):
