@@ -62,8 +62,16 @@ from .settings import SETTINGS
 _ = gettext.gettext
 
 
-Current = object()
-Default = object()
+class Current:
+    def __repr__(self):
+        return 'Current'
+Current = Current()
+
+
+class Default:
+    def __repr__(self):
+        return 'Default'
+Default = Default()
 
 
 class Store(Mapping):
