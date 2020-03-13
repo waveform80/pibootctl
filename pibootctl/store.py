@@ -179,6 +179,10 @@ class Store(Mapping):
             # TODO Sort content so config.txt is written last; this will allow
             # effectively atomic switches of configuration for systems using
             # os_prefix
+            # TODO What about empty config.txt? If it's not in the archive we
+            # leave the old config.txt lying around when we should delete it
+            # (and likewise for other configuration files). Should we always
+            # store an empty file as a sentinel for missing ones?
             for path, file in item.files.items():
                 with AtomicReplaceFile(self._boot_path / path) as temp:
                     temp.write(file.content)
