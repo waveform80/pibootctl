@@ -8,6 +8,17 @@ from datetime import datetime
 
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 info = pkginfo.Installed('pibootctl')
+if info.version is None:
+    # pkginfo prior to 1.5 seems broken (succeeds in construction, but doesn't
+    # contain any info); fall back to a horrific configparser hack...
+    import configparser
+    cfg = configparser.ConfigParser()
+    class Attr(dict):
+        __getattr__ = dict.__getitem__
+    assert cfg.read(('../setup.cfg',))
+    info = Attr(**cfg['metadata'])
+if info.version is None:
+    raise RuntimeError('Failed to load distro info')
 
 # -- General configuration ------------------------------------------------
 
@@ -25,7 +36,7 @@ templates_path = ['_templates']
 source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
 master_doc = 'index'
-project = info.package_name
+project = info.name
 copyright = '2019-%s %s' % (datetime.now().year, info.author)
 version = info.version
 release = info.version
@@ -81,7 +92,7 @@ html_static_path = ['_static']
 #html_show_copyright = True
 #html_use_opensearch = ''
 #html_file_suffix = None
-htmlhelp_basename = '%sdoc' % info.package_name
+htmlhelp_basename = '%sdoc' % info.name
 
 # Hack to make wide tables work properly in RTD
 # See https://github.com/snide/sphinx_rtd_theme/issues/117 for details
