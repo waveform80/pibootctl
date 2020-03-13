@@ -1,8 +1,3 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
-setup(
-    use_scm_version={
-        'version_scheme': 'post-release',
-        'local_scheme': 'dirty-tag'
-    }
-)
+setup()
