@@ -17,3 +17,4 @@ The API is split into several modules, documented in the following sections:
     api_parser
     api_setting
     api_store
+    api_userstr

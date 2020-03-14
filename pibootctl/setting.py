@@ -15,7 +15,7 @@ like :class:`CommandBool`, :class:`CommandInt`, etc.
 
     For the sake of brevity, only the generic classes defined in
     :mod:`pibootctl.setting` are documented here. There are also specialization
-    classes specific to individual settings define (for cases of complex
+    classes specific to individual settings defined (for cases of complex
     inter-dependencies, e.g. how the Bluetooth enabled status affects the
     default serial UART).
 
@@ -54,8 +54,11 @@ like :class:`CommandBool`, :class:`CommandInt`, etc.
 .. autoclass:: CommandMaskDummy
 
 .. autoclass:: CommandFilename
+    :members: filename
 
 .. autoclass:: CommandIncludedFile
+
+.. autoexception:: ValueWarning
 """
 
 import gettext
@@ -149,8 +152,9 @@ class Setting:
     def default(self):
         """
         The default value of this setting. The default may be sensitive to the
-        wider context of :class:`Settings` (i.e. the default of one setting
-        can change depending on the current value of other settings).
+        wider context of :class:`~pibootctl.store.Settings` (i.e. the default
+        of one setting can change depending on the current value of other
+        settings).
         """
         return self._default
 
@@ -213,16 +217,17 @@ class Setting:
     def validate(self):
         """
         Validates the setting within the context of the other
-        :class:`Settings`. Raises :exc:`ValueError` in the event that the
-        current value is invalid. May optionally use :exc:`ValueWarning` to
-        warn about dangerous or inappropriate configurations.
+        :class:`~pibootctl.store.Settings`. Raises :exc:`ValueError` in the
+        event that the current value is invalid. May optionally use
+        :exc:`ValueWarning` to warn about dangerous or inappropriate
+        configurations.
         """
-        pass
 
     def output(self):
         """
         Yields lines of configuration to represent the current state of the
-        setting, within the context of other :class:`Settings`.
+        setting, within the context of other
+        :class:`~pibootctl.store.Settings`.
         """
         raise NotImplementedError
 
@@ -1344,6 +1349,9 @@ class CommandDeviceTree(CommandFilename):
 
 
 class CommandDeviceTreeAddress(CommandIntHex):
+    """
+    Handles the ``device_tree_address`` command.
+    """
     @property
     def hint(self):
         if self.value == 0:
@@ -1391,6 +1399,10 @@ class CommandRamFSFilename(Command):
 
     @property
     def filename(self):
+        """
+        The list of full filenames represented by the value, after
+        concatenation with the value of "boot.prefix".
+        """
         prefix = self._query('boot.prefix').value
         return [prefix + item for item in self.value]
 
@@ -1436,6 +1448,10 @@ class CommandSerialEnabled(CommandBool):
 
 
 class OverlaySerialUART(Setting):
+    """
+    Handles deriving the default serial UART based on the enabled state of
+    Bluetooth (if present) and/or the presence of the miniuart-bt overlay.
+    """
     @property
     def default(self):
         if {'pi3', 'pi4', 'pi0w'} & get_board_types():
@@ -1793,6 +1809,9 @@ class CommandGPUMem(CommandInt):
 
 
 class CommandTVOut(CommandBool):
+    """
+    Handles the ``enable_tvout`` Pi4 command.
+    """
     @property
     def default(self):
         if 'pi4' in get_board_types():

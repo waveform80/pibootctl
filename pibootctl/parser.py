@@ -53,6 +53,8 @@ class BootLine:
         self.lineno = lineno
 
     def __eq__(self, other):
+        # These __eq__ implementations only really exist to make testing easier
+        # hence why there's no total_ordering or __ne__ implementations...
         return (
             isinstance(other, BootLine) and
             other.path == self.path and
@@ -113,8 +115,8 @@ class BootCommand(BootLine):
 
         The HDMI display that the command applies to. This is usually 0 unless
         the command has an explicit hdmi suffix (":" separated after the
-        :attr:`command` title but before the "="), or unless the command
-        appears in an [HDMI:1] section.
+        :attr:`command` title but before the "="), or the command appears in an
+        [HDMI:1] section.
     """
     def __init__(self, path, lineno, command, params, hdmi=None):
         super().__init__(path, lineno)

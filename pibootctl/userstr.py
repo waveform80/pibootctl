@@ -1,3 +1,25 @@
+"""
+The :mod:`pibootctl.userstr` module provides the :class:`UserStr` class which
+represents unparsed user input on the command line.
+
+The module also provides a variety of functions for converting input (either
+from JSON, YAML, or other structured formats, or from unparsed
+:class:`UserStr`) into common types (:func:`to_bool`, :func:`to_int`,
+:func:`to_str`, etc).
+
+.. autoclass:: UserStr
+
+.. autofunction:: to_bool
+
+.. autofunction:: to_int
+
+.. autofunction:: to_float
+
+.. autofunction:: to_str
+
+.. autofunction:: to_list
+"""
+
 import gettext
 
 _ = gettext.gettext
