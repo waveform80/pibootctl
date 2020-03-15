@@ -275,9 +275,11 @@ class BootConfiguration:
         parser.parse(self._filename)
         self._settings = Settings()
         for setting in self._settings.values():
+            lines = []
             for item, value in setting.extract(parser.config):
                 setting._value = value
-                # TODO track the config items affecting the setting
+                lines.append(item)
+            setting._lines = tuple(lines)
         for setting in self._settings.values():
             if isinstance(setting, CommandIncludedFile):
                 parser.add(setting.filename)
@@ -417,9 +419,23 @@ class IneffectiveConfiguration(ValueError):
 
     def __str__(self):
         return _(
-            "Failed to set {count:d} setting(s):\n{settings}").format(
-                count=len(self.settings),
+            "Failed to set:\n{settings}").format(
                 settings='\n'.join(s.name for s in self.settings))
+
+
+class MissingInclude(ValueError):
+    """
+    Error raised when the file that's re-written by pibootctl isn't included in
+    the configuration.
+    """
+    def __init__(self, rewrite):
+        super().__init__()
+        self.rewrite = rewrite
+
+    def __str__(self):
+        return _(
+            "{rewrite} was not included in the new configuration").format(
+                rewrite=self.rewrite)
 
 
 class MutableConfiguration(BootConfiguration):
@@ -450,6 +466,7 @@ class MutableConfiguration(BootConfiguration):
         for name, value in values.items():
             item = self.settings[name]
             item._value = item.update(value)
+            item._lines = ()
 
         # Validate the new configuration; aggregate all exceptions for the
         # user's convenience
@@ -495,7 +512,8 @@ class MutableConfiguration(BootConfiguration):
 
         # Check whether any settings were overridden by files later than the
         # _rewrite file
-        # TODO Check whether *rewrite* was ever read (should appear in files)
+        if self._rewrite not in self.files:
+            raise MissingInclude(self._rewrite)
         diff = updated.diff(self.settings)
         if diff:
             raise IneffectiveConfiguration([

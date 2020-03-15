@@ -222,7 +222,7 @@ dtparam=i2c=on
         mutable.update({'i2c.enabled': None})
     assert len(exc_info.value.settings) == 1
     assert str(exc_info.value) == """\
-Failed to set 1 setting(s):
+Failed to set:
 i2c.enabled"""
 
 

@@ -108,6 +108,7 @@ class Setting:
         self._default = default
         self._value = None
         self._doc = dedent(doc).format(name=name, default=default)
+        self._lines = ()
 
     def __repr__(self):
         return (
@@ -167,6 +168,15 @@ class Setting:
         # Must use self.default here, not self._default as descendents may
         # calculate more complex defaults
         return self.default if self._value is None else self._value
+
+    @property
+    def lines(self):
+        """
+        Returns the :class:`~pibootctl.parser.BootLine` items which affected
+        the value of the setting, in the order they were encountered while
+        parsing.
+        """
+        return self._lines
 
     @property
     def hint(self):
