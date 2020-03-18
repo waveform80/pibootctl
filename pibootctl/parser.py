@@ -251,12 +251,20 @@ class BootParam(BootLine):
 
 
 class BootFilter:
+    """
+    Represents the current state of conditional filters during parsing. This
+    class is only used internally by :class:`BootParser`.
+    """
     def __init__(self):
         self.pi = True
         self.hdmi = 0
         self.serial = True
 
     def evaluate(self, section):
+        """
+        Calculates the new state of the filter from the specified *section*
+        criteria.
+        """
         # Derived from information at:
         # https://www.raspberrypi.org/documentation/configuration/config-txt/conditional.md
         if section == 'all':
@@ -288,16 +296,20 @@ class BootFilter:
 
     @property
     def enabled(self):
+        """
+        Returns :data:`True` if parsed items are currently effective. If this
+        is :data:`False`, parsed items are ignored.
+        """
         return self.pi and self.serial
 
 
 class BootFile(namedtuple('Content', (
-    'filename',
-    'timestamp',
-    'content',
-    'encoding',
-    'errors'
-))):
+        'filename',
+        'timestamp',
+        'content',
+        'encoding',
+        'errors'
+    ))):
     """
     Represents a file in a boot configuration.
 

@@ -13,8 +13,13 @@ The API is split into several modules, documented in the following sections:
 .. toctree::
     :maxdepth: 1
 
+    api_files
+    api_formatter
+    api_info
     api_main
     api_parser
     api_setting
+    api_settings
     api_store
+    api_term
     api_userstr

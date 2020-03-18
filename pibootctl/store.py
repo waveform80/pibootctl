@@ -43,14 +43,11 @@ configuration parameters for constructing a :class:`Store`.
 
 import os
 import gettext
-import tempfile
 from weakref import ref
 from pathlib import Path
 from copy import deepcopy
-from textwrap import dedent
 from fnmatch import fnmatch
 from datetime import datetime
-from collections import OrderedDict
 from collections.abc import Mapping
 from zipfile import ZipFile, BadZipFile, ZIP_DEFLATED
 
@@ -63,12 +60,14 @@ _ = gettext.gettext
 
 
 class Current:
+    "Singleton representing the active boot configuration in :class:`Store`."
     def __repr__(self):
         return 'Current'
 Current = Current()
 
 
 class Default:
+    "Singleton representing the default boot configuration in :class:`Store`."
     def __repr__(self):
         return 'Default'
 Default = Default()
@@ -130,10 +129,10 @@ class Store(Mapping):
         return (self._store_path / name).with_suffix('.zip')
 
     def _enumerate(self):
-        for p in self._store_path.glob('*.zip'):
-            with ZipFile(str(p), 'r') as arc:
+        for path in self._store_path.glob('*.zip'):
+            with ZipFile(str(path), 'r') as arc:
                 if arc.comment.startswith(b'pibootctl:0:'):
-                    yield p.stem
+                    yield path.stem
 
     def __len__(self):
         # +2 for the current and default configs
@@ -153,8 +152,7 @@ class Store(Mapping):
         else:
             try:
                 with ZipFile(str(self._path_of(key)), 'r') as arc:
-                    if arc.comment.startswith(b'pibootctl:0:'):
-                        return True
+                    return arc.comment.startswith(b'pibootctl:0:')
             except (FileNotFoundError, BadZipFile):
                 return False
 
@@ -226,6 +224,7 @@ class Store(Mapping):
                 stored = self[key]
                 if stored.hash == current.hash:
                     return key
+        return None
 
 
 class DefaultConfiguration:
@@ -235,18 +234,34 @@ class DefaultConfiguration:
     """
     @property
     def files(self):
+        """
+        A mapping of filenames to :class:`~pibootctl.parser.BootFile` instances
+        representing all the files that make up the boot configuration.
+        """
         return {}
 
     @property
     def hash(self):
+        """
+        The SHA1 hash that identifies the boot configuration. This is obtained
+        by hashing the files of the boot configuration in parsing order.
+        """
         return 'da39a3ee5e6b4b0d3255bfef95601890afd80709'  # empty sha1
 
     @property
     def timestamp(self):
+        """
+        The last modified timestamp of the boot configuration, as a
+        :class:`~datetime.datetime`.
+        """
         return datetime(1970, 1, 1)  # UNIX epoch
 
     @property
     def settings(self):
+        """
+        A :class:`Settings` instance containing all the settings extracted from
+        the boot configuration.
+        """
         return Settings()
 
 
@@ -368,14 +383,14 @@ class StoredConfiguration(BootConfiguration):
         comment = self.path.comment
         if comment.startswith(b'pibootctl:0:'):
             i = len('pibootctl:0:')
-            h = comment[i:40 + i].decode('ascii')
-            if len(h) != 40:
+            zip_hash = comment[i:40 + i].decode('ascii')
+            if len(zip_hash) != 40:
                 raise ValueError(_(
                     'Invalid stored configuration: invalid length'))
-            if not set(h) <= set('0123456789abcdef'):
+            if not set(zip_hash) <= set('0123456789abcdef'):
                 raise ValueError(_(
                     'Invalid stored configuration: non-hex hash'))
-            self._hash = h
+            self._hash = zip_hash
             # A stored archive can be empty, hence default= is required
             self._timestamp = max(
                 (datetime(*info.date_time) for info in self.path.infolist()),
@@ -599,14 +614,12 @@ class Settings(Mapping):
         given as :data:`None`.
         """
         return {
-            (setting, other[setting.name]
-                      if setting.name in other else
-                      None)
+            (setting, other[setting.name] if setting.name in other else None)
             for setting in self.values()
             if setting.name not in other or
             other[setting.name].value != setting.value
         } | {
-            (None, setting)
+            (None, other[name])
             for name in other
             if name not in self
         }

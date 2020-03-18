@@ -1,3 +1,16 @@
+"""
+The :mod:`pibootctl.settings` module defines the template of all settings
+stored by the :class:`pibootctl.store.Settings` class. Users of the API never
+have any need for this module, but developers wishing to extend the set of
+settings will need to modify the :data:`SETTINGS` set.
+
+.. data:: SETTINGS
+
+    A :class:`dict` mapping setting names to :class:`pibootctl.setting.Setting`
+    instances which represents the complete set of settings that the
+    application handles.
+"""
+
 import gettext
 
 from . import setting
@@ -387,6 +400,7 @@ SETTINGS = {
             setting must be set when this is non-zero.
             """)),
     setting.CommandDisplayMode(
+        # TODO Numbered lists...
         'video.dpi.mode', command='dpi_mode', doc=_(
             """
             Defines which mode will be used for DPI LCD output. This defaults
@@ -412,7 +426,6 @@ SETTINGS = {
             [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
             [2]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
             """)),
-            # XXX Numbered lists...
     setting.CommandDisplayTimings(
         'video.dpi.timings', command='dpi_timings', doc=_(
             """
@@ -1171,6 +1184,7 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
             video.hdmi{index}.mode setting must be set when this is non-zero.
             """)),
     setting.CommandDisplayMode(
+        # TODO Numbered lists...
         'video.hdmi{}.mode'.format(hdmi), index=hdmi, command='hdmi_mode',
         doc=_(
             """
@@ -1197,7 +1211,6 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
             [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
             [2]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
             """)),
-            # XXX Numbered lists...
     setting.CommandInt(
         'video.hdmi{}.encoding'.format(hdmi), index=hdmi,
         command='hdmi_pixel_encoding', valid={

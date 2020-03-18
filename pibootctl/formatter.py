@@ -1,9 +1,222 @@
+"""
+The :mod:`pibootctl.formatter` module contains some generic text formatting
+routines, including the :class:`TableWrapper` class (akin to
+:class:`~textwrap.TextWrapper` but specific to table output), :class:`TransMap`
+for partially formatting templates, and the :func:`render` function: a crude
+markup renderer.
+
+.. autoclass:: TableWrapper
+
+.. data:: pretty_table
+
+    Uses simple ASCII characters to produce a typical "box-like" table
+    appearance::
+
+        >>> from pibootctl.formatter import *
+        >>> wrapper = TableWrapper(width=80, **pretty_table)
+        >>> data = [
+        ... ('Name', 'Length', 'Position'),
+        ... ('foo', 3, 1),
+        ... ('bar', 3, 2),
+        ... ('baz', 3, 3),
+        ... ('quux', 4, 4)]
+        >>> print(wrapper.fill(data))
+        +------+--------+----------+
+        | Name | Length | Position |
+        |------+--------+----------|
+        | foo  | 3      | 1        |
+        | bar  | 3      | 2        |
+        | baz  | 3      | 3        |
+        | quux | 4      | 4        |
+        +------+--------+----------+
+
+.. data:: curvy_table
+
+    Uses simple ASCII characters to produce a "round-edged" table appearance::
+
+        >>> from pibootctl.formatter import *
+        >>> wrapper = TableWrapper(width=80, **curvy_table)
+        >>> data = [
+        ... ('Name', 'Length', 'Position'),
+        ... ('foo', 3, 1),
+        ... ('bar', 3, 2),
+        ... ('baz', 3, 3),
+        ... ('quux', 4, 4)]
+        >>> print(wrapper.fill(data))
+        ,------+--------+----------.
+        | Name | Length | Position |
+        |------+--------+----------|
+        | foo  | 3      | 1        |
+        | bar  | 3      | 2        |
+        | baz  | 3      | 3        |
+        | quux | 4      | 4        |
+        `------+--------+----------'
+
+.. data:: unicode_table
+
+    Uses unicode box-drawing characters to produce a typical "box-like" table
+    appearance::
+
+        >>> from pibootctl.formatter import *
+        >>> wrapper = TableWrapper(width=80, **unicode_table)
+        >>> data = [
+        ... ('Name', 'Length', 'Position'),
+        ... ('foo', 3, 1),
+        ... ('bar', 3, 2),
+        ... ('baz', 3, 3),
+        ... ('quux', 4, 4)]
+        >>> print(wrapper.fill(data))
+        ┌──────┬────────┬──────────┐
+        │ Name │ Length │ Position │
+        ├──────┼────────┼──────────┤
+        │ foo  │ 3      │ 1        │
+        │ bar  │ 3      │ 2        │
+        │ baz  │ 3      │ 3        │
+        │ quux │ 4      │ 4        │
+        └──────┴────────┴──────────┘
+
+.. data:: curvy_unicode_table
+
+    Uses unicode box-drawing characters to produce a "round-edged" table
+    appearance::
+
+        >>> from pibootctl.formatter import *
+        >>> wrapper = TableWrapper(width=80, **curvy_unicode_table)
+        >>> data = [
+        ... ('Name', 'Length', 'Position'),
+        ... ('foo', 3, 1),
+        ... ('bar', 3, 2),
+        ... ('baz', 3, 3),
+        ... ('quux', 4, 4)]
+        >>> print(wrapper.fill(data))
+        ╭──────┬────────┬──────────╮
+        │ Name │ Length │ Position │
+        ├──────┼────────┼──────────┤
+        │ foo  │ 3      │ 1        │
+        │ bar  │ 3      │ 2        │
+        │ baz  │ 3      │ 3        │
+        │ quux │ 4      │ 4        │
+        ╰──────┴────────┴──────────╯
+
+.. autoclass:: TransMap
+
+.. autoclass:: FormatDict
+
+.. autofunction:: render
+"""
+
 from bisect import bisect
 from textwrap import dedent, TextWrapper
 from itertools import islice, zip_longest, chain, tee
 
 
 class TableWrapper:
+    """
+    Similar to :class:`~textwrap.TextWrapper`, this class provides facilities
+    for wrapping text to a particular width, but with a focus on table-based
+    output.
+
+    The constructor takes numerous arguments, but typically you don't need to
+    specify them all (or at all). A series of dictionaries are provided with
+    "common" configurations: :data:`pretty_table`, :data:`curvy_table`,
+    :data:`unicode_table`, and :data:`curvy_unicode_table`. For example::
+
+        >>> from pibootctl.formatter import *
+        >>> wrapper = TableWrapper(width=80, **curvy_table)
+        >>> data = [
+        ... ('Name', 'Length', 'Position'),
+        ... ('foo', 3, 1),
+        ... ('bar', 3, 2),
+        ... ('baz', 3, 3),
+        ... ('quux', 4, 4)]
+        >>> print(wrapper.fill(data))
+        ,------+--------+----------.
+        | Name | Length | Position |
+        |------+--------+----------|
+        | foo  | 3      | 1        |
+        | bar  | 3      | 2        |
+        | baz  | 3      | 3        |
+        | quux | 4      | 4        |
+        `------+--------+----------'
+
+    The :class:`TableWrapper` instance attributes (and keyword arguments to
+    the constructor) are as follows:
+
+    .. attribute:: width
+
+        (default 70) The maximum number of characters that the table can take
+        up horizontally. :class:`TableWrapper` guarantees that no output line
+        will be longer than :attr:`width` characters.
+
+    .. attribute:: header_rows
+
+        (default 1) The number of rows at the top of the table that will be
+        separated from the following rows by a horizontal border
+        (:attr:`internal_line`).
+
+    .. attribute:: footer_rows
+
+        (default 0) The number of rows at the bottom of the table that will be
+        separated from the preceding rows by a horizontal border
+        (:attr:`internal_line`).
+
+    .. attribute:: cell_separator
+
+        (default ``' '``) The string used to separate columns of cells.
+
+    .. attribute:: internal_line
+
+        (default ``'-'``) The string used to draw horizontal lines inside the
+        table for :attr:`header_rows` and :attr:`footer_rows`.
+
+    .. attribute:: internal_separator
+
+        (default ``' '``) The string used within runs of :attr:`internal_line`
+        to separate columns.
+
+    .. attribute:: borders
+
+        (default ``('', '', '', '')``) A 4-tuple of strings which specify the
+        characters used to create the left, top, right, and bottom borders of
+        the table respectively.
+
+    .. attribute:: corners
+
+        (default ``('', '', '', '')``) A 4-tuple of strings which specify the
+        characters used for the top-left, top-right, bottom-right, and
+        bottom-left corners of the table respectively.
+
+    .. attribute:: internal_borders
+
+        (default ``('', '', '', '')``) A 4-tuple of strings which specify the
+        characters used to interrupt runs of the :attr:`borders` characters
+        to draw row and column separators. Like :attr:`borders` these are the
+        left, top, right, and bottom characters respectively.
+
+    .. attribute:: align
+
+        A callable accepting three parameters: 0-based row index, 0-based
+        column index, and the cell data. The callable must return a character
+        indicating the intended alignment of data within the cell. "<" for
+        left justification, "^" for centered alignment, and ">" for right
+        justification (as in :meth:`str.format`). The default is to left align
+        everything.
+
+    .. attribute:: format
+
+        A callable accepting three parameters: 0-based row index, 0-based
+        column index, and the cell data. The callable must return the desired
+        string representation of the cell data. The default simply calls
+        :class:`str` on everything.
+
+    :class:`TableWrapper` also provides similar public methods to
+    :class:`~textwrap.TextWrapper`:
+
+    .. automethod:: wrap
+
+    .. automethod:: fill
+    """
+
     def __init__(self, width=70, header_rows=1, footer_rows=0,
                  cell_separator=' ', internal_line='-', internal_separator=' ',
                  borders=('', '', '', ''), corners=('', '', '', ''),
@@ -25,13 +238,19 @@ class TableWrapper:
         self.corners = tuple(corners)
         self.internal_borders = tuple(internal_borders)
         if align is None:
-            align = lambda data: '<'
+            align = lambda row, col, data: '<'
         self.align = align
         if format is None:
-            format = lambda data: str(data)
+            format = lambda row, col, data: str(data)
         self.format = format
 
     def fit_widths(self, widths):
+        """
+        Internal method which, given the sequence of *widths* (the calculated
+        maximum width of each column), reduces those widths until they fit in
+        the specified :attr:`width` limit, taking into account the implied
+        width of column separators, borders, etc.
+        """
         min_width = sum((
             len(self.borders[0]),
             len(self.borders[2]),
@@ -71,34 +290,43 @@ class TableWrapper:
         return [w for i, w in sorted((i, w) for w, i in widths)]
 
     def wrap_lines(self, data, widths):
+        """
+        Internal method responsible for wrapping the contents of each cell in
+        each row in *data* to the specified column *widths*.
+        """
         # Construct wrappers for each column width
         wrappers = [TextWrapper(width=width) for width in widths]
-        for row in data:
-            aligns = [self.align(cell) for cell in row]
+        for y, row in enumerate(data):
+            aligns = [self.align(y, x, cell) for x, cell in enumerate(row)]
             # Construct a list of wrapped lines for each cell in the row; these
             # are not necessarily of equal length (hence zip_longest below)
             cols = [
-                wrapper.wrap(self.format(cell))
-                for cell, wrapper in zip(row, wrappers)
+                wrapper.wrap(self.format(y, x, cell))
+                for x, (cell, wrapper) in enumerate(zip(row, wrappers))
             ]
             for line in zip_longest(*cols, fillvalue=''):
                 yield (
                     self.borders[0] +
                     self.cell_separator.join(
-                    '{cell:{align}{width}}'.format(
-                        cell=cell, align=align, width=width)
-                    for align, width, cell in zip(aligns, widths, line)) +
+                        '{cell:{align}{width}}'.format(
+                            cell=cell, align=align, width=width)
+                        for align, width, cell in zip(aligns, widths, line)) +
                     self.borders[2]
                 )
 
     def generate_lines(self, data):
+        """
+        Internal method which, given a sequence of rows of tuples in *data*,
+        uses :meth:`fit_widths` to calculate the maximum possible column
+        widths, and :meth:`wrap_lines` to wrap the text in *data* to the
+        calculated widths, yielding rows of strings to the caller.
+        """
         widths = [
-            max(1, max(len(self.format(item)) for item in row))
-            for row in zip(*data)  # transpose
+            max(1, max(len(
+                self.format(y, x, item)) for x, item in enumerate(row)))
+            for y, row in enumerate(zip(*data))  # transpose
         ]
         widths = self.fit_widths(widths)
-        int_width = sum(widths) + len(self.cell_separator) * (len(widths) - 1)
-        borders = []
         lines = iter(data)
         if self.borders[1]:
             yield (
@@ -135,9 +363,22 @@ class TableWrapper:
             )
 
     def wrap(self, data):
+        """
+        Wraps the table *data* returning a list of output lines without final
+        newlines. *data* must be a sequence of row tuples, each of which is
+        assumed to be the same length.
+
+        If the current :attr:`width` does not permit at least a single
+        character per column (after taking account of the width of borders,
+        internal separators, etc.) then :exc:`ValueError` will be raised.
+        """
         return list(self.generate_lines(data))
 
     def fill(self, data):
+        """
+        Wraps the table *data* returning a string containing the wrapped
+        output.
+        """
         return '\n'.join(self.wrap(data))
 
 
@@ -167,8 +408,11 @@ curvy_unicode_table = unicode_table.copy()
 curvy_unicode_table['corners'] = ('╭─', '─╮', '─╯', '╰─')
 
 
-def pairwise(it):
-    a, b = tee(it)
+def pairwise(iterable):
+    """
+    Taken from the recipe in the documentation for :mod:`itertools`.
+    """
+    a, b = tee(iterable)
     next(b, None)
     return zip(a, b)
 
@@ -265,6 +509,28 @@ class TransMap:
 
 
 class FormatDict:
+    """
+    Used to format *data*, a :class:`dict`, as a table in a format acceptable
+    as input to the :func:`render` function. The *key_title* and *value_title*
+    strings provide the cells for the single header row.
+
+    This class is intended to be used within a string for :meth:`str.format`.
+    For example::
+
+        >>> from pibootctl.formatter import FormatDict
+        >>> d = {'foo': 100, 'bar': 200}
+        >>> print('An example table:\\n\\n{table}'.format(table=FormatDict(d)))
+        An example table:
+
+        | Key | Value |
+        | foo | 100 |
+        | bar | 200 |
+
+    Note that, in Python versions before 3.7, you may need to use
+    :class:`collections.OrderedDict` to ensure output of the elements of *data*
+    in a particular order.
+    """
+
     def __init__(self, data, key_title='Key', value_title='Value'):
         self.data = data
         self.key_title = key_title
@@ -289,8 +555,9 @@ class FormatDict:
 
 
 def lex(text):
-    state = 'blank'
-    rows = []
+    """
+    Internal function which acts as the lexer for :func:`render`.
+    """
     for line in text.splitlines() + ['']:
         line = line.rstrip()
         if line.startswith('|') and line.endswith('|'):
@@ -306,6 +573,9 @@ def lex(text):
 
 
 def parse(text):
+    """
+    Internal function which acts as the parser for :func:`render`.
+    """
     state = 'break'
     for token, s in lex(text):
         if state == 'break':

@@ -1,3 +1,30 @@
+"""
+The :mod:`pibootctl.files` module contains the :class:`AtomicReplaceFile`
+context manager, used to "safely" replace files by writing to a temporary
+file in the same directory, then moving the result over the target if no
+exception occurs within the block. The result is that external processes either
+see the "old" state of the file, or the "new" state, but nothing in between::
+
+    >>> from pathlib import Path
+    >>> from pibootctl.files import AtomicReplaceFile
+    >>> foo = Path('foo.txt')
+    >>> foo.write_text('foo')
+    >>> foo.read_text()
+    'foo'
+    >>> with AtomicReplaceFile(foo, encoding='ascii') as f:
+    ...     f.write('bar')
+    ...     raise Exception('something went wrong!')
+    ...
+    3
+    Traceback (most recent call last):
+      File "<stdin>", line 3, in <module>
+    Exception: something went wrong!
+    >>> foo.read_text()
+    'foo'
+
+.. autoclass:: AtomicReplaceFile
+"""
+
 import os
 import tempfile
 import threading
@@ -27,7 +54,7 @@ class AtomicReplaceFile:
     """
     A context manager for atomically replacing a target file.
 
-    Uses :class:`tempfile.NamedTemporaryFile` to construct a temporary file in
+    Uses :func:`tempfile.NamedTemporaryFile` to construct a temporary file in
     the same directory as the target file. The associated file-like object is
     returned as the context manager's variable; you should write the content
     you wish to this object.
@@ -38,18 +65,20 @@ class AtomicReplaceFile:
     the context manager's block, the temporary file will be deleted leaving the
     original target file unaffected and the exception will be re-raised.
 
-    :param pathlib.Path path:
+    :type path: str or pathlib.Path
+    :param path:
         The full path and filename of the target file. This is expected to be
         an absolute path.
 
     :param str encoding:
-        If ``None`` (the default), the temporary file will be opened in binary
-        mode. Otherwise, this specifies the encoding to use with text mode.
+        If :data:`None` (the default), the temporary file will be opened in
+        binary mode. Otherwise, this specifies the encoding to use with text
+        mode.
     """
     umask = get_umask()
 
     def __init__(self, path, encoding=None):
-        if isinstance(path, str):
+        if not isinstance(path, Path):
             path = Path(path)
         self._path = path
         self._tempfile = tempfile.NamedTemporaryFile(

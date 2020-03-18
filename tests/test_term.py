@@ -2,6 +2,8 @@ import io
 import argparse
 from unittest import mock
 
+import pytest
+
 from pibootctl.term import *
 
 
@@ -56,27 +58,37 @@ def test_error_handler_ops():
 def test_error_handler_call(capsys):
     handler = ErrorHandler()
     handler[Exception] = (handler.exc_message, 1)
-    assert handler(SystemExit, SystemExit(4), None) == 4
+    with pytest.raises(SystemExit) as exc:
+        handler(SystemExit, SystemExit(4), None)
+    assert exc.value.args[0] == 4
     captured = capsys.readouterr()
     assert not captured.out
     assert not captured.err
-    assert handler(KeyboardInterrupt, KeyboardInterrupt(3), None) == 2
+    with pytest.raises(SystemExit) as exc:
+        handler(KeyboardInterrupt, KeyboardInterrupt(3), None)
+    assert exc.value.args[0] == 2
     captured = capsys.readouterr()
     assert not captured.out
     assert not captured.err
-    assert handler(ValueError, ValueError('Wrong value'), None) == 1
+    with pytest.raises(SystemExit) as exc:
+        handler(ValueError, ValueError('Wrong value'), None)
+    assert exc.value.args[0] == 1
     captured = capsys.readouterr()
     assert not captured.out
     assert captured.err == 'Wrong value\n'
-    assert handler(argparse.ArgumentError,
-                   argparse.ArgumentError(None, 'Invalid option'), None) == 2
+    with pytest.raises(SystemExit) as exc:
+        handler(argparse.ArgumentError,
+                argparse.ArgumentError(None, 'Invalid option'), None)
+    assert exc.value.args[0] == 2
     captured = capsys.readouterr()
     assert not captured.out
     assert captured.err == 'Invalid option\nTry the --help option for more information.\n'
     with mock.patch('traceback.format_exception') as m:
         del handler[Exception]
         m.return_value = ['Traceback lines\n', 'from some file\n', 'with some context\n']
-        assert handler(ValueError, ValueError('Another wrong value'), {}) == 1
+        with pytest.raises(SystemExit) as exc:
+            handler(ValueError, ValueError('Another wrong value'), {})
+        assert exc.value.args[0] == 1
         captured = capsys.readouterr()
         assert not captured.out
         assert captured.err == 'Traceback lines\nfrom some file\nwith some context\n'

@@ -33,7 +33,6 @@ import os
 import sys
 import gettext
 import argparse
-import subprocess
 import configparser
 from datetime import datetime
 
@@ -55,6 +54,12 @@ _ = gettext.gettext
 
 
 def permission_error(exc_type, exc_value, exc_tb):
+    """
+    Generates the error message for unhandled :exc:`PermissionError`
+    exceptions. As these are very likely to be caused by non-root execution,
+    this is customzied to warn about this in the event that the effective UID
+    is not 0.
+    """
     msg = [str(exc_value)]
     if os.geteuid() != 0:
         msg.append(_(
@@ -91,6 +96,13 @@ class Application:
         <manual>` as a self-contained script and calling it with
         :mod:`subprocess`.
     """
+    def __init__(self):
+        super().__init__()
+        self.parser = None
+        self.config = None
+        self.output = None
+        self.store = None
+
     def __call__(self, args=None):
         if not int(os.environ.get('DEBUG', '0')):
             sys.excepthook = ErrorHandler()
@@ -363,14 +375,14 @@ class Application:
         if 'cmd' in self.config and self.config.cmd is not None:
             if self.config.cmd in default:
                 self.output.dump_setting(default[self.config.cmd],
-                                         fp=sys.stdout)
+                                         file=sys.stdout)
                 raise SystemExit(0)
-            elif '.' in self.config.cmd:
+            if '.' in self.config.cmd:
                 # TODO Mis-spelled setting; use something like levenshtein to
                 # detect "close" but incorrect setting names
                 raise ValueError(_(
                     'Unknown setting "{self.config.cmd}"').format(self=self))
-            elif '_' in self.config.cmd:
+            if '_' in self.config.cmd:
                 # Old-style command
                 commands = [
                     setting
@@ -379,7 +391,7 @@ class Application:
                     and self.config.cmd in setting.commands
                 ]
                 if len(commands) == 1:
-                    self.output.dump_setting(commands[0], fp=sys.stdout)
+                    self.output.dump_setting(commands[0], file=sys.stdout)
                 else:
                     print(_(
                         '{self.config.cmd} is affected by the following '
@@ -388,8 +400,7 @@ class Application:
                             self=self, settings='\n'.join(
                                 setting.name for setting in commands)))
                 raise SystemExit(0)
-            else:
-                self.parser.parse_args([self.config.cmd, '-h'])
+            self.parser.parse_args([self.config.cmd, '-h'])
         else:
             self.parser.parse_args(['-h'])
 
@@ -409,7 +420,8 @@ class Application:
             settings = settings.filter(self.config.vars)
         if not self.config.all:
             settings = settings.modified()
-        self.output.dump_settings(settings, fp=sys.stdout, mod=self.config.all)
+        self.output.dump_settings(settings, file=sys.stdout,
+                                  mod=self.config.all)
 
     def do_get(self):
         """
@@ -430,7 +442,7 @@ class Application:
                     settings[var] = current.settings[var]
                 except KeyError:
                     raise ValueError(_('unknown setting: {}').format(var))
-            self.output.dump_settings(settings, fp=sys.stdout)
+            self.output.dump_settings(settings, file=sys.stdout)
 
     def do_set(self):
         """
@@ -484,7 +496,7 @@ class Application:
         right = self.store[self.config.right].settings
         self.output.dump_diff(
             self.config.left, self.config.right, left.diff(right),
-            fp=sys.stdout)
+            file=sys.stdout)
 
     def do_list(self):
         """
@@ -496,7 +508,7 @@ class Application:
             for key, value in self.store.items()
             if key not in (Current, Default)
         ]
-        self.output.dump_store(table, fp=sys.stdout)
+        self.output.dump_store(table, file=sys.stdout)
 
     def do_remove(self):
         """

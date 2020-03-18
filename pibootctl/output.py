@@ -1,10 +1,19 @@
+"""
+The :mod:`pibootctl.output` module defines the :class:`Output` class which is
+responsible for rendering various structures (the store list, diff output,
+etc.) in a selected style (JSON, YAML, user-friendly, etc.); it also provides a
+class method to add the supported styles to an
+:class:`~argparse.ArgumentParser`.
+
+.. autoclass:: Output
+    :members:
+"""
+
 import io
 import json
 import shlex
 import gettext
-import argparse
 from operator import attrgetter, itemgetter
-from collections import OrderedDict
 
 import yaml
 
@@ -16,12 +25,16 @@ from .term import term_size, term_is_utf8
 _ = gettext.gettext
 
 
-def values(l, r):
+def values(left, right):
+    """
+    Utility function for JSON/YAML output; generates a dict containing *left*
+    and *right* for non-:data:`None` values.
+    """
     obj = {}
-    if l is not None:
-        obj['left'] = l.value
-    if r is not None:
-        obj['right'] = r.value
+    if left is not None:
+        obj['left'] = left.value
+    if right is not None:
+        obj['right'] = right.value
     return obj
 
 
@@ -69,22 +82,22 @@ class Output:
                    "shell"))
         return fmt_group
 
-    def dump_store(self, store, fp):
+    def dump_store(self, store, file):
         """
         Write the content of *store* (a sequence of (name, active, timestamp)
-        triples) to the file-like object *fp*.
+        triples) to the file-like object *file*.
         """
         return {
             'user':  self._dump_store_user,
             'shell': self._dump_store_shell,
             'json':  self._dump_store_json,
             'yaml':  self._dump_store_yaml,
-        }[self.style](store, fp)
+        }[self.style](store, file)
 
-    def _dump_store_user(self, store, fp):
+    def _dump_store_user(self, store, file):
         if not store:
-            fp.write(_("No stored boot configurations found"))
-            fp.write("\n")
+            file.write(_("No stored boot configurations found"))
+            file.write("\n")
         else:
             self._print_table([
                 (_('Name'), _('Active'), _('Timestamp'))
@@ -92,48 +105,48 @@ class Output:
                 (name, self._check_mark if active else '',
                  timestamp.strftime('%Y-%m-%d %H:%M:%S'))
                 for name, active, timestamp in sorted(store, key=itemgetter(0))
-            ], fp)
+            ], file)
 
-    def _dump_store_json(self, store, fp):
+    def _dump_store_json(self, store, file):
         json.dump([
             {'name': name, 'active': active, 'timestamp': timestamp.isoformat()}
             for name, active, timestamp in store
-        ], fp)
+        ], file)
 
-    def _dump_store_yaml(self, store, fp):
+    def _dump_store_yaml(self, store, file):
         yaml.dump([
             {'name': name, 'active': active, 'timestamp': timestamp}
             for name, active, timestamp in store
-        ], fp)
+        ], file)
 
-    def _dump_store_shell(self, store, fp):
+    def _dump_store_shell(self, store, file):
         for name, active, timestamp in store:
-            fp.write('\t'.join(
+            file.write('\t'.join(
                 (timestamp.isoformat(), ('inactive', 'active')[active], name)
             ))
-            fp.write('\n')
+            file.write('\n')
 
-    def dump_diff(self, left, right, diff, fp):
+    def dump_diff(self, left, right, diff, file):
         """
         Write the *diff* (a sequence of (l, r) tuples in which l and r are
         either instances of :class:`Setting` or :data:`None`), of *left*
         and *right* (instances of :class:`Settings`) to the file-like object
-        *fp*.
+        *file*.
         """
         return {
             'user':  self._dump_diff_user,
             'shell': self._dump_diff_shell,
             'json':  self._dump_diff_json,
             'yaml':  self._dump_diff_yaml,
-        }[self.style](left, right, diff, fp)
+        }[self.style](left, right, diff, file)
 
-    def _dump_diff_user(self, left, right, diff, fp):
+    def _dump_diff_user(self, left, right, diff, file):
         if not diff:
-            fp.write(_(
+            file.write(_(
                 "No differences between {left} and {right}").format(
                     left='<{}>'.format(_('Current')) if left is Current else left,
                     right=right))
-            fp.write("\n")
+            file.write("\n")
         else:
             self._print_table([
                 (_('Name'),
@@ -146,62 +159,64 @@ class Output:
                  '-' if r is None else self._format_setting_user(r),
                  )
                 for (l, r) in diff
-            ]), fp)
+            ]), file)
 
-    def _dump_diff_json(self, left, right, diff, fp):
+    def _dump_diff_json(self, left, right, diff, file):
         json.dump({
             (l.name if l is not None else r.name): values(l, r)
             for (l, r) in diff
-        }, fp)
+        }, file)
 
-    def _dump_diff_yaml(self, left, right, diff, fp):
+    def _dump_diff_yaml(self, left, right, diff, file):
         yaml.dump({
             (l.name if l is not None else r.name): values(l, r)
             for (l, r) in diff
-        }, fp)
+        }, file)
 
-    def _dump_diff_shell(self, left, right, diff, fp):
-        for l, r in diff:
-            fp.write('\t'.join(
-                (l.name if l is not None else r.name,
-                 '-' if l is None else self._format_value_shell(l.value),
-                 '-' if r is None else self._format_value_shell(r.value)
-                 )
+    def _dump_diff_shell(self, left, right, diff, file):
+        file.write(
+            ''.join(
+                '\t'.join(
+                    (l.name if l is not None else r.name,
+                     '-' if l is None else self._format_value_shell(l.value),
+                     '-' if r is None else self._format_value_shell(r.value)
+                     )
+                ) + '\n'
+                for l, r in diff
             ))
-            fp.write('\n')
 
-    def dump_settings(self, settings, fp, mod=False):
+    def dump_settings(self, settings, file, mod=False):
         """
         Write the content of *settings* (a :class:`Settings` instance or just a
         mapping of settings names to :class:`Setting` objects) to the file-like
-        object *fp*.
+        object *file*.
         """
         return {
             'user':  self._dump_settings_user,
             'shell': self._dump_settings_shell,
             'json':  self._dump_settings_json,
             'yaml':  self._dump_settings_yaml,
-        }[self.style](settings, fp, mod=mod)
+        }[self.style](settings, file, mod=mod)
 
-    def _dump_settings_json(self, settings, fp, mod=False):
+    def _dump_settings_json(self, settings, file, mod=False):
         json.dump({
             name: setting.value for name, setting in settings.items()
-        }, fp)
+        }, file)
 
-    def _dump_settings_yaml(self, settings, fp, mod=False):
+    def _dump_settings_yaml(self, settings, file, mod=False):
         yaml.dump({
             name: setting.value for name, setting in settings.items()
-        }, fp)
+        }, file)
 
-    def _dump_settings_shell(self, settings, fp, mod=False):
+    def _dump_settings_shell(self, settings, file, mod=False):
         for setting in settings.values():
-            fp.write(self._format_setting_shell(setting))
-            fp.write("\n")
+            file.write(self._format_setting_shell(setting))
+            file.write("\n")
 
-    def _dump_settings_user(self, settings, fp, mod=False):
+    def _dump_settings_user(self, settings, file, mod=False):
         if not settings:
-            fp.write(_("No settings matching the pattern found"))
-            fp.write("\n")
+            file.write(_("No settings matching the pattern found"))
+            file.write("\n")
         else:
             data = [
                 (_('Name'), _('Modified'), _('Value'))
@@ -216,30 +231,30 @@ class Output:
             ]
             if not mod:
                 data = [(name, value) for (name, modified, value) in data]
-            self._print_table(data, fp)
+            self._print_table(data, file)
 
-    def load_settings(self, fp):
+    def load_settings(self, file):
         """
-        Load a dictionary of settings values from the file-like object *fp*.
+        Load a dictionary of settings values from the file-like object *file*.
         """
         return {
             'user':  self._load_settings_user,
             'json':  self._load_settings_json,
             'yaml':  self._load_settings_yaml,
             'shell': self._load_settings_shell,
-        }[self.style](fp)
+        }[self.style](file)
 
-    def _load_settings_json(self, fp):
-        return json.load(fp)
+    def _load_settings_json(self, file):
+        return json.load(file)
 
-    def _load_settings_yaml(self, fp):
-        return yaml.load(fp, Loader=yaml.SafeLoader)
+    def _load_settings_yaml(self, file):
+        return yaml.load(file, Loader=yaml.SafeLoader)
 
-    def _load_settings_shell(self, fp):
+    def _load_settings_shell(self, file):
         # TODO
         raise NotImplementedError
 
-    def _load_settings_user(self, fp):
+    def _load_settings_user(self, file):
         raise NotImplementedError
 
     def format_value(self, value):
@@ -258,9 +273,9 @@ class Output:
         return json.dumps(value)
 
     def _format_value_yaml(self, value):
-        with io.StringIO() as fp:
-            yaml.dump(value, fp)
-            return fp.getvalue()
+        with io.StringIO() as file:
+            yaml.dump(value, file)
+            return file.getvalue()
 
     def _format_value_shell(self, value):
         if value is None:
@@ -284,14 +299,19 @@ class Output:
         else:
             return str(value)
 
-    def _print_table(self, table, fp):
+    def _print_table(self, table, file):
         width = min(120, term_size()[0])
         renderer = TableWrapper(width=width, **self._table_style)
         for line in renderer.wrap(table):
-            fp.write(line)
-            fp.write('\n')
+            file.write(line)
+            file.write('\n')
 
-    def dump_setting(self, setting, fp):
+    def dump_setting(self, setting, file):
+        """
+        Output a help page describing the *setting* with information on the
+        underlying configuration command or overlay, the default value, and
+        a verbose description.
+        """
         assert self.style == 'user'
         width = min(120, term_size()[0])
         fields = [
@@ -308,7 +328,7 @@ class Output:
                 (_('Parameter'), setting.param),
             ]
         max_field_width = max(len(name) for name, value in fields)
-        fp.write('{fields}\n\n{doc}\n'.format(
+        file.write('{fields}\n\n{doc}\n'.format(
             fields='\n'.join(
                 '{name:>{width}}: {value}'.format(
                     name=name, width=max_field_width, value=value)

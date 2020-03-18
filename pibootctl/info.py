@@ -1,3 +1,18 @@
+"""
+The :mod:`pibootctl.info` module contains some simple routines for determining
+information about the Pi that the application is running on.
+
+.. autofunction:: get_board_revision
+
+.. autofunction:: get_board_serial
+
+.. autofunction:: get_board_type
+
+.. autofunction:: get_board_types
+
+.. autofunction:: get_board_mem
+"""
+
 import io
 import struct
 
@@ -12,47 +27,82 @@ def _hexdump(filename, fmt='>L'):
 
 
 def get_board_revision():
+    """
+    Return the Pi's board revision as an unsigned 32-bit integer number. This
+    is the same number as reported under "Revision" in :file:`/proc/cpuinfo`.
+    """
     return _hexdump('/proc/device-tree/system/linux,revision')
 
 
 def get_board_serial():
+    """
+    Return the Pi's serial number as an unsigned 64-bit integer number. This
+    can also be queried as "Serial" under :file:`/proc/cpuinfo`.
+    """
     return _hexdump('/proc/device-tree/system/linux,serial', '>Q')
 
 
-def get_board_types():
-    # Derived (excluding unsupported types) from the table at:
-    # https://www.raspberrypi.org/documentation/hardware/raspberrypi/revision-codes/README.md
-    # And from the filters listed under:
-    # https://www.raspberrypi.org/documentation/configuration/config-txt/conditional.md
+def get_board_type():
+    """
+    Return a string indicating the overall model of the Pi, e.g. "pi0w", "pi2",
+    or "pi3+". This is derived from the result of :func:`get_board_revision`
+    according to the Pi's `revision codes table`_.
+
+    .. _revision codes table:
+       https://www.raspberrypi.org/documentation/hardware/raspberrypi/revision-codes/README.md
+    """
     try:
         rev = get_board_revision()
         if rev & 0x800000:
             return {
-                0x0:  {'pi1'},
-                0x1:  {'pi1'},
-                0x2:  {'pi1'},
-                0x3:  {'pi1'},
-                0x4:  {'pi2'},
-                0x5:  {'pi1'},
-                0x6:  {'pi1'},
-                0x8:  {'pi3'},
-                0x9:  {'pi0'},
-                0xa:  {'pi3'},
-                0xc:  {'pi0', 'pi0w'},
-                0xd:  {'pi3', 'pi3+'},
-                0xe:  {'pi3', 'pi3+'},
-                0x10: {'pi3', 'pi3+'},
-                0x11: {'pi4'},
+                0x0:  'pi1',
+                0x1:  'pi1',
+                0x2:  'pi1',
+                0x3:  'pi1',
+                0x4:  'pi2',
+                0x5:  'pi1',
+                0x6:  'pi1',
+                0x8:  'pi3',
+                0x9:  'pi0',
+                0xa:  'pi3',
+                0xc:  'pi0w',
+                0xd:  'pi3+',
+                0xe:  'pi3+',
+                0x10: 'pi3+',
+                0x11: 'pi4',
             }[rev >> 4 & 0xff]
         else:
             # All old-style revs are pi1 models (A, B, A+, B+, CM1)
-            return {'pi1'}
-    except:
-        return set()
+            return 'pi1'
+    except KeyError:
+        return None
+
+
+def get_board_types():
+    """
+    Return a set of strings used for matching the model of Pi against
+    configuration sections according to the `conditional filters table`_.
+
+    .. _conditional filters table:
+       https://www.raspberrypi.org/documentation/configuration/config-txt/conditional.md
+    """
+    return {
+        None:  set(),
+        'pi0':  {'pi0'},
+        'pi0w': {'pi0', 'pi0w'},
+        'pi1':  {'pi1'},
+        'pi2':  {'pi2'},
+        'pi3':  {'pi3'},
+        'pi3+': {'pi3', 'pi3+'},
+        'pi4':  {'pi4'},
+    }[get_board_type()]
 
 
 def get_board_mem():
-    # See get_board_types for source data locations
+    """
+    Return the amount of memory (in megabytes) present on the Pi, according to
+    the model returned by :func:`get_board_revision`.
+    """
     try:
         rev = get_board_revision()
         if rev & 0x800000:
@@ -83,5 +133,5 @@ def get_board_mem():
                 0x0013: 512,
                 0x0014: 512,
             }[rev]
-    except:
+    except KeyError:
         return 0

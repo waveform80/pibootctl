@@ -193,7 +193,7 @@ def test_table_wrap_align():
     ]
     wrap = TableWrapper(
         width=40,
-        align=lambda data: '>' if isinstance(data, int) else '<')
+        align=lambda y, x, data: '>' if isinstance(data, int) else '<')
     assert wrap.wrap(data) == expected
     assert wrap.fill(data) == '\n'.join(expected)
 
@@ -212,8 +212,8 @@ def test_table_wrap_format():
     ]
     wrap = TableWrapper(
         width=40,
-        format=lambda data: '{:03d}'.format(data)
-                            if isinstance(data, int) else str(data))
+        format=lambda y, x, data: '{:03d}'.format(data)
+                                  if isinstance(data, int) else str(data))
     assert wrap.wrap(data) == expected
     assert wrap.fill(data) == '\n'.join(expected)
 

@@ -1,3 +1,24 @@
+"""
+The :mod:`pibootctl.term` module contains various utilities for determining the
+type of terminal the script is running under (:func:`term_is_dumb`,
+:func:`term_is_utf8`, and :func:`term_size`), for directing terminal output
+through the system's :func:`pager`, and for constructing an overall
+:class:`ErrorHandler` for the script.
+
+.. autoclass:: ErrorHandler
+    :members:
+
+.. autoclass:: ErrorAction(message, exitcode)
+
+.. autofunction:: term_is_dumb
+
+.. autofunction:: term_is_utf8
+
+.. autofunction:: term_size
+
+.. autofunction:: pager
+"""
+
 import os
 import io
 import sys
@@ -16,6 +37,10 @@ _ = gettext.gettext
 
 
 def term_is_dumb():
+    """
+    Returns :data:`True` if stdout is something other than a TTY (e.g. a file
+    redirection or a pipe).
+    """
     try:
         stdout_fd = sys.stdout.fileno()
     except OSError:
@@ -25,12 +50,13 @@ def term_is_dumb():
 
 
 def term_is_utf8():
+    "Returns :data:`True` if the code-set of the current locale is 'UTF-8'."
     locale.setlocale(locale.LC_ALL, '')
     return locale.nl_langinfo(locale.CODESET) == 'UTF-8'
 
 
 def term_size():
-    "Returns the size (cols, rows) of the console"
+    "Returns the size of the console as a (rows, cols) tuple."
 
     # POSIX query_console_size() adapted from
     # http://mail.python.org/pipermail/python-list/2006-February/365594.html
@@ -72,15 +98,31 @@ def term_size():
 
 
 @contextmanager
-def pager():
-    if term_is_dumb():
-        yield
-    else:
+def pager(enable=None):
+    """
+    Used as a context manager to redirect stdout to the system's pager utility
+    ("pager", "less", or "more" are all attempted, in that order).
+
+    By default (when *enable* is :data:`None`), stdout will only be redirected
+    if stdout is connected to a TTY. If *enable* is :data:`True` stdout will
+    always be redirected, and likewise when *enable* is :data:`False` the
+    function will do nothing.
+
+    For example, the following script should print "Hello, world!", piping the
+    result through the system's pager::
+
+        from pibootctl.term import pager
+        with pager():
+            print("Hello, world!")
+    """
+    if enable is None:
+        enable = not term_is_dumb()
+    if enable:
         env = os.environ.copy()
         env['LESS'] = 'FRSXMK'
         for exe in ('pager', 'less', 'more'):
             try:
-                p = subprocess.Popen(exe, stdin=subprocess.PIPE, env=env)
+                proc = subprocess.Popen(exe, stdin=subprocess.PIPE, env=env)
             except FileNotFoundError:
                 pass
             except OSError as exc:
@@ -89,17 +131,19 @@ def pager():
                 print(str(exc), file=sys.stderr)
             else:
                 try:
-                    with io.TextIOWrapper(p.stdin,
+                    with io.TextIOWrapper(proc.stdin,
                                           encoding=sys.stdout.encoding,
-                                          write_through=True) as w:
-                        with redirect_stdout(w):
+                                          write_through=True) as proc_in:
+                        with redirect_stdout(proc_in):
                             yield
                 finally:
-                    p.stdin.close()
-                    p.wait()
+                    proc.stdin.close()
+                    proc.wait()
                 break
         else:
             yield
+    else:
+        yield
 
 
 class ErrorAction(namedtuple('ErrorAction', ('message', 'exitcode'))):
@@ -114,7 +158,6 @@ class ErrorAction(namedtuple('ErrorAction', ('message', 'exitcode'))):
     exception info (type, value, traceback) and will be expected to return
     an iterable of lines (for *message*) or an integer (for *exitcode*).
     """
-    pass
 
 
 class ErrorHandler:
@@ -127,7 +170,25 @@ class ErrorHandler:
 
     The configuration can be augmented with other exception classes that should
     be handled specially by treating the instance as a dictionary mapping
-    exception classes to :class:`ErrorAction` tuples.
+    exception classes to :class:`ErrorAction` tuples (or any 2-tuple, which
+    will be converted to an :class:`ErrorAction`).
+
+    For example::
+
+        >>> from pibootctl.term import ErrorAction, ErrorHandler
+        >>> import sys
+        >>> sys.excepthook = ErrorHandler()
+        >>> sys.excepthook[KeyboardInterrupt]
+        (None, 1)
+        >>> sys.excepthook[SystemExit]
+        (None, <function ErrorHandler.exc_value at 0x7f6178915e18>)
+        >>> sys.excepthook[ValueError] = (sys.excepthook.exc_message, 3)
+        >>> sys.excepthook[Exception] = ("An error occurred", 1)
+        >>> raise ValueError("foo is not an integer")
+        foo is not an integer
+
+    Note the lack of a traceback in the output; if the example were a script
+    it would also have exited with return code 3.
     """
     def __init__(self):
         self._config = OrderedDict([
@@ -139,16 +200,38 @@ class ErrorHandler:
 
     @staticmethod
     def exc_message(exc_type, exc_value, exc_tb):
+        """
+        Extracts the message associated with the exception (by calling
+        :class:`str` on the exception instance). The result is returned as a
+        one-element list containing the message.
+        """
         return [str(exc_value)]
 
     @staticmethod
     def exc_value(exc_type, exc_value, exc_tb):
+        """
+        Returns the first argument of the exception instance. In the case of
+        :exc:`SystemExit` this is the expected return code of the script.
+        """
         return exc_value.args[0]
 
     @staticmethod
     def syntax_error(exc_type, exc_value, exc_tb):
-        return [str(exc_value),
-                _('Try the --help option for more information.')]
+        """
+        Returns the message associated with the exception, and an additional
+        line suggested the user try the ``--help`` option. This should be used
+        in response to exceptions indicating the user made an error in their
+        command line.
+        """
+        return ErrorHandler.exc_message(exc_type, exc_value, exc_tb) + [
+            _('Try the --help option for more information.'),
+        ]
+
+    def clear(self):
+        """
+        Remove all pre-defined error handlers.
+        """
+        self._config.clear()
 
     def __len__(self):
         return len(self._config)
@@ -175,10 +258,12 @@ class ErrorHandler:
                 if message is not None:
                     for line in message:
                         print(line, file=sys.stderr)
-                return value
+                    sys.stderr.flush()
+                raise SystemExit(value)
         # Otherwise, log the stack trace and the exception into the log
         # file for debugging purposes
         for line in traceback.format_exception(exc_type, exc_value, exc_tb):
             for msg in line.rstrip().split('\n'):
                 print(msg, file=sys.stderr)
-        return 1
+        sys.stderr.flush()
+        raise SystemExit(1)
