@@ -384,28 +384,29 @@ def render(text, width=70, list_space=False, table_style=None):
 
     The markup recognized by this routine is as follows:
 
-    * Paragraphs must be separated by at least one blank line. They will be
-      wrapped to *width*.
+    .. code-block:: text
 
-    * Items in bulleted lists must start with an asterisk. No list nesting is
-      permitted, but items may span several lines (without blank lines between
-      them). Items will be wrapped to *width* and indented appropriately.
+        * Paragraphs must be separated by at least one blank line. They will be
+          wrapped to *width*.
 
-    * Lines beginning and ending with a pipe character are assumed to be table
-      rows. Pipe characters also delimit columns within the row. The first row
-      is assumed to be a header row and will be separated from the rest. No
-      wrapping will be used within the table, but column widths will be
-      calculated automatically. If the total column width exceeds *width* the
-      table will be right-truncated in the output.
+        * Items in bulleted lists must start with an asterisk. No list nesting
+          is permitted, but items may span several lines (without blank lines
+          between them). Items will be wrapped to *width* and indented
+          appropriately.
 
-    An example table is shown below:
+        * Lines beginning and ending with a pipe character are assumed to be
+          table rows. Pipe characters also delimit columns within the row. The
+          first row is assumed to be a header row and will be separated from
+          the rest.
 
-    | Command | Description |
-    | cd | changes the current directory |
-    | ls | lists the content of a directory |
-    | cp | copies files |
-    | mv | renames files |
-    | rm | removes files |
+        An example table is shown below:
+
+        | Command | Description |
+        | cd | changes the current directory |
+        | ls | lists the content of a directory |
+        | cp | copies files |
+        | mv | renames files |
+        | rm | removes files |
     """
     if table_style is None:
         table_style = {}
