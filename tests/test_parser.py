@@ -57,7 +57,7 @@ initramfs initrd.img followkernel
 device_tree_address=0x3000000
 dtoverlay=vc4-fkms-v3d
 """)
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     p.parse()
     assert p.config == [
         BootCommand('config.txt', 2, 'kernel', 'vmlinuz', 0),
@@ -71,7 +71,7 @@ def test_parse_invalid(tmpdir):
     tmpdir.join('config.txt').write("""# This is a comment
 This is not
 """)
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     with pytest.warns(BootInvalid) as w:
         p.parse()
         assert p.config == []
@@ -85,7 +85,7 @@ dtparam=audio=on,i2c=on,i2c_baudrate=400000
 dtparam=spi,i2c0
 dtoverlay=lirc-rpi:gpio_out_pin=16,gpio_in_pin=17,gpio_in_pull=down
 """)
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     p.parse()
     assert p.config == [
         BootParam('config.txt', 1, 'base', 'audio', 'on'),
@@ -115,7 +115,7 @@ dtparam=spi=on
 hdmi_group=1
 hdmi_mode=4
 """)
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     p.parse()
     assert p.config == [
         BootSection('config.txt', 2, 'none'),
@@ -138,7 +138,7 @@ hdmi_mode=4
 hdmi_group=2
 hdmi_mode=28
 """)
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     p.parse()
     assert p.config == [
         BootCommand('config.txt', 2, 'hdmi_group', '1', 0),
@@ -155,7 +155,7 @@ hdmi_group:0=1
 hdmi_mode:1=4
 hdmi_mode:a=4
 """)
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     p.parse()
     assert p.config == [
         BootCommand('config.txt', 1, 'hdmi_group', '1', 0),
@@ -174,7 +174,7 @@ hdmi_mode=16
 hdmi_group=1
 hdmi_mode=4
 """)
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     p.parse()
     assert p.config == [
         BootSection('config.txt', 2, 'EDID=BNQ-BenQ_GW2270'),
@@ -191,7 +191,7 @@ def test_parse_gpio_section(tmpdir):
 [gpio4=1]
 dtparam=audio=on
 """)
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     p.parse()
     assert p.config == [
         BootSection('config.txt', 2, 'gpio4=1'),
@@ -205,7 +205,7 @@ def test_parse_serial_bad_section(tmpdir):
 [0xwtf]
 dtparam=audio=on
 """)
-        p = BootParser(Path(str(tmpdir)))
+        p = BootParser(str(tmpdir))
         p.parse()
         assert p.config == [
             BootSection('config.txt', 2, '0xwtf'),
@@ -218,7 +218,7 @@ def test_parse_unknown_section(tmpdir, recwarn):
 [foo]
 dtparam=audio=on
 """)
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     p.parse()
     assert p.config == [
         BootSection('config.txt', 2, 'foo'),
@@ -235,7 +235,7 @@ def test_parse_serial_section_match(tmpdir):
 [0xdeadd00d]
 dtparam=audio=on
 """)
-        p = BootParser(Path(str(tmpdir)))
+        p = BootParser(str(tmpdir))
         p.parse()
         assert p.config == [
             BootSection('config.txt', 2, '0xdeadd00d'),
@@ -250,7 +250,7 @@ def test_parse_serial_section_mismatch(tmpdir):
 [0x12345678]
 dtparam=audio=on
 """)
-        p = BootParser(Path(str(tmpdir)))
+        p = BootParser(str(tmpdir))
         p.parse()
         assert p.config == [
             BootSection('config.txt', 2, '0x12345678'),
@@ -268,7 +268,7 @@ kernel=uboot_3_32b.bin
 [pi4]
 kernel=uboot_4_32b.bin
 """)
-        p = BootParser(Path(str(tmpdir)))
+        p = BootParser(str(tmpdir))
         p.parse()
         assert p.config == [
             BootSection('config.txt', 2, 'pi2'),
@@ -359,7 +359,7 @@ hdmi_mode=4
 
 
 def test_parse_empty(tmpdir):
-    p = BootParser(Path(str(tmpdir)))
+    p = BootParser(str(tmpdir))
     p.parse()
     assert p.config == []
     assert p.hash == hashlib.sha1().hexdigest().lower()

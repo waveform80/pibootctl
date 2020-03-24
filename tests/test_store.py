@@ -20,6 +20,11 @@ def store_path(request, boot_path):
     return boot_path / 'pibootctl'
 
 
+def test_singleton_reprs():
+    assert repr(Current) == 'Current'
+    assert repr(Default) == 'Default'
+
+
 def test_store_container(boot_path, store_path):
     store = Store(boot_path, store_path)
     (boot_path / 'config.txt').write_text("""\

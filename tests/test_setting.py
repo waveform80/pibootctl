@@ -697,7 +697,8 @@ def test_kernel_address():
         BootCommand(Path('config.txt'), 1, 'arm_64bit', '0', hdmi=0),
         BootCommand(Path('config.txt'), 2, 'arm_control', '0x202', hdmi=0),
         BootCommand(Path('config.txt'), 3, 'kernel_address', '0x100', hdmi=0),
-        BootCommand(Path('config.txt'), 4, 'kernel_old', '1', hdmi=0),
+        BootCommand(Path('config.txt'), 4, 'kernel_old', '0', hdmi=0),
+        BootCommand(Path('config.txt'), 5, 'kernel_old', '1', hdmi=0),
     ]
     assert list(arm8.extract(config)) == [
         (config[0], False),
@@ -705,7 +706,7 @@ def test_kernel_address():
     ]
     assert list(addr.extract(config)) == [
         (config[2], 0x100),
-        (config[3], 0),
+        (config[4], 0),
     ]
 
 

@@ -39,6 +39,8 @@ configuration parameters for constructing a :class:`Store`.
 .. autoexception:: InvalidConfiguration
 
 .. autoexception:: IneffectiveConfiguration
+
+.. autoexception:: MissingInclude
 """
 
 import os
@@ -464,8 +466,8 @@ class InvalidConfiguration(ValueError):
     :exc:`ValueError` raised.
     """
     def __init__(self, errors):
-        super().__init__()
         self.errors = errors
+        super().__init__(str(self))
 
     def __str__(self):
         return _(
@@ -482,8 +484,8 @@ class IneffectiveConfiguration(ValueError):
     overridden are available from the :attr:`settings` attribute.
     """
     def __init__(self, settings):
-        super().__init__()
         self.settings = settings
+        super().__init__(str(self))
 
     def __str__(self):
         return _(
@@ -497,8 +499,8 @@ class MissingInclude(ValueError):
     the configuration.
     """
     def __init__(self, rewrite):
-        super().__init__()
         self.rewrite = rewrite
+        super().__init__(str(self))
 
     def __str__(self):
         return _(
