@@ -463,13 +463,6 @@ class TransTemplate(str):
     through for later substitution. When this value is used in a
     :meth:`str.format` substitution, it renders itself with the format
     specification as {self!conv:spec}, passing the template through verbatim.
-
-    .. note::
-
-        One exception is that the ``!a`` conversion is not handled correctly.
-        This is erroneously converted to ``!r``. Unfortunately there's no
-        solution to this; it's a side-effect of the means by which the ``!a``
-        conversion is performed.
     """
     # NOTE: No calling str.format in this class! ;)
 
@@ -497,6 +490,13 @@ class TransMap:
         '1{bar}'
         >>> '{foo:02d}{bar:02d}{baz:02d}'.format_map(TransMap(foo=1, baz=3))
         '01{bar:02d}03'
+
+    .. note::
+
+        One exception is that the ``!a`` conversion is not handled correctly.
+        This is erroneously converted to ``!r``. Unfortunately there's no
+        solution to this; it's a side-effect of the means by which the ``!a``
+        conversion is performed.
     """
     def __init__(self, **kw):
         self._kw = kw
