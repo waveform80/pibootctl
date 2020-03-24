@@ -117,13 +117,38 @@ class Store(Mapping):
     which cannot be removed (attempting to do so will raise a :exc:`KeyError`).
     Furthermore, the item with the key :data:`Default` cannot be modified
     either.
+
+    :param str boot_path:
+        The path on which the boot partition is mounted.
+
+    :param str store_path:
+        The path (relative to *boot_path*) under which stored configurations
+        will be saved.
+
+    :param str config_read:
+        The filename of the "root" of the configuration, i.e. the first file
+        read by the parser. Currently, this should always be "config.txt", the
+        default.
+
+    :param str config_write:
+        The filename of the configuration file which should be re-written by
+        mutable configurations. By default this is "config.txt" but
+        distributions may wish to include another file from "config.txt",
+        leaving "config.txt" to be managed by the distribution itself.
+
+    :param str config_template:
+        The template to use when re-writing *config_write*. By default this
+        is just "{config}", but this parameter can be used to add headers or
+        footers to the generated configuration (or for that matter, additional
+        fixed includes, or even configuration lines).
     """
     def __init__(self, boot_path, store_path, config_read='config.txt',
-                 config_write='config.txt'):
+                 config_write='config.txt', config_template='{config}'):
         self._boot_path = Path(boot_path)
         self._store_path = self._boot_path / store_path
         self._config_read = config_read
         self._config_write = config_write
+        self._config_template = config_template
 
     def _path_of(self, name):
         return (self._store_path / name).with_suffix('.zip')
@@ -160,11 +185,13 @@ class Store(Mapping):
         if key is Default:
             return DefaultConfiguration()
         elif key is Current:
-            return BootConfiguration(self._boot_path, self._config_read,
-                                     self._config_write)
+            return BootConfiguration(
+                self._boot_path, self._config_read, self._config_write,
+                self._config_template)
         elif key in self:
-            return StoredConfiguration(self._path_of(key), self._config_read,
-                                       self._config_write)
+            return StoredConfiguration(
+                self._path_of(key), self._config_read, self._config_write,
+                self._config_template)
         else:
             raise KeyError(_(
                 "No stored configuration named {key}").format(key=key))
@@ -274,8 +301,15 @@ class BootConfiguration:
     The file named by *rewrite* (default "config.txt") is the file within the
     configuration that should be considered mutable, i.e. this is the file that
     gets re-written within a :meth:`mutable` configuration.
+
+    Finally, the *template* string specifies the template used to format the
+    *rewrite* file. By default this is simple "{config}" indicating that the
+    generated configuration alone should be placed in the file, but headers
+    and footers (or even additional includes) can be added by means of this
+    parameter.
     """
-    def __init__(self, path, filename='config.txt', rewrite='config.txt'):
+    def __init__(self, path, filename='config.txt', rewrite='config.txt',
+                 template='{config}'):
         self._path = path
         self._filename = filename
         self._settings = None
@@ -283,6 +317,7 @@ class BootConfiguration:
         self._hash = None
         self._timestamp = None
         self._rewrite = rewrite
+        self._template = template
 
     def _parse(self):
         assert self._settings is None
@@ -368,16 +403,18 @@ class BootConfiguration:
         configuration is assigned back to something in the :class:`Store`.
         """
         return MutableConfiguration(self.files.copy(), self._filename,
-                                    self._rewrite)
+                                    self._rewrite, self._template)
 
 
 class StoredConfiguration(BootConfiguration):
     """
-    Represents a boot configuration stored in a zip file specified by *path*.
-    The starting file of the configuration is given by *filename*.
+    Represents a boot configuration stored in a :class:`~zipfile.ZipFile`
+    specified by *path*. The starting file of the configuration is given by
+    *filename*. All other parameters are as in :class:`BootConfiguration`.
     """
-    def __init__(self, path, filename='config.txt', rewrite='config.txt'):
-        super().__init__(ZipFile(str(path), 'r'), filename, rewrite)
+    def __init__(self, path, filename='config.txt', rewrite='config.txt',
+                 template='{config}'):
+        super().__init__(ZipFile(str(path), 'r'), filename, rewrite, template)
         # We can grab the hash and timestamp from the arc's meta-data without
         # any decompression work (it's all in the uncompressed footer)
         comment = self.path.comment
@@ -462,7 +499,8 @@ class MutableConfiguration(BootConfiguration):
     :meth:`~BootConfiguration.mutable`.
 
     Only one file in the configuration, specified by *rewrite*, is permitted to
-    be re-written.
+    be re-written and its contents are (partially) dictated by the specified
+    *template*.
 
     Mutable configurations can be changed with the :meth:`update` method which
     will also validate the new configuration, and check that the settings were
@@ -505,22 +543,15 @@ class MutableConfiguration(BootConfiguration):
         # Diff the re-parsed settings with the updated copy to figure out
         # which settings actually need writing, and re-construct the _rewrite
         # file from these
-        # TODO Make the header configurable
-        content = """\
-# This file is intended to contain system-made configuration changes. User
-# configuration changes should be placed in "usercfg.txt". Please refer to the
-# README file for a description of the various configuration files on the boot
-# partition.
-
-""".splitlines(keepends=True)
+        content = []
         # XXX Can new ever be None? Would that be an error?
         for old, new in sorted(self.settings.diff(updated),
                                key=lambda i: i[1].key):
-            for line in new.output():
-                content.append(line + '\n')
+            content.extend(new.output())
+        content = self._template.format(config='\n'.join(content))
         self._path[self._rewrite] = BootFile(
             self._rewrite, datetime.now(),
-            b''.join(line.encode('ascii') for line in content),
+            content.encode('ascii'),
             'ascii', 'replace')
         self._settings = self._files = self._hash = None
         self._parse()

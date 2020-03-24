@@ -167,7 +167,13 @@ dtparam=spi=on
 
 
 def test_store_mutable_update(boot_path, store_path):
-    store = Store(boot_path, store_path)
+    store = Store(boot_path, store_path, config_template="""\
+# Header goes here
+{config}
+
+# And then the footer plus another include
+include usercfg.txt
+""")
     (boot_path / 'config.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
@@ -175,14 +181,13 @@ dtparam=spi=on
     current = store[Current]
     mutable = current.mutable()
     mutable.update({'i2c.enabled': None, 'camera.enabled': True})
-    assert mutable.files['config.txt'].content == b"""\
-# This file is intended to contain system-made configuration changes. User
-# configuration changes should be placed in "usercfg.txt". Please refer to the
-# README file for a description of the various configuration files on the boot
-# partition.
-
+    assert mutable.files['config.txt'].content.decode('ascii') == """\
+# Header goes here
 start_x=1
 dtparam=spi=on
+
+# And then the footer plus another include
+include usercfg.txt
 """
 
 

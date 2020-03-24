@@ -43,8 +43,13 @@ section titled "defaults". A typical configuration file might look like this:
     [defaults]
     boot_path=/boot
     store_path=pibootctl
+
     config_read=config.txt
     config_write=config.txt
+    config_template=
+        # This file is changed by pibootctl; manual edits may be lost!
+        {config}
+
     reboot_required=/var/run/reboot-required
     reboot_required_pkgs=/var/run/reboot-required.pkgs
     package_name=pibootctl
@@ -69,6 +74,13 @@ The configuration specifies several settings, but the most important are:
     configuration includes several files. In this case, pibootctl needs to know
     which file it is allowed to re-write, and assume all other files are
     distribution maintained. This is also relative to ``boot_path``.
+
+``config_template``
+    The template to be used when writing the file specified by
+    ``config_write``. By default this is simply "{config}" (the bare
+    substitution marker for the generated configuration lines). However, this
+    setting can be used to add headers, footers, or for that matter additional
+    fixed includes or even other configuration settings.
 
 ``reboot_required``
     The file which should be created in the event that the active boot

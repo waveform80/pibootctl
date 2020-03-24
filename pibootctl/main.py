@@ -13,7 +13,8 @@ constructing a :class:`~pibootctl.store.Store`::
     config = Application.get_config()
     store = Store(
         config.boot_path, config.store_path,
-        config.config_read, config.config_write)
+        config.config_read, config.config_write,
+        config.config_template)
     store[Current] = store['foo']
 
 Note that :meth:`Application.get_config` is static, so it can be called on the
@@ -115,7 +116,8 @@ class Application:
                 self.config.style if 'style' in self.config else 'user')
             self.store = Store(
                 self.config.boot_path, self.config.store_path,
-                self.config.config_read, self.config.config_write)
+                self.config.config_read, self.config.config_write,
+                self.config.config_template)
             self.config.func()
 
     @staticmethod
@@ -131,6 +133,7 @@ class Application:
                 'store_path':            'pibootctl',
                 'config_read':           'config.txt',
                 'config_write':          'config.txt',
+                'config_template':       '{config}',
                 'backup':                'on',
                 'package_name':          'pibootctl',
                 'reboot_required':       '/var/run/reboot-required',
@@ -174,6 +177,7 @@ class Application:
             store_path=config['store_path'],
             config_read=config['config_read'],
             config_write=config['config_write'],
+            config_template=config['config_template'],
             backup=config.getboolean('backup'),
             package_name=config['package_name'],
             reboot_required=config['reboot_required'],
