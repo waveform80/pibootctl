@@ -201,18 +201,34 @@ class Store(Mapping):
             raise KeyError(_(
                 "Cannot change the default configuration"))
         elif key is Current:
-            # TODO Sort content so config.txt is written last; this will allow
-            # effectively atomic switches of configuration for systems using
-            # os_prefix
-            # TODO What about empty config.txt? If it's not in the archive we
-            # leave the old config.txt lying around when we should delete it
-            # (and likewise for other configuration files). Should we always
-            # store an empty file as a sentinel for missing ones?
-            for path, file in item.files.items():
+            def replace_file(path, file):
                 with AtomicReplaceFile(self._boot_path / path) as temp:
                     temp.write(file.content)
                 os.utime(str(self._boot_path / path), (
                     datetime.now().timestamp(), file.timestamp.timestamp()))
+
+            old_files = set(self[Current].files.keys())
+            for path, file in item.files.items():
+                if path != self._config_read:
+                    replace_file(path, file)
+            # config.txt is deliberately dealt with last. This ensures that,
+            # in the case of systems using os_prefix to switch boot directories
+            # the switch is effectively atomic
+            try:
+                path = self._config_read
+                file = item.files[self._config_read]
+            except KeyError:
+                pass
+            else:
+                replace_file(path, file)
+            # Remove files that existed in the old configuration but not the
+            # new; this is necessary to deal with the case of switching from
+            # a config with config.txt (or other includes) to one without
+            # (which is a valid, default configuration). Again, for systems
+            # using os_prefix to switch boot dirs, this must occur last
+            for path in old_files:
+                if not path in item.files:
+                    os.unlink(str(self._boot_path / path))
         else:
             self._store_path.mkdir(parents=True, exist_ok=True)
             with ZipFile(str(self._path_of(key)), 'x',

@@ -149,6 +149,19 @@ dtparam=spi=on
         del store[Default]
 
 
+def test_store_restore_default(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
+dtparam=i2c=on
+dtparam=spi=on
+""")
+    store['foo'] = store[Current]
+    store[Current] = store[Default]
+    assert not (boot_path / 'config.txt').exists()
+    store[Current] = store['foo']
+    assert (boot_path / 'config.txt').exists()
+
+
 def test_store_active(boot_path, store_path):
     store = Store(boot_path, store_path)
     (boot_path / 'config.txt').write_text("""\
@@ -229,6 +242,24 @@ dtparam=i2c=on
     assert str(exc_info.value) == """\
 Failed to set:
 i2c.enabled"""
+
+
+def test_mutable_missing_include(boot_path, store_path):
+    store = Store(boot_path, store_path, config_write='syscfg.txt')
+    (boot_path / 'config.txt').write_text("""\
+include usercfg.txt
+""")
+    (boot_path / 'syscfg.txt').write_text("""\
+dtparam=i2c=on
+dtparam=spi=on
+""")
+    current = store[Current]
+    mutable = current.mutable()
+    with pytest.raises(MissingInclude) as exc_info:
+        mutable.update({'i2c.enabled': None})
+    assert exc_info.value.rewrite == 'syscfg.txt'
+    assert str(exc_info.value) == (
+        "syscfg.txt was not included in the new configuration")
 
 
 def test_settings_container():
