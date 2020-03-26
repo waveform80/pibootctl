@@ -1543,6 +1543,57 @@ class OverlayBluetoothEnabled(Setting):
                 yield 'dtoverlay=miniuart-bt'
 
 
+class OverlayKMS(Setting):
+    """
+    Represents the framebuffer driver as 0 (legacy, when no overlays are used),
+    1 (FKMS, when the vc4-fkms-v3d overlay is loaded), or 2 (KMS, when the
+    vc4-kms-v3d overlay is loaded).
+    """
+    @property
+    def default(self):
+        return 0
+
+    @property
+    def key(self):
+        return ('overlays', 'vc4-fkms-v3d')
+
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootOverlay):
+                try:
+                    yield item, {
+                        'vc4-fkms-v3d': 1,
+                        'vc4-kms-v3d':  2,
+                    }[item.overlay]
+                except KeyError:
+                    pass
+
+    def update(self, value):
+        return to_int(value)
+
+    def validate(self):
+        if not 0 <= self.value <= 2:
+            raise ValueError(
+                _('{self.name} must be 0, 1, or 2').format(self=self))
+
+    def output(self):
+        try:
+            yield 'dtoverlay=' + {
+                1: 'vc4-fkms-v3d',
+                2: 'vc4-kms-v3d',
+            }[self.value]
+        except KeyError:
+            pass
+
+    @property
+    def hint(self):
+        return {
+            0: 'legacy',
+            1: 'FKMS',
+            2: 'KMS',
+        }[self.value]
+
+
 class CommandCPUL2Cache(CommandBoolInv):
     """
     Handles the ``disable_l2cache`` command.

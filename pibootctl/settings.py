@@ -210,6 +210,40 @@ SETTINGS = {
             and the display).
             """)),
     setting.CommandInt(
+        'video.framebuffer.max', command='max_framebuffers', default=1,
+        doc=_(
+            """
+            Specifies the maximum number of framebuffers in the video firmware.
+            If you have more than one display attached, you need to increase
+            this setting to match the number of physical displays.
+
+            When video.firmware.mode is 0 (legacy mode) you get one linux
+            framebuffer per display; when it is 1 (FKMS) you still need to set
+            this setting to match the number of physical displays but FKMS
+            takes over the system and simulates a single framebuffer over those
+            multiple displays. [1]
+
+            [1]: https://www.raspberrypi.org/forums/viewtopic.php?t=245789
+            """)),
+    setting.OverlayKMS(
+        'video.firmware.mode', doc=_(
+            """
+            Specifies the means by which the Linux kernel communicates with the
+            video firmware. By default this is 0 (legacy mode).
+
+            When this is 1 the FKMS ("fake" kernel mode setting) overlay is
+            loaded and the Linux kernel talks to the video firmware via the
+            mailbox APIs for composition and output.
+
+            When this is 2 the KMS (kernel mode setting) overlay is loaded and
+            the Linux kernel drives the video hardware registers directly,
+            bypassing the firmware. However, this means that facilities still
+            running on the firmware (e.g. the camera) no longer operate
+            correctly. [1]
+
+            [1]: https://www.raspberrypi.org/forums/viewtopic.php?t=243564
+            """)),
+    setting.CommandInt(
         'video.framebuffer.depth', command='framebuffer_depth', default=16,
         valid={
             8:  '8-bit framebuffer; default RGB palette is unreadable',
