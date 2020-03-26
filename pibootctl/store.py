@@ -151,22 +151,6 @@ class Store(Mapping):
         self._config_write = config_write
         self._config_template = config_template
 
-    @property
-    def boot_path(self):
-        """
-        The path under which the boot partition is mounted, as a
-        :class:`~pathlib.Path`.
-        """
-        return self._boot_path
-
-    @property
-    def store_path(self):
-        """
-        The path under which stored configurations are stored, returned as a
-        :class:`~pathlib.Path`.
-        """
-        return self._store_path
-
     def _path_of(self, name):
         return (self._store_path / name).with_suffix('.zip')
 
@@ -246,7 +230,7 @@ class Store(Mapping):
             for path in old_files:
                 if not path in item.files:
                     os.unlink(str(self._boot_path / path))
-        else:
+        elif isinstance(key, str) and key:
             self._store_path.mkdir(parents=True, exist_ok=True)
             with ZipFile(str(self._path_of(key)), 'x',
                          compression=ZIP_DEFLATED) as arc:
@@ -259,6 +243,9 @@ class Store(Mapping):
                 ).encode('ascii')
                 for file in item.files.values():
                     file.add_to_zip(arc)
+        else:
+            raise KeyError(_(
+                '{key!r} is an invalid stored configuration').format(key=key))
 
     def __delitem__(self, key):
         if key is Default:

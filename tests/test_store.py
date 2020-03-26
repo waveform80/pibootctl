@@ -131,6 +131,8 @@ def test_store_setitem(boot_path, store_path):
     assert store['foo'].files == store[Current].files
     with pytest.raises(KeyError):
         store[Default] = store[Current]
+    with pytest.raises(KeyError):
+        store[''] = store[Current]
 
 
 def test_store_delitem(boot_path, store_path):
