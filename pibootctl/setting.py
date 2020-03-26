@@ -173,8 +173,8 @@ class Setting:
     def lines(self):
         """
         Returns the :class:`~pibootctl.parser.BootLine` items which affected
-        the value of the setting, in the order they were encountered while
-        parsing.
+        the value of the setting, in the reverse order they were encountered
+        while parsing (so the first item holds the current value).
         """
         return self._lines
 

@@ -62,8 +62,8 @@ class Output:
             self._table_style = pretty_table
             self._check_mark = 'x'
 
-    @classmethod
-    def add_style_arg(cls, parser, *, required=False):
+    @staticmethod
+    def add_style_arg(parser, *, required=False):
         """
         Create a mutually exclusive :mod:`argparse` group and add to it options
         for the various input and output styles supported by this class.
@@ -107,19 +107,22 @@ class Output:
                 for name, active, timestamp in sorted(store, key=itemgetter(0))
             ], file)
 
-    def _dump_store_json(self, store, file):
+    @staticmethod
+    def _dump_store_json(store, file):
         json.dump([
             {'name': name, 'active': active, 'timestamp': timestamp.isoformat()}
             for name, active, timestamp in store
         ], file)
 
-    def _dump_store_yaml(self, store, file):
+    @staticmethod
+    def _dump_store_yaml(store, file):
         yaml.dump([
             {'name': name, 'active': active, 'timestamp': timestamp}
             for name, active, timestamp in store
         ], file)
 
-    def _dump_store_shell(self, store, file):
+    @staticmethod
+    def _dump_store_shell(store, file):
         for name, active, timestamp in store:
             file.write('\t'.join(
                 (timestamp.isoformat(), ('inactive', 'active')[active], name)
@@ -155,31 +158,34 @@ class Output:
                  )
             ] + sorted([
                 (l.name if l is not None else r.name,
-                 '-' if l is None else self._format_setting_user(l),
-                 '-' if r is None else self._format_setting_user(r),
+                 '-' if l is None else self.format_setting_user(l),
+                 '-' if r is None else self.format_setting_user(r),
                  )
                 for (l, r) in diff
             ]), file)
 
-    def _dump_diff_json(self, left, right, diff, file):
+    @staticmethod
+    def _dump_diff_json(left, right, diff, file):
         json.dump({
             (l.name if l is not None else r.name): values(l, r)
             for (l, r) in diff
         }, file)
 
-    def _dump_diff_yaml(self, left, right, diff, file):
+    @staticmethod
+    def _dump_diff_yaml(left, right, diff, file):
         yaml.dump({
             (l.name if l is not None else r.name): values(l, r)
             for (l, r) in diff
         }, file)
 
-    def _dump_diff_shell(self, left, right, diff, file):
+    @staticmethod
+    def _dump_diff_shell(left, right, diff, file):
         file.write(
             ''.join(
                 '\t'.join(
                     (l.name if l is not None else r.name,
-                     '-' if l is None else self._format_value_shell(l.value),
-                     '-' if r is None else self._format_value_shell(r.value)
+                     '-' if l is None else Output._format_value_shell(l.value),
+                     '-' if r is None else Output._format_value_shell(r.value)
                      )
                 ) + '\n'
                 for l, r in diff
@@ -198,12 +204,14 @@ class Output:
             'yaml':  self._dump_settings_yaml,
         }[self.style](settings, file, mod=mod)
 
-    def _dump_settings_json(self, settings, file, mod=False):
+    @staticmethod
+    def _dump_settings_json(settings, file, mod=False):
         json.dump({
             name: setting.value for name, setting in settings.items()
         }, file)
 
-    def _dump_settings_yaml(self, settings, file, mod=False):
+    @staticmethod
+    def _dump_settings_yaml(settings, file, mod=False):
         yaml.dump({
             name: setting.value for name, setting in settings.items()
         }, file)
@@ -224,7 +232,7 @@ class Output:
                 (
                     setting.name,
                     self._check_mark if setting.modified else '',
-                    self._format_setting_user(setting),
+                    self.format_setting_user(setting),
                 )
                 for setting in sorted(
                     settings.values(), key=attrgetter('name'))
@@ -244,17 +252,21 @@ class Output:
             'shell': self._load_settings_shell,
         }[self.style](file)
 
-    def _load_settings_json(self, file):
+    @staticmethod
+    def _load_settings_json(file):
         return json.load(file)
 
-    def _load_settings_yaml(self, file):
+    @staticmethod
+    def _load_settings_yaml(file):
         return yaml.load(file, Loader=yaml.SafeLoader)
 
-    def _load_settings_shell(self, file):
+    @staticmethod
+    def _load_settings_shell(file):
         # TODO
         raise NotImplementedError
 
-    def _load_settings_user(self, file):
+    @staticmethod
+    def _load_settings_user(file):
         raise NotImplementedError
 
     def format_value(self, value):
@@ -269,27 +281,31 @@ class Output:
             'yaml':  self._format_value_yaml,
         }[self.style](value)
 
-    def _format_value_json(self, value):
+    @staticmethod
+    def _format_value_json(value):
         return json.dumps(value)
 
-    def _format_value_yaml(self, value):
+    @staticmethod
+    def _format_value_yaml(value):
         with io.StringIO() as file:
             yaml.dump(value, file)
             return file.getvalue()
 
-    def _format_value_shell(self, value):
+    @staticmethod
+    def _format_value_shell(value):
         if value is None:
             return 'auto'
         elif isinstance(value, bool):
             return ('off', 'on')[value]
         elif isinstance(value, list):
             return '({})'.format(' '.join(
-                self._format_value_shell(e) for e in value
+                Output._format_value_shell(e) for e in value
             ))
         else:
             return shlex.quote(str(value))
 
-    def _format_value_user(self, value):
+    @staticmethod
+    def _format_value_user(value):
         if value is None:
             return _('auto')
         elif isinstance(value, bool):
@@ -316,7 +332,7 @@ class Output:
         width = min(120, term_size()[0])
         fields = [
             (_('Name'), setting.name),
-            (_('Default'), self._format_setting_user(setting)),
+            (_('Default'), self.format_setting_user(setting)),
         ]
         if isinstance(setting, Command):
             fields += [
@@ -337,14 +353,20 @@ class Output:
             doc=render(setting.doc, width=width, table_style=self._table_style),
         ))
 
-    def _format_setting_shell(self, setting):
+    @staticmethod
+    def _format_setting_shell(setting):
         return '{name}={value}'.format(
             name=setting.name.replace('.', '_'),
-            value=self._format_value_shell(setting.value)
+            value=Output._format_value_shell(setting.value)
         )
 
-    def _format_setting_user(self, setting):
-        value = self._format_value_user(setting.value)
+    @staticmethod
+    def format_setting_user(setting):
+        """
+        Output the value of *setting* in "human readable" style, with the
+        optional :attr:`~Setting.hint` in parentheses.
+        """
+        value = Output._format_value_user(setting.value)
         return (
             '{value}' if setting.hint is None else
             '{value} ({setting.hint})'

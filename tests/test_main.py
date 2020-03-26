@@ -317,7 +317,7 @@ def test_backup_fallback(store, distro):
 
 def test_reboot_required(tmpdir, distro):
     boot_path = Path(str(tmpdir))
-    store_path = boot_path / 'pibootctl'
+    store_path = boot_path / 'store'
     var_run_path = boot_path / 'run'
     store_path.mkdir()
     var_run_path.mkdir()
@@ -357,6 +357,55 @@ def test_permission_error(store):
             msg = permission_error(*sys.exc_info())
             assert len(msg) == 1
             assert msg[0] == 'permission denied'
+
+
+def test_invalid_config(tmpdir, distro):
+    boot_path = Path(str(tmpdir))
+    (boot_path / 'config.txt').write_text('include syscfg.txt\n')
+    store_path = boot_path / 'store'
+    store_path.mkdir()
+    def my_read(self, *args, **kwargs):
+        self['defaults']['boot_path'] = str(boot_path)
+        self['defaults']['store_path'] = str(store_path)
+        self['defaults']['config_read'] = 'config.txt'
+        self['defaults']['config_write'] = 'syscfg.txt'
+    with mock.patch('configparser.ConfigParser.read', my_read):
+        try:
+            main(['set', 'video.hdmi0.group=1'])
+        except:
+            msg = invalid_config(*sys.exc_info())
+            assert len(msg) == 2
+            assert msg == [
+                "Configuration failed to validate with 1 error(s)",
+                "video.hdmi0.mode must be between 1 and 59 when "
+                "video.hdmi0.group is 1",
+            ]
+
+
+def test_overridden_config(tmpdir, distro):
+    boot_path = Path(str(tmpdir))
+    (boot_path / 'config.txt').write_text(
+        'include syscfg.txt\ninclude usercfg.txt\n')
+    (boot_path / 'usercfg.txt').write_text(
+        'dtparam=spi=on\n')
+    store_path = boot_path / 'store'
+    store_path.mkdir()
+    def my_read(self, *args, **kwargs):
+        self['defaults']['boot_path'] = str(boot_path)
+        self['defaults']['store_path'] = str(store_path)
+        self['defaults']['config_read'] = 'config.txt'
+        self['defaults']['config_write'] = 'syscfg.txt'
+    with mock.patch('configparser.ConfigParser.read', my_read):
+        try:
+            main(['set', 'spi.enabled='])
+        except:
+            msg = overridden_config(*sys.exc_info())
+            assert len(msg) == 2
+            assert msg == [
+                "Failed to set 1 setting(s)",
+                "Expected spi.enabled to be False, but was True after being "
+                "overridden by usercfg.txt line 1",
+            ]
 
 
 def test_debug_run(capsys, distro):

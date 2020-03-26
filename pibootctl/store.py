@@ -35,12 +35,6 @@ configuration parameters for constructing a :class:`Store`.
 
 .. autoclass:: Settings
     :members:
-
-.. autoexception:: InvalidConfiguration
-
-.. autoexception:: IneffectiveConfiguration
-
-.. autoexception:: MissingInclude
 """
 
 import os
@@ -57,6 +51,11 @@ from .files import AtomicReplaceFile
 from .parser import BootParser, BootFile
 from .setting import CommandIncludedFile
 from .settings import SETTINGS
+from .exc import (
+    InvalidConfiguration,
+    IneffectiveConfiguration,
+    MissingInclude,
+)
 
 _ = gettext.gettext
 
@@ -151,6 +150,22 @@ class Store(Mapping):
         self._config_read = config_read
         self._config_write = config_write
         self._config_template = config_template
+
+    @property
+    def boot_path(self):
+        """
+        The path under which the boot partition is mounted, as a
+        :class:`~pathlib.Path`.
+        """
+        return self._boot_path
+
+    @property
+    def store_path(self):
+        """
+        The path under which stored configurations are stored, returned as a
+        :class:`~pathlib.Path`.
+        """
+        return self._store_path
 
     def _path_of(self, name):
         return (self._store_path / name).with_suffix('.zip')
@@ -347,7 +362,7 @@ class BootConfiguration:
             for item, value in setting.extract(parser.config):
                 setting._value = value
                 lines.append(item)
-            setting._lines = tuple(lines)
+            setting._lines = tuple(lines[::-1])
         for setting in self._settings.values():
             if isinstance(setting, CommandIncludedFile):
                 parser.add(setting.filename)
@@ -458,56 +473,6 @@ class StoredConfiguration(BootConfiguration):
             assert False, 'Invalid stored configuration: missing hash'
 
 
-class InvalidConfiguration(ValueError):
-    """
-    Error raised when an updated configuration fails to validate. All
-    :exc:`ValueError` exceptions raised during validation are available from
-    the :attr:`errors` attribute which maps setting names to the
-    :exc:`ValueError` raised.
-    """
-    def __init__(self, errors):
-        self.errors = errors
-        super().__init__(str(self))
-
-    def __str__(self):
-        return _(
-            "Configuration failed to validate with {count:d} "
-            "error(s):\n{errors}").format(
-                count=len(self.errors),
-                errors='\n'.join(str(e) for e in self.errors.values()))
-
-
-class IneffectiveConfiguration(ValueError):
-    """
-    Error raised when an updated configuration has been overridden by something
-    in a file we're not allowed to edit. All settings which have been
-    overridden are available from the :attr:`settings` attribute.
-    """
-    def __init__(self, settings):
-        self.settings = settings
-        super().__init__(str(self))
-
-    def __str__(self):
-        return _(
-            "Failed to set:\n{settings}").format(
-                settings='\n'.join(s.name for s in self.settings))
-
-
-class MissingInclude(ValueError):
-    """
-    Error raised when the file that's re-written by pibootctl isn't included in
-    the configuration.
-    """
-    def __init__(self, rewrite):
-        self.rewrite = rewrite
-        super().__init__(str(self))
-
-    def __str__(self):
-        return _(
-            "{rewrite} was not included in the new configuration").format(
-                rewrite=self.rewrite)
-
-
 class MutableConfiguration(BootConfiguration):
     """
     Represents a changeable boot configuration.
@@ -580,8 +545,7 @@ class MutableConfiguration(BootConfiguration):
             raise MissingInclude(self._rewrite)
         diff = updated.diff(self.settings)
         if diff:
-            raise IneffectiveConfiguration([
-                new for old, new in diff if old is not None])
+            raise IneffectiveConfiguration(diff)
 
 
 class Settings(Mapping):

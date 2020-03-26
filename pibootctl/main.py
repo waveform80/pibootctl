@@ -44,6 +44,11 @@ from .store import Store, Current, Default
 from .term import ErrorHandler, pager
 from .userstr import UserStr
 from .output import Output
+from .exc import (
+    InvalidConfiguration,
+    IneffectiveConfiguration,
+    MissingInclude
+)
 
 try:
     import argcomplete
@@ -54,14 +59,60 @@ except ImportError:
 _ = gettext.gettext
 
 
-def permission_error(exc_type, exc_value, exc_tb):
+def invalid_config(*exc):
+    """
+    Generates the error message for unhandled :exc:`InvalidConfiguration`
+    exceptions. These are caused when a configuration fails to validate, and
+    have an :attr:`~InvalidConfiguration.errors` attribute listing all the
+    exceptions that occurred during validation.
+    """
+    msg = sys.excepthook.exc_message(*exc)
+    for error in exc[1].errors.values():
+        msg.extend(sys.excepthook.exc_message(type(error), error, None))
+    return msg
+
+
+def overridden_config(*exc):
+    """
+    Generates the error message for unhandled :exc:`IneffectiveConfiguration`
+    exceptions. These are caused when a boot configuration is split across
+    multiple files; the application is permitted to modify a file before the
+    final one, but a later file overrides a value the application has tried to
+    set in the file it is permitted to modify.
+    """
+    msg = sys.excepthook.exc_message(*exc)
+    for expected, actual in exc[1].diff:
+        if expected is None and actual is not None:
+            template = _(
+                "{actual.name} appears unexpectedly in the generated "
+                "configuration")
+        elif expected is not None and actual is None:
+            if expected.lines:
+                template = _(
+                    "{expected.name} is not set in the generated "
+                    "configuration although it was set in "
+                    "{expected.lines[0].path} line {expected.lines[0].lineno}")
+            else:
+                template = _(
+                    "{expected.name} is not set in the generated "
+                    "configuration")
+        else:
+            template = _(
+                "Expected {expected.name} to be {expected.value}, but was "
+                "{actual.value} after being overridden by "
+                "{actual.lines[0].path} line {actual.lines[0].lineno}")
+        msg.append(template.format(expected=expected, actual=actual))
+    return msg
+
+
+def permission_error(*exc):
     """
     Generates the error message for unhandled :exc:`PermissionError`
     exceptions. As these are very likely to be caused by non-root execution,
     this is customzied to warn about this in the event that the effective UID
     is not 0.
     """
-    msg = [str(exc_value)]
+    msg = sys.excepthook.exc_message(*exc)
     if os.geteuid() != 0:
         msg.append(_(
             "You need root permissions to modify the boot configuration or "
@@ -107,7 +158,10 @@ class Application:
     def __call__(self, args=None):
         if not int(os.environ.get('DEBUG', '0')):
             sys.excepthook = ErrorHandler()
-            sys.excepthook[PermissionError] = (permission_error, 1)
+            sys.excepthook[InvalidConfiguration] = (invalid_config, 3)
+            sys.excepthook[IneffectiveConfiguration] = (overridden_config, 4)
+            sys.excepthook[MissingInclude] = (sys.excepthook.exc_message, 5)
+            sys.excepthook[PermissionError] = (permission_error, 6)
             sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
         with pager():
             self.parser = self.get_parser()

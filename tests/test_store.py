@@ -221,9 +221,8 @@ dtparam=spi=on
         mutable.update({'video.hdmi0.mode': 1})
     assert len(exc_info.value.errors) == 1
     assert isinstance(exc_info.value.errors['video.hdmi0.mode'], ValueError)
-    assert str(exc_info.value) == """\
-Configuration failed to validate with 1 error(s):
-video.hdmi0.mode must be between 0 and 0 when video.hdmi0.group is 0"""
+    assert str(exc_info.value) == (
+        "Configuration failed to validate with 1 error(s)")
 
 
 def test_store_mutable_ineffective(boot_path, store_path):
@@ -243,10 +242,8 @@ dtparam=i2c=on
     mutable = current.mutable()
     with pytest.raises(IneffectiveConfiguration) as exc_info:
         mutable.update({'i2c.enabled': None})
-    assert len(exc_info.value.settings) == 1
-    assert str(exc_info.value) == """\
-Failed to set:
-i2c.enabled"""
+    assert len(exc_info.value.diff) == 1
+    assert str(exc_info.value) == "Failed to set 1 setting(s)"
 
 
 def test_mutable_missing_include(boot_path, store_path):
