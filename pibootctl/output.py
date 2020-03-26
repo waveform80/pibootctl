@@ -191,7 +191,7 @@ class Output:
                 for l, r in diff
             ))
 
-    def dump_settings(self, settings, file, mod=False):
+    def dump_settings(self, settings, file, mod_only=True):
         """
         Write the content of *settings* (a :class:`Settings` instance or just a
         mapping of settings names to :class:`Setting` objects) to the file-like
@@ -202,29 +202,31 @@ class Output:
             'shell': self._dump_settings_shell,
             'json':  self._dump_settings_json,
             'yaml':  self._dump_settings_yaml,
-        }[self.style](settings, file, mod=mod)
+        }[self.style](settings, file, mod_only=mod_only)
 
     @staticmethod
-    def _dump_settings_json(settings, file, mod=False):
+    def _dump_settings_json(settings, file, mod_only=True):
         json.dump({
             name: setting.value for name, setting in settings.items()
         }, file)
 
     @staticmethod
-    def _dump_settings_yaml(settings, file, mod=False):
+    def _dump_settings_yaml(settings, file, mod_only=True):
         yaml.dump({
             name: setting.value for name, setting in settings.items()
         }, file)
 
-    def _dump_settings_shell(self, settings, file, mod=False):
+    def _dump_settings_shell(self, settings, file, mod_only=True):
         for setting in settings.values():
             file.write(self._format_setting_shell(setting))
             file.write("\n")
 
-    def _dump_settings_user(self, settings, file, mod=False):
+    def _dump_settings_user(self, settings, file, mod_only=True):
         if not settings:
-            file.write(_("No settings matching the pattern found"))
-            file.write("\n")
+            file.write(_(
+                "No modified settings matching the pattern found.\n"))
+            if mod_only:
+                file.write(_("Try --all to include unmodified settings.\n"))
         else:
             data = [
                 (_('Name'), _('Modified'), _('Value'))
@@ -237,7 +239,7 @@ class Output:
                 for setting in sorted(
                     settings.values(), key=attrgetter('name'))
             ]
-            if not mod:
+            if mod_only:
                 data = [(name, value) for (name, modified, value) in data]
             self._print_table(data, file)
 

@@ -166,7 +166,7 @@ def test_dump_settings_user():
 +-------------------+-------+
 """
     buf = io.StringIO()
-    output.dump_settings(default, buf, mod=True)
+    output.dump_settings(default, buf, mod_only=False)
     assert buf.getvalue() == """\
 +-------------------+----------+-------+
 | Name              | Modified | Value |
@@ -178,7 +178,9 @@ def test_dump_settings_user():
 """
     buf = io.StringIO()
     output.dump_settings(set(), buf)
-    assert buf.getvalue() == "No settings matching the pattern found\n"
+    assert buf.getvalue() == (
+        "No modified settings matching the pattern found.\n"
+        "Try --all to include unmodified settings.\n")
 
 
 def test_dump_settings_json():

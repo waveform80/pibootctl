@@ -426,3 +426,81 @@ def test_debug_run(main, capsys, distro):
     with pytest.raises(SystemExit):
         main(['help'])
     assert isinstance(sys.excepthook, ErrorHandler)
+
+
+def test_complete_help(main):
+    assert set(main._complete_help('he')) == {'help'}
+    assert set(main._complete_help('cam')) == {
+        'camera.enabled', 'camera.led.enabled'}
+
+
+def test_complete_status(main):
+    assert set(main._complete_status('he')) == set()
+    assert set(main._complete_status('cam')) == {
+        'camera.enabled', 'camera.led.enabled'}
+
+
+def test_complete_show(main, store):
+    assert set(main._complete_show_name('ca')) == set()
+    store['cam'] = store[Current]
+    store['default'] = store[Default]
+    assert set(main._complete_show_name('ca')) == {'cam'}
+    parsed_args = mock.Mock()
+    parsed_args.name = 'cam'
+    assert set(main._complete_show_vars('camera.', parsed_args)) == {
+        'camera.enabled', 'camera.led.enabled'}
+
+
+def test_complete_get(main):
+    assert set(main._complete_get_vars('boot.kernel.a')) == {
+        'boot.kernel.address', 'boot.kernel.atags'}
+
+
+def test_complete_set(main):
+    assert set(main._complete_set_vars('bluetooth.e')) == {
+        'bluetooth.enabled='}
+    assert set(main._complete_set_vars('bluetooth.enabled=o')) == set()
+
+
+def test_complete_save(main, store):
+    store['cam'] = store[Current]
+    store['default'] = store[Default]
+    parsed_args = mock.Mock()
+    parsed_args.force = False
+    assert set(main._complete_save_name('', parsed_args)) == set()
+    parsed_args.force = True
+    assert set(main._complete_save_name('', parsed_args)) == {'cam', 'default'}
+
+
+def test_complete_load(main, store):
+    store['cam'] = store[Current]
+    store['default'] = store[Default]
+    assert set(main._complete_load_name('c')) == {'cam'}
+
+
+def test_complete_diff(main, store):
+    store['cam'] = store[Current]
+    store['default'] = store[Default]
+    assert set(main._complete_diff_left('c')) == {'cam'}
+    parsed_args = mock.Mock()
+    parsed_args.left = 'cam'
+    assert set(main._complete_diff_right('c', parsed_args)) == set()
+    assert set(main._complete_diff_right('', parsed_args)) == {'default'}
+
+
+def test_complete_remove(main, store):
+    store['cam'] = store[Current]
+    store['default'] = store[Default]
+    assert set(main._complete_remove_name('')) == {'default', 'cam'}
+
+
+def test_complete_rename(main, store):
+    store['cam'] = store[Current]
+    store['default'] = store[Default]
+    assert set(main._complete_rename_name('')) == {'default', 'cam'}
+    parsed_args = mock.Mock()
+    parsed_args.force = False
+    parsed_args.name = 'cam'
+    assert set(main._complete_rename_to('', parsed_args)) == set()
+    parsed_args.force = True
+    assert set(main._complete_rename_to('', parsed_args)) == {'default'}

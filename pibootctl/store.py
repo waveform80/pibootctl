@@ -9,8 +9,8 @@ itself. Each :class:`BootConfiguration` contains an instance of
 :class:`Settings` which maps setting names to
 :class:`~pibootctl.setting.Setting` instances.
 
-See :class:`pibootctl.main` for information on obtaining the necessary
-configuration parameters for constructing a :class:`Store`.
+See :class:`pibootctl.main` for information on obtaining an instance of
+:class:`Store`.
 
 .. data:: Current
 
