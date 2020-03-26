@@ -156,6 +156,9 @@ class Application:
         self.store = None
 
     def __call__(self, args=None):
+        self.parser = self.get_parser()
+        if argcomplete:
+            argcomplete.autocomplete(self.parser)
         if not int(os.environ.get('DEBUG', '0')):
             sys.excepthook = ErrorHandler()
             sys.excepthook[InvalidConfiguration] = (invalid_config, 3)
@@ -164,7 +167,6 @@ class Application:
             sys.excepthook[PermissionError] = (permission_error, 6)
             sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
         with pager():
-            self.parser = self.get_parser()
             self.config = self.parser.parse_args(args)
             self.output = Output(
                 self.config.style if 'style' in self.config else 'user')
