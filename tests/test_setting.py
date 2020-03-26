@@ -60,11 +60,11 @@ def test_overlay_init():
 def test_overlay_extract():
     o = Overlay('sense.enabled', overlay='sensehat')
 
-    config = [BootParam(Path('config.txt'), 3, 'base', 'i2c_arm', 'on')]
+    config = [BootParam('config.txt', 3, 'base', 'i2c_arm', 'on')]
     assert list(o.extract(config)) == []
     config = [
-        BootOverlay(Path('config.txt'), 3, 'disable-bt'),
-        BootOverlay(Path('config.txt'), 4, 'sensehat')]
+        BootOverlay('config.txt', 3, 'disable-bt'),
+        BootOverlay('config.txt', 4, 'sensehat')]
     assert list(o.extract(config)) == [(config[1], True)]
 
 def test_overlay_output():
@@ -88,9 +88,9 @@ def test_param_extract():
     p = OverlayParam('i2c.enabled', param='i2c_arm')
 
     config = [
-        BootOverlay(Path('config.txt'), 1, 'sensehat'),
-        BootOverlay(Path('config.txt'), 2, 'base'),
-        BootParam(Path('config.txt'), 3, 'base', 'i2c_arm', 'on'),
+        BootOverlay('config.txt', 1, 'sensehat'),
+        BootOverlay('config.txt', 2, 'base'),
+        BootParam('config.txt', 3, 'base', 'i2c_arm', 'on'),
     ]
     assert list(p.extract(config)) == [
         (config[1], None),
@@ -117,9 +117,9 @@ def test_int_param_extract():
     p = OverlayParamInt('i2c.baud', param='i2c_baud')
 
     config = [
-        BootOverlay(Path('config.txt'), 1, 'sensehat'),
-        BootOverlay(Path('config.txt'), 2, 'base'),
-        BootParam(Path('config.txt'), 3, 'base', 'i2c_baud', '100000'),
+        BootOverlay('config.txt', 1, 'sensehat'),
+        BootOverlay('config.txt', 2, 'base'),
+        BootParam('config.txt', 3, 'base', 'i2c_baud', '100000'),
     ]
     assert list(p.extract(config)) == [
         (config[1], None),
@@ -138,9 +138,9 @@ def test_bool_param_extract():
     p = OverlayParamBool('i2c.enabled', param='i2c_arm')
 
     config = [
-        BootOverlay(Path('config.txt'), 1, 'sensehat'),
-        BootOverlay(Path('config.txt'), 2, 'base'),
-        BootParam(Path('config.txt'), 3, 'base', 'i2c_arm', 'on'),
+        BootOverlay('config.txt', 1, 'sensehat'),
+        BootOverlay('config.txt', 2, 'base'),
+        BootParam('config.txt', 3, 'base', 'i2c_arm', 'on'),
     ]
     assert list(p.extract(config)) == [
         (config[1], None),
@@ -173,7 +173,7 @@ def test_command_extract():
     c = Command('video.cec.name', command='cec_osd_name', default='RPi')
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'cec_osd_name', 'FOO', hdmi=0),
+        BootCommand('config.txt', 1, 'cec_osd_name', 'FOO', hdmi=0),
     ]
     assert list(c.extract(config)) == [
         (config[0], 'FOO'),
@@ -215,7 +215,7 @@ def test_int_command_extract():
                    valid={0: 'auto', 1: 'dvi', 2: 'hdmi'})
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'hdmi_drive', '2', hdmi=1),
+        BootCommand('config.txt', 1, 'hdmi_drive', '2', hdmi=1),
     ]
     assert list(c.extract(config)) == [
         (config[0], 2),
@@ -268,7 +268,7 @@ def test_bool_command_extract():
     c = CommandBool('boot.test.enabled', command='test_mode')
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'test_mode', '1', hdmi=0),
+        BootCommand('config.txt', 1, 'test_mode', '1', hdmi=0),
     ]
     assert list(c.extract(config)) == [
         (config[0], True),
@@ -302,7 +302,7 @@ def test_inv_bool_command_extract():
                        default=True)
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'disable_overscan', '1', hdmi=0),
+        BootCommand('config.txt', 1, 'disable_overscan', '1', hdmi=0),
     ]
     assert list(c.extract(config)) == [
         (config[0], False),
@@ -323,8 +323,8 @@ def test_force_ignore_command_extract():
                            ignore='hdmi_ignore')
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'hdmi_force', '1', hdmi=0),
-        BootCommand(Path('config.txt'), 2, 'hdmi_ignore', '1', hdmi=0),
+        BootCommand('config.txt', 1, 'hdmi_force', '1', hdmi=0),
+        BootCommand('config.txt', 2, 'hdmi_ignore', '1', hdmi=0),
     ]
     assert list(c.extract(config)) == [
         (config[0], True),
@@ -386,7 +386,7 @@ def test_mask_command_extract():
     cd = CommandMaskDummy('video.dpi.clock', command='dpi_format', mask=0x10)
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'dpi_format', '0x18', hdmi=0),
+        BootCommand('config.txt', 1, 'dpi_format', '0x18', hdmi=0),
     ]
     assert list(cm.extract(config)) == [
         (config[0], 8),
@@ -454,8 +454,8 @@ def test_display_timings_extract():
     t = CommandDisplayTimings('video.timings', command='video_timings')
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'video_timings', '', hdmi=0),
-        BootCommand(Path('config.txt'), 1, 'video_timings',
+        BootCommand('config.txt', 1, 'video_timings', '', hdmi=0),
+        BootCommand('config.txt', 1, 'video_timings',
                     ' '.join(['0'] * 17), hdmi=0),
     ]
     assert list(t.extract(config)) == [
@@ -510,7 +510,7 @@ def test_rotate_flip_extract():
     flip = settings['video.flip']
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'hdmi_rotate', '0x10001', hdmi=0),
+        BootCommand('config.txt', 1, 'hdmi_rotate', '0x10001', hdmi=0),
     ]
     assert list(rot.extract(config)) == [
         (config[0], 90),
@@ -636,9 +636,9 @@ def test_edid_ignore():
     assert ignore.hint is None
 
     assert list(ignore.output()) == ['hdmi_ignore=0xa5000080']
-    config = [BootCommand(Path('config.txt'), 1, 'hdmi_ignore', '0', hdmi=0)]
+    config = [BootCommand('config.txt', 1, 'hdmi_ignore', '0', hdmi=0)]
     assert list(ignore.extract(config)) == [(config[0], False)]
-    config = [BootCommand(Path('config.txt'), 1, 'hdmi_ignore', '0xa5000080', hdmi=0)]
+    config = [BootCommand('config.txt', 1, 'hdmi_ignore', '0xa5000080', hdmi=0)]
     assert list(ignore.extract(config)) == [(config[0], True)]
 
 
@@ -651,9 +651,9 @@ def test_boot_delay2():
     delay.validate()
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'boot_delay', '1', hdmi=0),
-        BootCommand(Path('config.txt'), 2, 'boot_delay_ms', '500', hdmi=0),
-        BootCommand(Path('config.txt'), 3, 'boot_delay', '2', hdmi=0),
+        BootCommand('config.txt', 1, 'boot_delay', '1', hdmi=0),
+        BootCommand('config.txt', 2, 'boot_delay_ms', '500', hdmi=0),
+        BootCommand('config.txt', 3, 'boot_delay', '2', hdmi=0),
     ]
     assert list(delay.extract(config)) == [
         (config[0], 1.0),
@@ -694,11 +694,11 @@ def test_kernel_address():
     assert addr.value == 0x80000
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'arm_64bit', '0', hdmi=0),
-        BootCommand(Path('config.txt'), 2, 'arm_control', '0x202', hdmi=0),
-        BootCommand(Path('config.txt'), 3, 'kernel_address', '0x100', hdmi=0),
-        BootCommand(Path('config.txt'), 4, 'kernel_old', '0', hdmi=0),
-        BootCommand(Path('config.txt'), 5, 'kernel_old', '1', hdmi=0),
+        BootCommand('config.txt', 1, 'arm_64bit', '0', hdmi=0),
+        BootCommand('config.txt', 2, 'arm_control', '0x202', hdmi=0),
+        BootCommand('config.txt', 3, 'kernel_address', '0x100', hdmi=0),
+        BootCommand('config.txt', 4, 'kernel_old', '0', hdmi=0),
+        BootCommand('config.txt', 5, 'kernel_old', '1', hdmi=0),
     ]
     assert list(arm8.extract(config)) == [
         (config[0], False),
@@ -773,10 +773,10 @@ def test_camera_firmware(fw_settings):
 def test_camera_firmware_extract(fw_settings):
     cam = fw_settings['camera.enabled']
     config = [
-        BootCommand(Path('config.txt'), 1, 'gpu_mem', '192', hdmi=0),
-        BootCommand(Path('config.txt'), 2, 'start_x', '1', hdmi=0),
-        BootCommand(Path('config.txt'), 3, 'start_x', '0', hdmi=0),
-        BootCommand(Path('config.txt'), 4, 'start_debug', '1', hdmi=0),
+        BootCommand('config.txt', 1, 'gpu_mem', '192', hdmi=0),
+        BootCommand('config.txt', 2, 'start_x', '1', hdmi=0),
+        BootCommand('config.txt', 3, 'start_x', '0', hdmi=0),
+        BootCommand('config.txt', 4, 'start_debug', '1', hdmi=0),
     ]
     assert list(cam.extract(config)) == [
         (config[1], True),
@@ -821,8 +821,8 @@ def test_debug_firmware(fw_settings):
 def test_debug_firmware_extract(fw_settings):
     debug = fw_settings['boot.debug.enabled']
     config = [
-        BootCommand(Path('config.txt'), 1, 'start_debug', '1', hdmi=0),
-        BootCommand(Path('config.txt'), 2, 'start_debug', '0', hdmi=0),
+        BootCommand('config.txt', 1, 'start_debug', '1', hdmi=0),
+        BootCommand('config.txt', 2, 'start_debug', '0', hdmi=0),
     ]
     assert list(debug.extract(config)) == [
         (config[0], True),
@@ -901,9 +901,9 @@ def test_initrd_addr():
 def test_initrd_addr_extract():
     initrd_addr = CommandRamFSAddress('initrd.addr', commands=('ramfsaddr', 'initramfs'))
     config = [
-        BootCommand(Path('config.txt'), 1, 'initramfs', ('initrd.img', 'followkernel'), hdmi=0),
-        BootCommand(Path('config.txt'), 2, 'initramfs', ('initrd.img', '0x2400000'), hdmi=0),
-        BootCommand(Path('config.txt'), 3, 'ramfsaddr', '0x2700000', hdmi=0),
+        BootCommand('config.txt', 1, 'initramfs', ('initrd.img', 'followkernel'), hdmi=0),
+        BootCommand('config.txt', 2, 'initramfs', ('initrd.img', '0x2400000'), hdmi=0),
+        BootCommand('config.txt', 3, 'ramfsaddr', '0x2700000', hdmi=0),
     ]
     assert list(initrd_addr.extract(config)) == [
         (config[0], None),
@@ -952,9 +952,9 @@ def test_initrd_filename():
 def test_initrd_filename_extract():
     initrd = CommandRamFSFilename('initrd.file', commands=('ramfsfile', 'initramfs'))
     config = [
-        BootCommand(Path('config.txt'), 1, 'initramfs', ('initrd.img', 'followkernel'), hdmi=0),
-        BootCommand(Path('config.txt'), 2, 'initramfs', ('initrd.img,splash.img', '0x2400000'), hdmi=0),
-        BootCommand(Path('config.txt'), 3, 'ramfsfile', 'initrd.img,net.img', hdmi=0),
+        BootCommand('config.txt', 1, 'initramfs', ('initrd.img', 'followkernel'), hdmi=0),
+        BootCommand('config.txt', 2, 'initramfs', ('initrd.img,splash.img', '0x2400000'), hdmi=0),
+        BootCommand('config.txt', 3, 'ramfsfile', 'initrd.img,net.img', hdmi=0),
     ]
     assert list(initrd.extract(config)) == [
         (config[0], ['initrd.img']),
@@ -1041,10 +1041,10 @@ def test_serial_bt_extract():
     uart = settings['serial.uart']
 
     config = [
-        BootCommand(Path('config.txt'), 1, 'enable_uart', '1', hdmi=0),
-        BootOverlay(Path('config.txt'), 2, 'pi3-miniuart-bt'),
-        BootOverlay(Path('config.txt'), 3, 'disable-bt'),
-        BootOverlay(Path('config.txt'), 4, 'foo'),
+        BootCommand('config.txt', 1, 'enable_uart', '1', hdmi=0),
+        BootOverlay('config.txt', 2, 'pi3-miniuart-bt'),
+        BootOverlay('config.txt', 3, 'disable-bt'),
+        BootOverlay('config.txt', 4, 'foo'),
     ]
     assert list(enable.extract(config)) == [(config[0], True)]
     assert list(bt.extract(config)) == [(config[1], True), (config[2], False)]
@@ -1344,10 +1344,10 @@ def test_gpu_mem():
         assert mem.hint == 'Mb'
 
         config = [
-            BootCommand(Path('config.txt'), 1, 'gpu_mem_1024', '256', hdmi=0),
-            BootCommand(Path('config.txt'), 2, 'gpu_mem_512', '192', hdmi=0),
-            BootCommand(Path('config.txt'), 3, 'gpu_mem', '96', hdmi=0),
-            BootCommand(Path('config.txt'), 4, 'gpu_mem_256', '64', hdmi=0),
+            BootCommand('config.txt', 1, 'gpu_mem_1024', '256', hdmi=0),
+            BootCommand('config.txt', 2, 'gpu_mem_512', '192', hdmi=0),
+            BootCommand('config.txt', 3, 'gpu_mem', '96', hdmi=0),
+            BootCommand('config.txt', 4, 'gpu_mem_256', '64', hdmi=0),
         ]
 
         get_board_mem.return_value = 1024
