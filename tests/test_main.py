@@ -428,7 +428,7 @@ def test_debug_run(main, capsys, distro):
     assert isinstance(sys.excepthook, ErrorHandler)
 
 
-def test_complete_help(main):
+def test_complete_help(main, distro):
     assert set(main._complete_help('he')) == {'help'}
     assert set(main._complete_help('cam')) == {
         'camera.enabled', 'camera.led.enabled'}
