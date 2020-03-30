@@ -532,10 +532,12 @@ class Application:
                     if isinstance(setting, Command)
                     and self._args.cmd in setting.commands
                 ]
+                if len(commands) == 0:
+                    raise ValueError(_(
+                        'Unknown command "{self._args.cmd}"').format(self=self))
                 if len(commands) == 1:
                     self._output.dump_setting(commands[0], file=sys.stdout)
                 else:
-                    # TODO What if it's no commands?
                     print(_(
                         '{self._args.cmd} is affected by the following '
                         'settings:\n\n'

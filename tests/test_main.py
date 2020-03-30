@@ -111,6 +111,9 @@ def test_help_config_command(main, capsys, distro):
     assert captured.out.lstrip().startswith('Name: camera.enabled')
     assert {'start_x', 'start_debug', 'start_file', 'fixup_file'} <= set(
         captured.out.replace(',', '').split())
+    with pytest.raises(ValueError) as exc_info:
+        main(['help', 'foo_bar'])
+    assert str(exc_info.value) == 'Unknown command "foo_bar"'
 
 
 def test_help_config_multi(main, capsys, distro):
