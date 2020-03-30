@@ -90,8 +90,11 @@ class Application:
         self._store = None
 
     def __call__(self, args=None):
-        if argcomplete:
-            argcomplete.autocomplete(self.parser)
+        if int(os.environ.get('_ARGCOMPLETE', '0')):
+            if argcomplete:
+                argcomplete.autocomplete(self.parser)
+            else:
+                raise RuntimeError('missing argcomplete')
         if not int(os.environ.get('DEBUG', '0')):
             sys.excepthook = ErrorHandler()
             sys.excepthook[InvalidConfiguration] = (self.invalid_config, 3)
