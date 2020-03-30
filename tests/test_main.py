@@ -25,6 +25,7 @@ def store(request, tmpdir):
         self['defaults']['store_path'] = str(store_path)
         self['defaults']['reboot_required'] = ''
         self['defaults']['reboot_required_pkgs'] = ''
+        return []
     with mock.patch('configparser.ConfigParser.read', my_read):
         yield Store(boot_path, store_path)
 
@@ -334,6 +335,7 @@ def test_reboot_required(main, tmpdir, distro):
         self['defaults']['store_path'] = str(store_path)
         self['defaults']['reboot_required'] = str(var_run_path / 'reboot-required')
         self['defaults']['reboot_required_pkgs'] = str(var_run_path / 'reboot-required.pkgs')
+        return []
     with mock.patch('configparser.ConfigParser.read', my_read):
         store = Store(boot_path, store_path)
         current = store[Current].mutable()
@@ -377,6 +379,7 @@ def test_invalid_config(main, tmpdir, distro):
         self['defaults']['store_path'] = str(store_path)
         self['defaults']['config_read'] = 'config.txt'
         self['defaults']['config_write'] = 'syscfg.txt'
+        return []
     with mock.patch('configparser.ConfigParser.read', my_read):
         try:
             main(['set', 'video.hdmi0.group=1'])
@@ -403,6 +406,7 @@ def test_overridden_config(main, tmpdir, distro):
         self['defaults']['store_path'] = str(store_path)
         self['defaults']['config_read'] = 'config.txt'
         self['defaults']['config_write'] = 'syscfg.txt'
+        return []
     with mock.patch('configparser.ConfigParser.read', my_read):
         try:
             main(['set', 'spi.enabled='])

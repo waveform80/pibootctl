@@ -4,8 +4,8 @@ instance of this called :data:`main`. Instances of :class:`Application` are
 callable and thus :data:`main` is the entry-point for the :doc:`pibootctl
 <manual>` script.
 
-This module is primarily useful for obtaining an instance of the
-:class:`~pibootctl.store.Store`::
+From an API perspective, this module is primarily useful for providing an
+instance of the :class:`~pibootctl.store.Store` class::
 
     from pibootctl.main import main
     from pibootctl.store import Store, Current, Default
@@ -29,6 +29,7 @@ import gettext
 import argparse
 import configparser
 from datetime import datetime
+from pathlib import Path
 
 import pkg_resources
 
@@ -160,7 +161,7 @@ class Application:
                 'store_path':            'pibootctl',
                 'config_read':           'config.txt',
                 'config_write':          'config.txt',
-                'config_template':       '{config}',
+                'config_template':       'pibootctl.template',
                 'backup':                'on',
                 'package_name':          'pibootctl',
                 'reboot_required':       '/var/run/reboot-required',
@@ -170,7 +171,7 @@ class Application:
             delimiters=('=',),
             comment_prefixes=('#',),
             interpolation=None)
-        parser.read(
+        read = parser.read(
             [
                 '/lib/pibootctl/pibootctl.conf',
                 '/etc/pibootctl.conf',
@@ -185,11 +186,19 @@ class Application:
             store_path=section['store_path'],
             config_read=section['config_read'],
             config_write=section['config_write'],
-            config_template=section['config_template'],
+            config_template='{config}',
             backup=section.getboolean('backup'),
             package_name=section['package_name'],
             reboot_required=section['reboot_required'],
             reboot_required_pkgs=section['reboot_required_pkgs'])
+        # Read the specific template file(s)
+        template_path = Path(section['config_template'])
+        for filename in read:
+            path = Path(filename).parent.joinpath(template_path)
+            try:
+                config.config_template = path.read_text()
+            except FileNotFoundError:
+                pass
         return config
 
     def _get_parser(self):

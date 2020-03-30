@@ -39,6 +39,7 @@ The configuration file is a straight-forward INI-style containing a single
 section titled "defaults". A typical configuration file might look like this:
 
 .. code-block:: ini
+    :caption: pibootctl.conf
 
     [defaults]
     boot_path=/boot
@@ -46,14 +47,18 @@ section titled "defaults". A typical configuration file might look like this:
 
     config_read=config.txt
     config_write=config.txt
-    config_template=
-        # This file is changed by pibootctl; manual edits may be lost!
-        {config}
+    config_template=pibootctl.template
 
     reboot_required=/var/run/reboot-required
     reboot_required_pkgs=/var/run/reboot-required.pkgs
     package_name=pibootctl
     backup=on
+
+.. code-block:: text
+    :caption: pibootctl.template
+
+    # This file is changed by pibootctl; manual edits may be lost!
+    {config}
 
 The configuration specifies several settings, but the most important are:
 
@@ -76,11 +81,11 @@ The configuration specifies several settings, but the most important are:
     distribution maintained. This is also relative to ``boot_path``.
 
 ``config_template``
-    The template to be used when writing the file specified by
-    ``config_write``. By default this is simply "{config}" (the bare
-    substitution marker for the generated configuration lines). However, this
-    setting can be used to add headers, footers, or for that matter additional
-    fixed includes or even other configuration settings.
+    The location of the file, relative to this configuration file, containing
+    the template to be used when writing the file specified by
+    ``config_write``. The specified text file must contain the substitution
+    marker "{config}" and whatever else is desired (header or footer comments,
+    or for that matter additional includes or other configuration settings).
 
 ``reboot_required``
     The file which should be created in the event that the active boot
