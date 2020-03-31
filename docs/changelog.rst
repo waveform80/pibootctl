@@ -23,7 +23,37 @@ Change log
 .. currentmodule:: pibootctl
 
 
-Release 0.1 (2020-03-??)
+Release 0.4 (2020-03-31)
+========================
+
+* Handle unrecognized commands correctly in the "help" command
+* Implemented loading settings with the ``--shell`` style
+* Improved help output for reference lists
+* Fixed all legal stuff (added copyright headers where required, re-licensed to
+  GPL 3+)
+
+Release 0.3 (2020-03-27)
+========================
+
+* Added full bash completion support
+
+Release 0.2 (2020-03-26)
+========================
+
+* The application now reports which lines overrode a setting when the
+  "ineffective setting" error occurs
+* Added the max_framebuffers setting, and detection for the vc4-\*-v3d overlays
+* Fixed restoring the default configuration in which config.txt doesn't exist
+  (i.e. when config.txt should be deleted or blanked; the prior version simply
+  left the old config.txt in place incorrectly)
+* Various documentation fixes
+
+Release 0.1.1 (2020-03-13)
+==========================
+
+* Fixed broken build on Bionic
+
+Release 0.1 (2020-03-13)
 ========================
 
 * Initial release.
