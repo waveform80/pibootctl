@@ -161,9 +161,9 @@ def test_dump_diff_shell(left_right_diff):
     output = Output(style='shell')
     output.dump_diff('left', 'right', diff, buf)
     assert set(buf.getvalue().splitlines()) == {
-        "boot.test.enabled\toff\t-",
+        "boot.test.enabled\tfalse\t-",
         "video.cec.name\t'Raspberry Pi'\tFoo",
-        "video.hdmi0.enabled\t-\ton",
+        "video.hdmi0.enabled\t-\ttrue",
     }
 
 
@@ -199,6 +199,10 @@ def test_dump_settings_user():
     assert buf.getvalue() == (
         "No modified settings matching the pattern found.\n"
         "Try --all to include unmodified settings.\n")
+    buf = io.StringIO()
+    output.dump_settings(set(), buf, mod_only=False)
+    assert buf.getvalue() == (
+        "No modified settings matching the pattern found.\n")
 
 
 def test_dump_settings_json():
@@ -229,8 +233,8 @@ def test_dump_settings_shell():
     output.dump_settings(default, buf)
     # Sets because there's no guarantee of order in the output
     assert set(buf.getvalue().splitlines()) == {
-        "video_cec_enabled=on",
-        "video_cec_init=on",
+        "video_cec_enabled=true",
+        "video_cec_init=true",
         "video_cec_name='Raspberry Pi'",
     }
 
@@ -267,20 +271,27 @@ def test_load_settings_yaml():
     assert output.load_settings(buf) == settings
 
 
-@pytest.mark.xfail(raises=NotImplementedError)
 def test_load_settings_shell():
     settings = {
         'video.cec.enabled': True,
         'video.cec.init': False,
         'video.cec.name': 'Raspberry Pi',
+        'gpu.mem': 256,
+        'made.up.value': [256, False, 'Raspberry Pi'],
     }
     buf = io.StringIO("""\
-video_cec_enabled=on
-video_cec_init=off
+video_cec_enabled=true
+video_cec_init=false
 video_cec_name='Raspberry Pi'
+gpu_mem=256
+made_up_value=(256 false 'Raspberry Pi')
 """)
     output = Output(style='shell')
     assert output.load_settings(buf) == settings
+    buf = io.StringIO("false")
+    assert output.load_settings(buf) is False
+    buf = io.StringIO("gpu_mem=256")
+    assert output.load_settings(buf) == {'gpu.mem': 256}
 
 
 def test_format_value_user():
@@ -320,8 +331,8 @@ def test_format_value_shell():
     output = Output(style='shell')
     assert output.format_value(1) == '1'
     assert output.format_value(None) == 'auto'
-    assert output.format_value(True) == 'on'
-    assert output.format_value(False) == 'off'
+    assert output.format_value(True) == 'true'
+    assert output.format_value(False) == 'false'
     assert output.format_value([1, 2, 3]) == '(1 2 3)'
     assert output.format_value('Foo') == 'Foo'
     assert output.format_value('Foo Bar') == "'Foo Bar'"

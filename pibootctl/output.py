@@ -282,8 +282,28 @@ class Output:
 
     @staticmethod
     def _load_settings_shell(file):
-        # TODO
-        raise NotImplementedError
+        def parse(value):
+            if value in {'false', 'true'}:
+                return value == 'true'
+            elif value.isdigit():
+                return int(value)
+            elif value.startswith('(') and value.endswith(')'):
+                return [
+                    parse(shlex.quote(item))
+                    for item in shlex.split(value[1:-1])
+                ]
+            else:
+                return shlex.split(value)[0]
+
+        data = file.read().splitlines()
+        if len(data) == 1:
+            if '=' not in data[0]:
+                return parse(data[0])
+        return {
+            key.replace('_', '.'): parse(value)
+            for line in data
+            for key, value in (line.split('=', 1),)
+        }
 
     @staticmethod
     def _load_settings_user(file):
@@ -316,7 +336,7 @@ class Output:
         if value is None:
             return 'auto'
         elif isinstance(value, bool):
-            return ('off', 'on')[value]
+            return ('false', 'true')[value]
         elif isinstance(value, list):
             return '({})'.format(' '.join(
                 Output._format_value_shell(e) for e in value
