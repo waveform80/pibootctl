@@ -1,3 +1,13 @@
+pibootctl (0.4-1) focal; urgency=medium
+
+  * Handle unrecognized commands correctly in the "help" command
+  * Implemented loading settings with the ``--shell`` style
+  * Improved help output for reference lists
+  * Fixed all legal stuff (added copyright headers where required, re-licensed
+    to GPL 3+)
+
+ -- Dave Jones <dave.jones@canonical.com>  Tue, 31 Mar 2020 16:15:22 +0100
+
 pibootctl (0.3-1) focal; urgency=medium
 
   * Added full bash completions
