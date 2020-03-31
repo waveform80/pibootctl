@@ -1,3 +1,9 @@
+pibootctl (0.4-2) focal; urgency=medium
+
+  * Fix the config.template configuration file
+
+ -- Dave Jones <dave.jones@canonical.com>  Tue, 31 Mar 2020 22:12:29 +0100
+
 pibootctl (0.4-1) focal; urgency=medium
 
   * Handle unrecognized commands correctly in the "help" command
