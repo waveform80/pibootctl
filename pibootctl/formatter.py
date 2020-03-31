@@ -123,6 +123,7 @@ markup renderer.
 .. autofunction:: render
 """
 
+import re
 from bisect import bisect
 from textwrap import dedent, TextWrapper
 from itertools import islice, zip_longest, chain, tee
@@ -528,25 +529,44 @@ class TransMap:
 
 class FormatDict:
     """
-    Used to format *data*, a :class:`dict`, as a table in a format acceptable
-    as input to the :func:`render` function. The *key_title* and *value_title*
-    strings provide the cells for the single header row.
+    Used to format *data*, a :class:`dict`, in a format acceptable as input to
+    the :func:`render` function. The *key_title* and *value_title* strings
+    provide the cells for the single header row.
 
     This class is intended to be used within a string for :meth:`str.format`.
     For example::
 
         >>> from pibootctl.formatter import FormatDict
         >>> d = {'foo': 100, 'bar': 200}
-        >>> print('An example table:\\n\\n{table}'.format(table=FormatDict(d)))
+        >>> print('An example table:\\n\\n{s}'.format(s=FormatDict(d)))
         An example table:
 
         | Key | Value |
         | foo | 100 |
         | bar | 200 |
 
-    Note that, in Python versions before 3.7, you may need to use
-    :class:`collections.OrderedDict` to ensure output of the elements of *data*
-    in a particular order.
+    The format specification in the format string can be used to request
+    different kinds of output, for instance::
+
+        >>> f = FormatDict({'foo': 100, 'bar': 200})
+        >>> print('An example list:\\n\\n{f:list}'.format(f=f)
+        An example list:
+
+        * foo = 100
+        * bar = 200
+        >>> print('An example reference list:\\n\\n{f:refs}'.format(f=f))
+        An example reference list:
+
+        [foo]: 100
+        [bar]: 200
+
+    The default format specification is "table", naturally.
+
+    .. note::
+
+        In Python versions before 3.7, you may need to use
+        :class:`collections.OrderedDict` to ensure output of the elements of
+        *data* in a particular order.
     """
 
     def __init__(self, data, key_title='Key', value_title='Value'):
@@ -568,6 +588,11 @@ class FormatDict:
                 '* {key} = {value}'.format(key=key, value=value)
                 for key, value in self.data.items()
             )
+        elif spec == 'refs':
+            return '\n'.join(
+                '[{key}]: {value}'.format(key=key, value=value)
+                for key, value in self.data.items()
+            )
         else:
             raise ValueError('Unknown format spec. {!r}'.format(spec))
 
@@ -576,12 +601,19 @@ def lex(text):
     """
     Internal function which acts as the lexer for :func:`render`.
     """
+    row_re = re.compile(r'^\|.*\|$')
+    item_re = re.compile(r'^\*')
+    ref_re = re.compile(r'^\[[0-9A-Z]+\]:')
+
     for line in text.splitlines() + ['']:
         line = line.rstrip()
-        if line.startswith('|') and line.endswith('|'):
+        if row_re.match(line):
             yield 'row', [col.strip() for col in line[1:-1].split('|')]
-        elif line.startswith('*'):
+        elif item_re.match(line):
             yield 'item', line[1:].strip()
+        elif ref_re.match(line):
+            ref, link = line.split(':', 1)
+            yield 'ref', (ref, link.strip())
         elif line:
             yield 'line', line.strip()
         else:
@@ -595,67 +627,88 @@ def parse(text):
     Internal function which acts as the parser for :func:`render`.
     """
     state = 'break'
-    for token, s in lex(text):
-        if state == 'break':
-            if token == 'row':
-                state = 'table/row'
-                rows = [s]
-            elif token == 'item':
-                state = 'list/item'
-                item = [s]
-                items = []
-            elif token == 'line':
-                state = 'para'
-                para = [s]
-        elif state == 'table/row':
-            if token == 'row':
-                rows.append(s)
+    rows = []
+    items = []
+    item = []
+    para = []
+
+    def start_table():
+        nonlocal rows
+        rows = [s]
+        return 'table/row'
+
+    def start_list():
+        nonlocal item, items
+        item = [s]
+        items = []
+        return 'list/item'
+
+    def start_refs():
+        nonlocal items
+        items = [s]
+        return 'refs'
+
+    def start_para():
+        nonlocal para
+        para = [s]
+        return 'para'
+
+    def start_break():
+        return 'break'
+
+    switch = {
+        'row':   start_table,
+        'item':  start_list,
+        'ref':   start_refs,
+        'line':  start_para,
+        'blank': start_break,
+    }
+
+    try:
+        for token, s in lex(text):
+            if state == 'break':
+                state = switch[token]()
+            elif state == 'table/row':
+                if token == 'row':
+                    rows.append(s)
+                else:
+                    yield 'table', rows
+                    state = switch[token]()
+            elif state == 'list/item':
+                if token == 'line':
+                    item.append(s)
+                else:
+                    items.append(' '.join(item))
+                    if token == 'item':
+                        item = [s]
+                    elif token == 'blank':
+                        state = 'list'
+                    else:
+                        yield 'list', items
+                        state = switch[token]()
+            elif state == 'list':
+                if token == 'item':
+                    state = 'list/item'
+                    item = [s]
+                else:
+                    yield 'list', items
+                    state = switch[token]()
+            elif state == 'refs':
+                if token == 'ref':
+                    items.append(s)
+                else:
+                    yield 'refs', items
+                    state = switch[token]()
+            elif state == 'para':
+                if token == 'line':
+                    para.append(s)
+                else:
+                    yield 'para', ' '.join(para)
+                    state = switch[token]()
             else:
-                yield 'table', rows
-                state = 'break'
-        elif state == 'list/item':
-            if token == 'item':
-                items.append(' '.join(item))
-                item = [s]
-            elif token == 'line':
-                item.append(s)
-            elif token == 'row':
-                items.append(' '.join(item))
-                yield 'list', items
-                state = 'table/row'
-                rows = [s]
-            else:
-                items.append(' '.join(item))
-                state = 'list'
-        elif state == 'list':
-            if token == 'item':
-                state = 'list/item'
-                item = [s]
-            elif token == 'row':
-                yield 'list', items
-                state = 'table/row'
-                rows = [s]
-            elif token == 'line':
-                yield 'list', items
-                state = 'para'
-                para = [s]
-        elif state == 'para':
-            if token == 'row':
-                yield 'para', ' '.join(para)
-                state = 'table/row'
-                rows = [s]
-            elif token == 'item':
-                yield 'para', ' '.join(para)
-                state = 'list/item'
-                item = [s]
-                items = []
-            elif token == 'line':
-                para.append(s)
-            else:
-                yield 'para', ' '.join(para)
-                state = 'break'
-        else:
-            assert False  # pragma: no cover
+                assert False, 'invalid state'  # pragma: no cover
+    except KeyError:
+        assert False, 'invalid token'  # pragma: no cover
 
     # Deal with residual state (lists have indeterminate endings)
     if state == 'list':
@@ -715,6 +768,13 @@ def render(text, width=70, list_space=False, table_style=None):
                     list_wrapper.fill(item)
                     for item in data
                 ))
+        elif token == 'refs':
+            ref_len = max(len(ref) for ref, link in data)
+            chunks.append('\n'.join(
+                para_wrapper.fill('{ref}:{space} {link}'.format(
+                    ref=ref, link=link, space=' ' * (ref_len - len(ref))))
+                for ref, link in data
+            ))
         elif token == 'table':
             chunks.append(table_wrapper.fill(data))
         else:

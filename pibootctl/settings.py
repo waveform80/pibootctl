@@ -452,7 +452,6 @@ SETTINGS = {
             setting must be set when this is non-zero.
             """)),
     setting.CommandDisplayMode(
-        # TODO Numbered lists...
         'video.dpi.mode', command='dpi_mode', doc=_(
             """
             Defines which mode will be used for DPI LCD output. This defaults
@@ -472,11 +471,10 @@ SETTINGS = {
 
             {valid_dmt}
 
-            Note that there is a pixel clock limit [2]. The highest supported
+            Note that there is a pixel clock limit [1]. The highest supported
             mode is 1920x1200 at 60Hz which reduced blanking.
 
-            [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
-            [2]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
+            [1]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
             """)),
     setting.CommandDisplayTimings(
         'video.dpi.timings', command='dpi_timings', doc=_(
@@ -1236,7 +1234,6 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
             video.hdmi{index}.mode setting must be set when this is non-zero.
             """)),
     setting.CommandDisplayMode(
-        # TODO Numbered lists...
         'video.hdmi{}.mode'.format(hdmi), index=hdmi, command='hdmi_mode',
         doc=_(
             """
@@ -1257,11 +1254,10 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
 
             {valid_dmt}
 
-            Note that there is a pixel clock limit [2]. The highest supported
+            Note that there is a pixel clock limit [1]. The highest supported
             mode is 1920x1200 at 60Hz which reduced blanking.
 
-            [1]: https://www.raspberrypi.org/documentation/configuration/config-txt/video.md
-            [2]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
+            [1]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
             """)),
     setting.CommandInt(
         'video.hdmi{}.encoding'.format(hdmi), index=hdmi,

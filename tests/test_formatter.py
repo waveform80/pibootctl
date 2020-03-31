@@ -28,18 +28,18 @@ from pibootctl.formatter import *
 def table_data(request):
     return [
         ['Key', 'Value'],
-        ['foo', 'bar'],
-        ['baz', 'A much longer value which can wrap over several lines'],
-        ['quux', 'Just for completeness'],
+        ['FOO', 'bar'],
+        ['BAZ', 'A much longer value which can wrap over several lines'],
+        ['QUUX', 'Just for completeness'],
     ]
 
 
 @pytest.fixture()
 def dict_data(request):
     return OrderedDict([
-        ['foo', 'bar'],
-        ['baz', 'A much longer value which can wrap over several lines'],
-        ['quux', 'Just for completeness'],
+        ['FOO', 'bar'],
+        ['BAZ', 'A much longer value which can wrap over several lines'],
+        ['QUUX', 'Just for completeness'],
     ])
 
 
@@ -47,9 +47,9 @@ def test_table_wrap_basic(table_data):
     expected = [
         "Key  Value                                                ",
         "---- -----------------------------------------------------",
-        "foo  bar                                                  ",
-        "baz  A much longer value which can wrap over several lines",
-        "quux Just for completeness                                ",
+        "FOO  bar                                                  ",
+        "BAZ  A much longer value which can wrap over several lines",
+        "QUUX Just for completeness                                ",
     ]
     wrap = TableWrapper()
     assert wrap.wrap(table_data) == expected
@@ -59,9 +59,9 @@ def test_table_wrap_basic(table_data):
 def test_table_wrap_no_header(table_data):
     expected = [
         "Key  Value                                                ",
-        "foo  bar                                                  ",
-        "baz  A much longer value which can wrap over several lines",
-        "quux Just for completeness                                ",
+        "FOO  bar                                                  ",
+        "BAZ  A much longer value which can wrap over several lines",
+        "QUUX Just for completeness                                ",
     ]
     wrap = TableWrapper(header_rows=0)
     assert wrap.wrap(table_data) == expected
@@ -73,10 +73,10 @@ def test_table_wrap_thin(table_data):
     expected = [
         "Key  Value                              ",
         "---- -----------------------------------",
-        "foo  bar                                ",
-        "baz  A much longer value which can wrap ",
+        "FOO  bar                                ",
+        "BAZ  A much longer value which can wrap ",
         "     over several lines                 ",
-        "quux Just for completeness              ",
+        "QUUX Just for completeness              ",
     ]
     assert wrap.wrap(table_data) == expected
     assert wrap.fill(table_data) == '\n'.join(expected)
@@ -88,10 +88,10 @@ def test_table_wrap_pretty_thin(table_data):
         "+------+-------------------------------+",
         "| Key  | Value                         |",
         "|------+-------------------------------|",
-        "| foo  | bar                           |",
-        "| baz  | A much longer value which can |",
+        "| FOO  | bar                           |",
+        "| BAZ  | A much longer value which can |",
         "|      | wrap over several lines       |",
-        "| quux | Just for completeness         |",
+        "| QUUX | Just for completeness         |",
         "+------+-------------------------------+",
     ]
     assert wrap.wrap(table_data) == expected
@@ -104,11 +104,11 @@ def test_table_wrap_footer(table_data):
         "+------+-------------------------------+",
         "| Key  | Value                         |",
         "|------+-------------------------------|",
-        "| foo  | bar                           |",
-        "| baz  | A much longer value which can |",
+        "| FOO  | bar                           |",
+        "| BAZ  | A much longer value which can |",
         "|      | wrap over several lines       |",
         "|------+-------------------------------|",
-        "| quux | Just for completeness         |",
+        "| QUUX | Just for completeness         |",
         "+------+-------------------------------+",
     ]
     assert wrap.wrap(table_data) == expected
@@ -179,9 +179,9 @@ def test_table_wrap_too_thin(table_data):
     expected = [
         "Key  Value                                                ",
         "---- -----------------------------------------------------",
-        "foo  bar                                                  ",
-        "baz  A much longer value which can wrap over several lines",
-        "quux Just for completeness                                ",
+        "FOO  bar                                                  ",
+        "BAZ  A much longer value which can wrap over several lines",
+        "QUUX Just for completeness                                ",
     ]
     wrap = TableWrapper(width=5, **pretty_table)
     with pytest.raises(ValueError):
@@ -256,21 +256,21 @@ def test_transmap():
 def test_format_dict_table(dict_data):
     assert '{:table}'.format(FormatDict(dict_data)) == """\
 | Key | Value |
-| foo | bar |
-| baz | A much longer value which can wrap over several lines |
-| quux | Just for completeness |"""
+| FOO | bar |
+| BAZ | A much longer value which can wrap over several lines |
+| QUUX | Just for completeness |"""
 
 
 def test_format_dict_list(dict_data):
     assert '{:list}'.format(FormatDict(dict_data)) == """\
-* foo = bar
-* baz = A much longer value which can wrap over several lines
-* quux = Just for completeness"""
+* FOO = bar
+* BAZ = A much longer value which can wrap over several lines
+* QUUX = Just for completeness"""
 
 
 def test_format_dict_bad_format(dict_data):
     with pytest.raises(ValueError):
-        '{:foo}'.format(FormatDict(dict_data))
+        '{:FOO}'.format(FormatDict(dict_data))
 
 
 def test_render_para():
@@ -291,10 +291,10 @@ This is a short line."""
 
 def test_render_list(dict_data):
     assert render("{:list}".format(FormatDict(dict_data)), width=40) == """\
-* foo = bar
-* baz = A much longer value which can
+* FOO = bar
+* BAZ = A much longer value which can
   wrap over several lines
-* quux = Just for completeness"""
+* QUUX = Just for completeness"""
     assert render("""
 * A list item
   can be defined across
@@ -314,16 +314,24 @@ def test_render_list(dict_data):
 * Or not"""
 
 
+def test_render_refs(dict_data):
+    assert render("{:refs}".format(FormatDict(dict_data)), width=40) == """\
+[FOO]:  bar
+[BAZ]:  A much longer value which can
+wrap over several lines
+[QUUX]: Just for completeness"""
+
+
 def test_render_table(dict_data):
     assert render("{:table}".format(FormatDict(dict_data)), width=40,
                   table_style=pretty_table) == """\
 +------+-------------------------------+
 | Key  | Value                         |
 |------+-------------------------------|
-| foo  | bar                           |
-| baz  | A much longer value which can |
+| FOO  | bar                           |
+| BAZ  | A much longer value which can |
 |      | wrap over several lines       |
-| quux | Just for completeness         |
+| QUUX | Just for completeness         |
 +------+-------------------------------+"""
 
 
