@@ -1,2 +1,3 @@
 debian/etc/pibootctl.conf etc
+debian/etc/pibootctl.template etc
 debian/completions/pibootctl usr/share/bash-completion/completions
