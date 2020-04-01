@@ -31,7 +31,7 @@ The design philosophy of the utility is as follows:
 Links
 =====
 
-* The code is licensed under the `GPL v2`_ or above
+* The code is licensed under the `GPL v3`_ or above
 * The `source code`_ can be obtained from GitHub, which also hosts the
   `bug tracker`_
 * The `documentation`_ (which includes installation and quick start examples)
@@ -40,7 +40,7 @@ Links
   instructions will probably be more useful
 
 .. _Raspberry Pi: https://raspberrypi.org/
-.. _GPL v2: https://www.gnu.org/licenses/gpl-2.0.html
+.. _GPL v3: https://www.gnu.org/licenses/gpl-3.0.html
 .. _source code: https://github.com/waveform80/pibootctl
 .. _bug tracker: https://github.com/waveform80/pibootctl/issues
 .. _documentation: https://pibootctl.readthedocs.io/
