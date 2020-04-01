@@ -22,9 +22,9 @@ API
 
 :doc:`pibootctl <manual>` can be used both as a standalone application, and as
 an API within Python. The primary class of interest when using :doc:`pibootctl
-<manual>` as an API is :class:`pibootctl.store.Store`, but
-:class:`pibootctl.main.Application` is useful for constructing an instance of
-the :class:`~pibootctl.store.Store` using the stored configuration.
+<manual>` as an API is :class:`~pibootctl.store.Store` in the
+:mod:`pibootctl.store` module, but :mod:`pibootctl.main` is useful for
+providing an instance of this, constructed from the pibootctl configuration.
 
 The API is split into several modules, documented in the following sections:
 
