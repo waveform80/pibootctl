@@ -45,8 +45,41 @@ configuration before editing it with the :doc:`set` command:
     :doc:`save` and :doc:`set`) are executed with :command:`sudo` as root
     privileges are typically required.
 
+The configuration of :program:`pibootctl` itself dictates where the stored
+configurations are placed on disk. By default this is under a "pibootctl"
+directory on the boot partition, but this can be changed in the
+:program:`pibootctl` configuration. The application attempts to read its
+configuration from the following locations on startup:
+
+* :file:`/lib/pibootctl/pibootctl.conf`
+* :file:`/etc/pibootctl.conf`
+* :file:`$XDG_CONFIG_HOME/pibootctl.conf`
+
+The final location is only intended for developers working on
+:program:`pibootctl` itself. The others should be used by packages providing
+pibootctl on your chosen OS.
+
+Stored boot configurations are simply `PKZIP`_ files containing the files that
+make up the boot configuration (sometimes this is just the :file:`config.txt`
+file, and sometimes other files may be included).
+
+.. note::
+
+    In the event that your system is unable to boot (e.g. because of
+    mis-configuration), you can restore a stored boot configuration simply by
+    unzipping the stored configuration back into the root of the boot
+    partition.
+
+    In other words, you can simply place your Pi's SD card in a Windows or MAC
+    OS X computer which should automatically mount the boot partition (which is
+    the only partition that these OS' will understand on the card), find the
+    "pibootctl" folder and under there you should see all your stored
+    configurations as .zip files. Unzip one of these into the folder above
+    "pibootctl", overwriting files as necessary and you have restored your boot
+    configuration.
+
 The :doc:`diff` command can be used to discover the differences between
-configurations:
+boot configurations:
 
 .. code-block:: console
 
@@ -67,8 +100,7 @@ configurations:
     default value.
 
 The :doc:`help` command can be used to display the help screen for each
-sub-command, but additionally will accept setting names to display information
-about the defaults and underlying commands each setting represents:
+sub-command:
 
 .. code-block:: console
 
@@ -84,6 +116,11 @@ about the defaults and underlying commands each setting represents:
     optional arguments:
       -h, --help   show this help message and exit
       -f, --force  Overwrite an existing configuration, if one exists
+
+Additionally, :doc:`help` will accept setting names to display information
+about the defaults and underlying commands each setting represents:
+
+.. code-block:: console
 
     $ pibootctl help camera.enabled
           Name: camera.enabled
@@ -111,3 +148,6 @@ store, and :doc:`load` to restore previously saved configurations:
     | default |        | 2020-03-11 21:29:13 |
     +---------+--------+---------------------+
     $ sudo pibootctl load default
+
+
+.. _PKZIP: https://en.wikipedia.org/wiki/Zip_(file_format)

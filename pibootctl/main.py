@@ -131,8 +131,9 @@ class Application:
     def config(self):
         """
         Returns the script's configuration as derived from the files in the
-        three pre-defined locations. Returns a :class:`~argparse.Namespace`
-        containing the parsed configuration.
+        three pre-defined locations (see :doc:`pibootctl <manual>` for more
+        information). Returns a :class:`~argparse.Namespace` containing the
+        parsed configuration.
         """
         if self._config is None:
             self._config = self._get_config()
@@ -143,7 +144,7 @@ class Application:
         """
         The parser for all the sub-commands that the script accepts. The
         parser's defaults are derived from the configuration obtained from
-        :meth:`config`. Returns the newly constructed argument parser.
+        :attr:`config`. Returns the newly constructed argument parser.
         """
         if self._parser is None:
             self._parser, self._commands = self._get_parser()
@@ -438,10 +439,11 @@ class Application:
     @staticmethod
     def invalid_config(*exc):
         """
-        Generates the error message for unhandled :exc:`InvalidConfiguration`
-        exceptions. These are caused when a configuration fails to validate,
-        and have an :attr:`~InvalidConfiguration.errors` attribute listing all
-        the exceptions that occurred during validation.
+        Generates the error message for unhandled
+        :exc:`~pibootctl.exc.InvalidConfiguration` exceptions. These are caused
+        when a configuration fails to validate, and have an
+        :attr:`~pibootctl.exc.InvalidConfiguration.errors` attribute listing
+        all the exceptions that occurred during validation.
         """
         msg = sys.excepthook.exc_message(*exc)
         for error in exc[1].errors.values():
@@ -452,11 +454,11 @@ class Application:
     def overridden_config(*exc):
         """
         Generates the error message for unhandled
-        :exc:`IneffectiveConfiguration` exceptions. These are caused when a
-        boot configuration is split across multiple files; the application is
-        permitted to modify a file before the final one, but a later file
-        overrides a value the application has tried to set in the file it is
-        permitted to modify.
+        :exc:`~pibootctl.exc.IneffectiveConfiguration` exceptions. These are
+        caused when a boot configuration is split across multiple files; the
+        application is permitted to modify a file before the final one, but a
+        later file overrides a value the application has tried to set in the
+        file it is permitted to modify.
         """
         msg = sys.excepthook.exc_message(*exc)
         for expected, actual in exc[1].diff:

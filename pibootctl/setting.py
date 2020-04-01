@@ -231,9 +231,10 @@ class Setting:
 
         The *value* may be a regular type (:class:`str`, :class:`int`,
         :data:`None`, etc.) as deserialized from one of the input formats (JSON
-        or YAML). Alternatively, it may be a :class:`UserStr`, indicating that
-        the value is a string given by the user on the command line and should
-        be interpreted by the setting accordingly.
+        or YAML). Alternatively, it may be a
+        :class:`~pibootctl.userstr.UserStr`, indicating that the value is a
+        string given by the user on the command line and should be interpreted
+        by the setting accordingly.
 
         .. note::
 
@@ -506,7 +507,7 @@ class CommandInt(Command):
 
     The *valid* parameter may optionally provide a dictionary mapping valid
     integer values for the command to string explanations, to be provided by
-    the basic :meth:`explain` implementation.
+    the basic :attr:`~Setting.hint` implementation.
     """
     def __init__(self, name, *, command=None, commands=None, default=0, doc='',
                  index=0, valid=None):

@@ -308,8 +308,11 @@ class DefaultConfiguration:
     @property
     def hash(self):
         """
-        The SHA1 hash that identifies the boot configuration. This is obtained
-        by hashing the files of the boot configuration in parsing order.
+        The `SHA-1`_ hash that identifies the boot configuration. This is
+        obtained by hashing the files of the boot configuration in parsing
+        order.
+
+        .. _SHA-1: https://en.wikipedia.org/wiki/SHA-1
         """
         return 'da39a3ee5e6b4b0d3255bfef95601890afd80709'  # empty sha1
 
