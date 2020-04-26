@@ -76,7 +76,7 @@ all:
 	@echo "make test - Run tests"
 	@echo "make doc - Generate HTML and PDF documentation"
 	@echo "make source - Create source package"
-	@echo "make egg - Generate a PyPI egg package"
+	@echo "make wheel - Generate a PyPI wheel package"
 	@echo "make zip - Generate a source zip package"
 	@echo "make tar - Generate a source tar package"
 	@echo "make deb - Generate Debian packages"
