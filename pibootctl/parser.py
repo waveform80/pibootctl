@@ -50,39 +50,81 @@ from collections import namedtuple
 from .info import get_board_types, get_board_serial
 
 
+def coalesce(*values):
+    for value in values:
+        if value is not None:
+            return value
+
+
 class BootInvalid(Warning):
     "Raised when an invalid line is encountered"
 
 
 class BootLine:
     """
-    Represents a line in a boot configuration. Provides two simple attributes:
+    Represents a line in a boot configuration. This is effectively an abstract
+    base class and should never appear in output itself. Provides four
+    attributes:
 
     .. attribute:: path
 
         A :class:`str` indicating the path of the file containing the line.
 
-    .. attribute:: lineno
+    .. attribute:: linenum
 
         The 1-based line number of the line.
+
+    .. attribute:: condition
+
+        A :class:`BootCondition` specifying the filters in effect for this
+        configuration line.
+
+    .. attribute:: comment
+
+        Any comment that appears after other content on the line, or
+        :data:`None` if no comment was present
     """
-    def __init__(self, path, lineno):
+    def __init__(self, path, linenum, conditions, comment=None):
         self.path = path
-        self.lineno = lineno
+        self.linenum = linenum
+        self.conditions = conditions
+        self.comment = comment
+
+    def compare(self, other):
+        if not isinstance(other, BootLine):
+            raise ValueError('other is not a BootLine')
+        result = set()
+        if self.path == other.path and self.linenum == other.linenum:
+            result.add('location')
+        if self.conditions == other.conditions:
+            result.add('conditions')
+        if self.comment == other.comment:
+            result.add('comment')
+        return result
 
     def __eq__(self, other):
-        # These __eq__ implementations only really exist to make testing easier
-        # hence why there's no total_ordering or __ne__ implementations...
-        return (
-            isinstance(other, BootLine) and
-            other.path == self.path and
-            other.lineno == self.lineno
-        )
+        try:
+            return self.compare(other) == {
+                'location', 'conditions', 'comment', 'key', 'value'}
+        except ValueError:
+            return NotImplemented
+
+
+class BootComment(BootLine):
+    """
+    A derivative of :class:`BootLine` for lines consisting purely of ``#
+    comments`` in a boot configuration.
+    """
+    def compare(self, other):
+        result = super().compare(other)
+        if isinstance(other, BootComment):
+            result |= {'key', 'value'}
+        return result
 
     def __repr__(self):
         return (
-            'BootLine(path={self.path!r}, lineno={self.lineno!r})'.format(
-                self=self))
+            'BootComment(path={self.path!r}, linenum={self.linenum!r}, '
+            'comment={self.comment!r})'.format(self=self))
 
 
 class BootSection(BootLine):
@@ -93,10 +135,23 @@ class BootSection(BootLine):
     .. attribute:: section
 
         The criteria of the section (everything between the square brackets).
+
+    .. note::
+
+        The :attr:`conditions` for a :class:`BootSection` instance *includes*
+        the filters defined by that section.
     """
-    def __init__(self, path, lineno, section):
-        super().__init__(path, lineno)
+    def __init__(self, path, linenum, conditions, section, comment=None):
+        super().__init__(path, linenum, conditions, comment)
         self.section = section
+
+    def compare(self, other):
+        result = super().compare(other)
+        if isinstance(other, BootSection):
+            result.add('key')
+            if self.section == other.section:
+                result.add('value')
+        return result
 
     def __eq__(self, other):
         return (
@@ -110,7 +165,7 @@ class BootSection(BootLine):
 
     def __repr__(self):
         return (
-            'BootSection(path={self.path!r}, lineno={self.lineno!r}, '
+            'BootSection(path={self.path!r}, linenum={self.linenum!r}, '
             'section={self.section!r})'.format(self=self))
 
 
@@ -136,11 +191,23 @@ class BootCommand(BootLine):
         :attr:`command` title but before the "="), or the command appears in an
         [HDMI:1] section.
     """
-    def __init__(self, path, lineno, command, params, hdmi=None):
-        super().__init__(path, lineno)
+    def __init__(self, path, linenum, conditions, command, params, hdmi=None,
+                 comment=None):
+        super().__init__(path, linenum, conditions, comment)
         self.command = command
         self.params = params
         self.hdmi = hdmi
+
+    def compare(self, other):
+        result = super().compare(other)
+        if isinstance(other, BootCommand):
+            if self.command == other.command and \
+                    coalesce(self.hdmi, other.hdmi, 0) == \
+                    coalesce(other.hdmi, self.hdmi, 0):
+                result.add('key')
+                if self.params == other.params:
+                    result.add('value')
+        return result
 
     def __eq__(self, other):
         return (
@@ -162,7 +229,7 @@ class BootCommand(BootLine):
 
     def __repr__(self):
         return (
-            'BootCommand(path={self.path!r}, lineno={self.lineno!r}, '
+            'BootCommand(path={self.path!r}, linenum={self.linenum!r}, '
             'command={self.command!r}, params={self.params!r}, '
             'hdmi={self.hdmi!r})'.format(self=self))
 
@@ -176,9 +243,17 @@ class BootInclude(BootLine):
 
         The name of the file to be included.
     """
-    def __init__(self, path, lineno, include):
-        super().__init__(path, lineno)
+    def __init__(self, path, linenum, conditions, include, comment=None):
+        super().__init__(path, linenum, conditions, comment)
         self.include = include
+
+    def compare(self, other):
+        result = super().compare(other)
+        if isinstance(other, BootInclude):
+            result.add('key')
+            if self.include == other.include:
+                result.add('value')
+        return result
 
     def __eq__(self, other):
         return (
@@ -192,7 +267,7 @@ class BootInclude(BootLine):
 
     def __repr__(self):
         return (
-            'BootInclude(path={self.path!r}, lineno={self.lineno!r}, '
+            'BootInclude(path={self.path!r}, linenum={self.linenum!r}, '
             'include={self.include!r})'.format(self=self))
 
 
@@ -205,9 +280,17 @@ class BootOverlay(BootLine):
 
         The name of the device-tree overlay to load.
     """
-    def __init__(self, path, lineno, overlay):
-        super().__init__(path, lineno)
+    def __init__(self, path, linenum, conditions, overlay, comment=None):
+        super().__init__(path, linenum, conditions, comment)
         self.overlay = overlay
+
+    def compare(self, other):
+        result = super().compare(other)
+        if isinstance(other, BootOverlay):
+            result.add('key')
+            if self.overlay == other.overlay:
+                result.add('value')
+        return result
 
     def __eq__(self, other):
         return (
@@ -221,7 +304,7 @@ class BootOverlay(BootLine):
 
     def __repr__(self):
         return (
-            'BootOverlay(path={self.path!r}, lineno={self.lineno!r}, '
+            'BootOverlay(path={self.path!r}, linenum={self.linenum!r}, '
             'overlay={self.overlay!r})'.format(self=self))
 
 
@@ -243,11 +326,21 @@ class BootParam(BootLine):
 
         The new value to assign to the overlay parameter.
     """
-    def __init__(self, path, lineno, overlay, param, value):
-        super().__init__(path, lineno)
+    def __init__(self, path, linenum, conditions, overlay, param, value,
+                 comment=None):
+        super().__init__(path, linenum, conditions, comment)
         self.overlay = overlay
         self.param = param
         self.value = value
+
+    def compare(self, other):
+        result = super().compare(other)
+        if isinstance(other, BootParam):
+            if self.overlay == other.overlay and self.param == other.param:
+                result.add('key')
+                if self.value == other.value:
+                    result.add('value')
+        return result
 
     def __eq__(self, other):
         return (
@@ -263,54 +356,132 @@ class BootParam(BootLine):
 
     def __repr__(self):
         return (
-            'BootParam(path={self.path!r}, lineno={self.lineno!r}, '
+            'BootParam(path={self.path!r}, linenum={self.linenum!r}, '
             'overlay={self.overlay!r}, param={self.param!r}, '
             'value={self.value!r})'.format(self=self))
 
 
-class BootFilter:
+class BootConditions(
+        namedtuple('BootConditions', (
+            'pi', 'hdmi', 'edid', 'serial', 'gpio', 'suppress_count'))
+):
     """
-    Represents the current state of conditional filters during parsing. This
-    class is only used internally by :class:`BootParser`.
+    Represents the state of conditional filters that apply to a given
+    :class:`BootLine`.
     """
-    def __init__(self):
-        self.pi = True
-        self.hdmi = 0
-        self.serial = True
+    __slots__ = ()
+
+    def __new__(cls, pi=None, hdmi=None, edid=None, serial=None, gpio=None,
+                suppress_count=0):
+        return super().__new__(
+            cls, pi, hdmi, edid, serial, gpio, suppress_count)
+
+    def __eq__(self, other):
+        if not isinstance(other, BootConditions):
+            return NotImplemented
+        if self.gpio != other.gpio:
+            return False
+        if self.serial != other.serial:
+            return False
+        if self.edid != other.edid:
+            return False
+        if self.hdmi != other.hdmi:
+            return False
+        if self.pi != other.pi:
+            return False
+        # NOTE: suppress_count is deliberately excluded here; it is nothing to
+        # do with the conditional filters themselves but is an artefact of
+        # their effect on includes
+        return True
+
+    def __le__(self, other):
+        if not isinstance(other, BootConditions):
+            return NotImplemented
+        if self.gpio != other.gpio and other.gpio is not None:
+            return False
+        if self.serial != other.serial and other.serial is not None:
+            return False
+        if self.edid != other.edid and other.edid is not None:
+            return False
+        if self.hdmi != other.hdmi and other.hdmi is not None:
+            return False
+        if self.pi != other.pi and other.pi is not None and (
+                # Former are subsets of the latter for conditional matching
+                # purposes; see [COND] for details:
+                (self.pi, other.pi) not in {
+                ('pi3+', 'pi3'),
+                ('pi0w', 'pi0'),
+        }):
+            return False
+        # See note above regarding suppress_count
+        return True
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __ge__(self, other):
+        return not (self < other)
+
+    def __lt__(self, other):
+        return (self <= other) and (self != other)
+
+    def __gt__(self, other):
+        return (self >= other) and (self != other)
 
     def evaluate(self, section):
         """
-        Calculates the new state of the filter from the specified *section*
-        criteria.
+        Calculates a new conditional state (based upon the current conditional
+        state) from the specified *section* criteria. Returns a new
+        :class:`BootConditions` instance.
         """
-        # Derived from information at:
-        # https://www.raspberrypi.org/documentation/configuration/config-txt/conditional.md
+        # Derived from information at [COND]
         if section == 'all':
-            self.pi = self.serial = True
+            return self._replace(pi=None, hdmi=None, edid=None, serial=None,
+                                 gpio=None)
         elif section == 'none':
-            self.pi = False
+            return self._replace(pi=False)
         elif section.startswith('HDMI:'):
-            self.hdmi = 1 if section == 'HDMI:1' else 0
+            try:
+                return self._replace(hdmi={
+                    'HDMI:0': 0,
+                    'HDMI:1': 1,
+                }[section])
+            except KeyError:
+                # Ignore invalid filters (as the bootloader does)
+                return self
         elif section.startswith('EDID='):
-            # We can't currently evaluate this at runtime so just assume it
-            # doesn't alter the current filter state
-            pass
+            return self._replace(edid=section[len('EDID='):])
         elif section.startswith('gpio'):
-            # We can't evaluate the GPIO filters either (the GPIO state has
-            # potentially changed since boot and we shouldn't mess with their
-            # modes at this point)
-            pass
+            s = section[len('gpio'):]
+            gpio, value = s.split('=', 1)
+            try:
+                gpio = int(gpio)
+                value = bool(int(value))
+            except ValueError:
+                return self
+            else:
+                return self._replace(gpio=(gpio, value))
         elif section.startswith('0x'):
             try:
-                self.serial = int(section, base=16) == get_board_serial()
+                return self._replace(serial=int(section, base=16))
             except ValueError:
-                # Ignore invalid filters (as the bootloader does)
-                pass
+                return self
         elif section.startswith('pi'):
-            self.pi = section in get_board_types()
+            if section in {'pi0', 'pi0w', 'pi1', 'pi2', 'pi3', 'pi3+', 'pi4'}:
+                return self._replace(pi=section)
+            else:
+                return self
         else:
             warnings.warn(
                 BootInvalid('unrecognized conditional: {}'.format(section)))
+            return self
+        assert False  # pragma: no cover
+
+    def suppress(self):
+        if not self.enabled:
+            return self._replace(suppress_count=self.suppress_count + 1)
+        else:
+            return self
 
     @property
     def enabled(self):
@@ -318,7 +489,12 @@ class BootFilter:
         Returns :data:`True` if parsed items are currently effective. If this
         is :data:`False`, parsed items are ignored.
         """
-        return self.pi and self.serial
+        return (
+            # Cannot currently assess HDMI, EDID, or GPIO criteria
+            (self.pi is None or self.pi in get_board_types()) and
+            (self.serial is None or self.serial == get_board_serial()) and
+            (self.suppress_count == 0)
+        )
 
 
 class BootFile(namedtuple('Content', (
@@ -508,57 +684,68 @@ class BootParser:
         """
         return self._open(filename, encoding, errors)
 
-    def _parse(self, filename):
+    def _parse(self, filename, conditions=None):
         overlay = 'base'
-        filter = BootFilter()
-        for lineno, content in self._read_text(filename):
-            if content.startswith('[') and content.endswith(']'):
+        if conditions is None:
+            conditions = BootConditions()
+        for linenum, content, comment in self._read_text(filename):
+            if not content:
+                yield BootComment(filename, linenum, conditions, comment)
+            elif content.startswith('[') and content.endswith(']'):
                 content = content[1:-1]
-                filter.evaluate(content)
-                yield BootSection(filename, lineno, content)
-            elif filter.enabled:
-                if '=' in content:
-                    cmd, value = content.split('=', 1)
-                    # We deliberately don't strip cmd or value here because the
-                    # bootloader doesn't either; whitespace on either side of
-                    # the = is significant and can invalidate lines
-                    if cmd in {'device_tree_overlay', 'dtoverlay'}:
-                        if ':' in value:
-                            overlay, params = value.split(':', 1)
-                            yield BootOverlay(filename, lineno, overlay)
-                            for param, value in self._parse_params(overlay, params):
-                                yield BootParam(
-                                    filename, lineno, overlay, param, value)
-                        else:
-                            overlay = value or 'base'
-                            yield BootOverlay(filename, lineno, overlay)
-                    elif cmd in {'device_tree_param', 'dtparam'}:
-                        for param, value in self._parse_params(overlay, value):
+                conditions = conditions.evaluate(content)
+                yield BootSection(
+                    filename, linenum, conditions, content, comment=comment)
+            elif '=' in content:
+                cmd, value = content.split('=', 1)
+                # We deliberately don't strip cmd or value here because the
+                # bootloader doesn't either; whitespace on either side of
+                # the = is significant and can invalidate lines
+                if cmd in {'device_tree_overlay', 'dtoverlay'}:
+                    if ':' in value:
+                        overlay, params = value.split(':', 1)
+                        yield BootOverlay(
+                            filename, linenum, conditions, overlay,
+                            comment=comment)
+                        for param, value in self._parse_params(overlay, params):
                             yield BootParam(
-                                filename, lineno, overlay, param, value)
+                                filename, linenum, conditions, overlay, param,
+                                value, comment=comment)
                     else:
-                        if ':' in cmd:
-                            cmd, hdmi = cmd.split(':', 1)
-                            try:
-                                hdmi = int(hdmi)
-                            except ValueError:
-                                hdmi = 0
-                        else:
-                            hdmi = filter.hdmi
-                        yield BootCommand(
-                            filename, lineno, cmd, value, hdmi=hdmi)
-                elif content.startswith('include'):
-                    command, included = content.split(None, 1)
-                    yield BootInclude(filename, lineno, included)
-                    yield from self._parse(included)
-                elif content.startswith('initramfs'):
-                    command, initrd, address = content.split(None, 2)
-                    yield BootCommand(
-                        filename, lineno, command, (initrd, address))
+                        overlay = value or 'base'
+                        yield BootOverlay(
+                            filename, linenum, conditions, overlay,
+                            comment=comment)
+                elif cmd in {'device_tree_param', 'dtparam'}:
+                    for param, value in self._parse_params(overlay, value):
+                        yield BootParam(
+                            filename, linenum, conditions, overlay, param,
+                            value, comment=comment)
                 else:
-                    warnings.warn(BootInvalid(
-                        "{filename}:{lineno} invalid line".format(
-                            filename=filename, lineno=lineno)))
+                    if ':' in cmd:
+                        cmd, hdmi = cmd.split(':', 1)
+                        try:
+                            hdmi = int(hdmi)
+                        except ValueError:
+                            hdmi = None
+                    else:
+                        hdmi = conditions.hdmi
+                    yield BootCommand(
+                        filename, linenum, conditions, cmd, value, hdmi=hdmi,
+                        comment=comment)
+            elif content.startswith('include'):
+                command, included = content.split(None, 1)
+                yield BootInclude(filename, linenum, conditions, included)
+                yield from self._parse(included, conditions.suppress())
+            elif content.startswith('initramfs'):
+                command, initrd, address = content.split(None, 2)
+                yield BootCommand(
+                    filename, linenum, conditions, command, (initrd, address),
+                    comment=comment)
+            else:
+                warnings.warn(BootInvalid(
+                    "{filename}:{linenum} invalid line".format(
+                        filename=filename, linenum=linenum)))
 
     def _parse_params(self, overlay, params):
         for token in params.split(','):
@@ -578,23 +765,24 @@ class BootParser:
             yield param, value
 
     def _read_text(self, filename):
-        for lineno, line in enumerate(
+        for linenum, line in enumerate(
                 self._open(filename, encoding='ascii', errors='replace').lines(),
                 start=1):
             # The bootloader ignores everything beyond column 80 and
             # leading whitespace. The following slicing and stripping of
-            # the string is done in a precise order to ensure we excise
-            # chars beyond column 80 *before* stripping leading spaces
-            line = line.rstrip()[:80].lstrip()
+            # the string is done in a precise order to ensure that we capture
+            # any comments fully, but ignore all non-comment chars beyond
+            # column 80 *before* stripping leading spaces
             try:
-                comment = line.index('#')
+                i = line.index('#')
             except ValueError:
-                pass
+                comment = None
             else:
-                line = line[:comment]
-            if not line.strip():
+                line, comment = line[:i], line[i + 1:].rstrip()
+            line = line.rstrip()[:80].lstrip()
+            if not line.strip() and comment is None:
                 continue
-            yield lineno, line
+            yield linenum, line, comment
 
     def _open(self, filename, encoding=None, errors=None):
         if isinstance(self.path, Path):
@@ -640,3 +828,7 @@ class BootParser:
             self._hash.update(file.content)
             self._files[filename] = file
         return file
+
+
+# [COND]:
+# https://www.raspberrypi.org/documentation/configuration/config-txt/conditional.md
