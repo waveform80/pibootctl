@@ -87,7 +87,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 
 from .formatter import FormatDict, TransMap, int_ranges
-from .parser import BootOverlay, BootParam, BootCommand
+from .parser import BootOverlay, BootParam, BootCommand, coalesce
 from .userstr import UserStr, to_bool, to_int, to_float, to_list
 from .info import get_board_type, get_board_mem
 
@@ -457,7 +457,7 @@ class Command(Setting):
     (integer, boolean, etc).
     """
     def __init__(self, name, *, command=None, commands=None, default=None,
-                 doc='', index=0):
+                 doc='', index=None):
         assert (command is None) ^ (commands is None), \
             'command or commands must be given, not both'
         doc = dedent(doc).format_map(TransMap(index=index))
@@ -492,7 +492,7 @@ class Command(Setting):
             if (
                     isinstance(item, BootCommand) and
                     item.command in self.commands and
-                    item.hdmi == self.index):
+                    coalesce(item.hdmi, 0) == coalesce(self.index, 0)):
                 yield item, item.params
 
     def output(self, fmt=''):

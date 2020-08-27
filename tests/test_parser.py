@@ -96,7 +96,7 @@ def test_bootsection_comparisons():
 def test_bootcommand_comparisons():
     assert BootCommand('config.txt', 1, cond_all, 'disable_overscan', '1') != \
            BootComment('config.txt', 1, cond_all, 'foo')
-    assert BootCommand('config.txt', 1, cond_all, 'disable_overscan', '1') != \
+    assert BootCommand('config.txt', 1, cond_all, 'disable_overscan', '1', 0) != \
            BootCommand('config.txt', 1, cond_all, 'disable_overscan', '1', 1)
     assert BootCommand('config.txt', 1, cond_all, 'disable_overscan', '1') != \
            BootCommand('config.txt', 1, cond_all, 'disable_overscan', '0')

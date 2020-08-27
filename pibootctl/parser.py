@@ -50,10 +50,11 @@ from collections import namedtuple
 from .info import get_board_types, get_board_serial
 
 
-def coalesce(*values):
+def coalesce(*values, default=None):
     for value in values:
         if value is not None:
             return value
+    return default
 
 
 class BootInvalid(Warning):
@@ -153,13 +154,6 @@ class BootSection(BootLine):
                 result.add('value')
         return result
 
-    def __eq__(self, other):
-        return (
-            super().__eq__(other) and
-            isinstance(other, BootSection) and
-            other.section == self.section
-        )
-
     def __str__(self):
         return '[{self.section}]'.format(self=self)
 
@@ -186,10 +180,10 @@ class BootCommand(BootLine):
 
     .. attribute:: hdmi
 
-        The HDMI display that the command applies to. This is usually 0 unless
-        the command has an explicit hdmi suffix (":" separated after the
-        :attr:`command` title but before the "="), or the command appears in an
-        [HDMI:1] section.
+        The HDMI display that the command applies to. This is usually
+        :data:`None` unless the command has an explicit hdmi suffix (":"
+        separated after the :attr:`command` title but before the "="), or the
+        command appears in an [HDMI:1] section.
     """
     def __init__(self, path, linenum, conditions, command, params, hdmi=None,
                  comment=None):
@@ -208,15 +202,6 @@ class BootCommand(BootLine):
                 if self.params == other.params:
                     result.add('value')
         return result
-
-    def __eq__(self, other):
-        return (
-            super().__eq__(other) and
-            isinstance(other, BootCommand) and
-            other.command == self.command and
-            other.params == self.params and
-            other.hdmi == self.hdmi
-        )
 
     def __str__(self):
         if self.command == 'initramfs':
@@ -255,13 +240,6 @@ class BootInclude(BootLine):
                 result.add('value')
         return result
 
-    def __eq__(self, other):
-        return (
-            super().__eq__(other) and
-            isinstance(other, BootInclude) and
-            other.include == self.include
-        )
-
     def __str__(self):
         return 'include {self.include}'.format(self=self)
 
@@ -291,13 +269,6 @@ class BootOverlay(BootLine):
             if self.overlay == other.overlay:
                 result.add('value')
         return result
-
-    def __eq__(self, other):
-        return (
-            super().__eq__(other) and
-            isinstance(other, BootOverlay) and
-            other.overlay == self.overlay
-        )
 
     def __str__(self):
         return 'dtoverlay={self.overlay}'.format(self=self)
@@ -341,15 +312,6 @@ class BootParam(BootLine):
                 if self.value == other.value:
                     result.add('value')
         return result
-
-    def __eq__(self, other):
-        return (
-            super().__eq__(other) and
-            isinstance(other, BootParam) and
-            other.overlay == self.overlay and
-            other.param == self.param and
-            other.value == self.value
-        )
 
     def __str__(self):
         return 'dtparam={self.param}={self.value}'.format(self=self)

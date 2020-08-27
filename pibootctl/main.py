@@ -472,7 +472,7 @@ class Application:
                         "{expected.name} is not set in the generated "
                         "configuration although it was set in "
                         "{expected.lines[0].path} line "
-                        "{expected.lines[0].lineno}")
+                        "{expected.lines[0].linenum}")
                 else:
                     template = _(
                         "{expected.name} is not set in the generated "
@@ -481,7 +481,7 @@ class Application:
                 template = _(
                     "Expected {expected.name} to be {expected.value}, but was "
                     "{actual.value} after being overridden by "
-                    "{actual.lines[0].path} line {actual.lines[0].lineno}")
+                    "{actual.lines[0].path} line {actual.lines[0].linenum}")
             msg.append(template.format(expected=expected, actual=actual))
         return msg
 

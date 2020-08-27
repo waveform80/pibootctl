@@ -186,7 +186,7 @@ def test_command_init():
 
     c = Command('video.cec.name', command='cec_osd_name', default='RPi')
     assert c.commands == ('cec_osd_name',)
-    assert c.index == 0
+    assert c.index is None
     assert c.key == ('commands', 'video.cec.name')
 
 
