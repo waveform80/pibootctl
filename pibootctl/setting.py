@@ -190,9 +190,10 @@ class Setting:
     @property
     def lines(self):
         """
-        Returns the :class:`~pibootctl.parser.BootLine` items which affected
-        the value of the setting, in the reverse order they were encountered
-        while parsing (so the first item holds the current value).
+        Returns the :class:`~pibootctl.parser.BootLine` items which (if enabled
+        by conditionals) affected the value of the setting, in the reverse
+        order they were encountered while parsing (so the first *enabled* item
+        holds the current value).
         """
         return self._lines
 
@@ -212,14 +213,22 @@ class Setting:
         """
         Given a *config* which must be a sequence of
         :class:`~pibootctl.parser.BootLine` items, yields each line that
-        affects the setting's value, and the new value that the line produces
-        (or :data:`None` indicating that the value is now, or is still, the
-        default state).
+        potentially affects the setting's value (including those currently
+        disabled by conditionals), and the new value that the line produces (or
+        :data:`None` indicating that the value is now, or is still, the default
+        state).
 
         .. note::
 
-            Note to implementers: the method must *not* affect :attr:`value`
-            directly; the caller will handle this.
+            This method is *not* influenced by conditionals that disable a
+            line. In this case the method must still yield the line and the
+            value it would produce (were it enabled). The caller will deal with
+            the fact the line is currently disabled (but needs to be aware of
+            such lines for the configuration mutator).
+
+            For this reason (and others) this method must *not* affect
+            :attr:`value` directly; the caller will handle mutating the value
+            when required.
         """
         raise NotImplementedError
 
@@ -255,8 +264,8 @@ class Setting:
     def output(self):
         """
         Yields lines of configuration to represent the current state of the
-        setting, within the context of other
-        :class:`~pibootctl.store.Settings`.
+        setting (taking in account the context of other
+        :class:`~pibootctl.store.Settings`).
         """
         raise NotImplementedError
 
@@ -344,9 +353,6 @@ class Overlay(Setting):
             if isinstance(item, BootOverlay):
                 if item.overlay == self.overlay:
                     yield item, True
-                    # We can "break" here because there's no way to "unload" an
-                    # overlay in the config
-                    break
 
     def update(self, value):
         return to_bool(value)
@@ -391,8 +397,6 @@ class OverlayParam(Overlay):
                 if item.overlay == self.overlay and item.param == self.param:
                     value = item.value
                     yield item, value
-                    # No break here because later settings override earlier
-                    # ones
 
     def update(self, value):
         return value
@@ -490,7 +494,6 @@ class Command(Setting):
                     item.command in self.commands and
                     item.hdmi == self.index):
                 yield item, item.params
-                # No break here because later settings override earlier ones
 
     def output(self, fmt=''):
         if self.modified:
@@ -630,7 +633,6 @@ class CommandForceIgnore(CommandBool):
                     item.command in self.commands and
                     int(item.params)):
                 yield item, (item.command == self.force)
-                # No break here because later settings override earlier ones
 
     def output(self):
         if self.modified:
