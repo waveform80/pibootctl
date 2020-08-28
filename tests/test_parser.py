@@ -46,29 +46,29 @@ def test_str():
 
 def test_repr():
     assert repr(BootComment('config.txt', 2, cond_all)) == (
-        "BootComment(path='config.txt', linenum=2, comment=None)")
+        "BootComment(filename='config.txt', linenum=2, comment=None)")
     assert repr(BootSection('config.txt', 1, cond_all, 'all')) == (
-        "BootSection(path='config.txt', linenum=1, section='all')")
+        "BootSection(filename='config.txt', linenum=1, section='all')")
     assert repr(BootCommand(
         'config.txt', 1, cond_all, 'initramfs', ('initrd.img', 'followkernel')
     )) == (
-        "BootCommand(path='config.txt', linenum=1, "
+        "BootCommand(filename='config.txt', linenum=1, "
         "command='initramfs', params=('initrd.img', 'followkernel'), "
         "hdmi=None)"
     )
     assert repr(BootCommand('config.txt', 1, cond_all, 'hdmi_group', '1')) == (
-        "BootCommand(path='config.txt', linenum=1, "
+        "BootCommand(filename='config.txt', linenum=1, "
         "command='hdmi_group', params='1', hdmi=None)")
     assert repr(BootCommand('config.txt', 1, cond_all, 'hdmi_group', '2', 1)) == (
-        "BootCommand(path='config.txt', linenum=1, "
+        "BootCommand(filename='config.txt', linenum=1, "
         "command='hdmi_group', params='2', hdmi=1)")
     assert repr(BootInclude('config.txt', 1, cond_all, 'syscfg.txt')) == (
-        "BootInclude(path='config.txt', linenum=1, "
+        "BootInclude(filename='config.txt', linenum=1, "
         "include='syscfg.txt')")
     assert repr(BootOverlay('config.txt', 1, cond_all, 'foo')) == (
-        "BootOverlay(path='config.txt', linenum=1, overlay='foo')")
+        "BootOverlay(filename='config.txt', linenum=1, overlay='foo')")
     assert repr(BootParam('config.txt', 1, cond_all, 'base', 'spi', 'on')) == (
-        "BootParam(path='config.txt', linenum=1, overlay='base', "
+        "BootParam(filename='config.txt', linenum=1, overlay='base', "
         "param='spi', value='on')")
 
 

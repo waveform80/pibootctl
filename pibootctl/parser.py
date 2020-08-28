@@ -67,17 +67,18 @@ class BootLine:
     base class and should never appear in output itself. Provides four
     attributes:
 
-    .. attribute:: path
+    .. attribute:: filename
 
-        A :class:`str` indicating the path of the file containing the line.
+        A :class:`str` indicating the path (relative to the configuration's
+        root) of the file containing the line.
 
     .. attribute:: linenum
 
         The 1-based line number of the line.
 
-    .. attribute:: condition
+    .. attribute:: conditions
 
-        A :class:`BootCondition` specifying the filters in effect for this
+        A :class:`BootConditions` specifying the filters in effect for this
         configuration line.
 
     .. attribute:: comment
@@ -85,8 +86,8 @@ class BootLine:
         Any comment that appears after other content on the line, or
         :data:`None` if no comment was present
     """
-    def __init__(self, path, linenum, conditions, comment=None):
-        self.path = path
+    def __init__(self, filename, linenum, conditions, comment=None):
+        self.filename = filename
         self.linenum = linenum
         self.conditions = conditions
         self.comment = comment
@@ -95,7 +96,7 @@ class BootLine:
         if not isinstance(other, BootLine):
             raise ValueError('other is not a BootLine')
         result = set()
-        if self.path == other.path and self.linenum == other.linenum:
+        if self.filename == other.filename and self.linenum == other.linenum:
             result.add('location')
         if self.conditions == other.conditions:
             result.add('conditions')
@@ -124,7 +125,7 @@ class BootComment(BootLine):
 
     def __repr__(self):
         return (
-            'BootComment(path={self.path!r}, linenum={self.linenum!r}, '
+            'BootComment(filename={self.filename!r}, linenum={self.linenum!r}, '
             'comment={self.comment!r})'.format(self=self))
 
 
@@ -142,8 +143,8 @@ class BootSection(BootLine):
         The :attr:`conditions` for a :class:`BootSection` instance *includes*
         the filters defined by that section.
     """
-    def __init__(self, path, linenum, conditions, section, comment=None):
-        super().__init__(path, linenum, conditions, comment)
+    def __init__(self, filename, linenum, conditions, section, comment=None):
+        super().__init__(filename, linenum, conditions, comment)
         self.section = section
 
     def compare(self, other):
@@ -159,7 +160,7 @@ class BootSection(BootLine):
 
     def __repr__(self):
         return (
-            'BootSection(path={self.path!r}, linenum={self.linenum!r}, '
+            'BootSection(filename={self.filename!r}, linenum={self.linenum!r}, '
             'section={self.section!r})'.format(self=self))
 
 
@@ -185,9 +186,9 @@ class BootCommand(BootLine):
         separated after the :attr:`command` title but before the "="), or the
         command appears in an [HDMI:1] section.
     """
-    def __init__(self, path, linenum, conditions, command, params, hdmi=None,
-                 comment=None):
-        super().__init__(path, linenum, conditions, comment)
+    def __init__(self, filename, linenum, conditions, command, params,
+                 hdmi=None, comment=None):
+        super().__init__(filename, linenum, conditions, comment)
         self.command = command
         self.params = params
         self.hdmi = hdmi
@@ -214,7 +215,7 @@ class BootCommand(BootLine):
 
     def __repr__(self):
         return (
-            'BootCommand(path={self.path!r}, linenum={self.linenum!r}, '
+            'BootCommand(filename={self.filename!r}, linenum={self.linenum!r}, '
             'command={self.command!r}, params={self.params!r}, '
             'hdmi={self.hdmi!r})'.format(self=self))
 
@@ -228,8 +229,8 @@ class BootInclude(BootLine):
 
         The name of the file to be included.
     """
-    def __init__(self, path, linenum, conditions, include, comment=None):
-        super().__init__(path, linenum, conditions, comment)
+    def __init__(self, filename, linenum, conditions, include, comment=None):
+        super().__init__(filename, linenum, conditions, comment)
         self.include = include
 
     def compare(self, other):
@@ -245,7 +246,7 @@ class BootInclude(BootLine):
 
     def __repr__(self):
         return (
-            'BootInclude(path={self.path!r}, linenum={self.linenum!r}, '
+            'BootInclude(filename={self.filename!r}, linenum={self.linenum!r}, '
             'include={self.include!r})'.format(self=self))
 
 
@@ -258,8 +259,8 @@ class BootOverlay(BootLine):
 
         The name of the device-tree overlay to load.
     """
-    def __init__(self, path, linenum, conditions, overlay, comment=None):
-        super().__init__(path, linenum, conditions, comment)
+    def __init__(self, filename, linenum, conditions, overlay, comment=None):
+        super().__init__(filename, linenum, conditions, comment)
         self.overlay = overlay
 
     def compare(self, other):
@@ -275,7 +276,7 @@ class BootOverlay(BootLine):
 
     def __repr__(self):
         return (
-            'BootOverlay(path={self.path!r}, linenum={self.linenum!r}, '
+            'BootOverlay(filename={self.filename!r}, linenum={self.linenum!r}, '
             'overlay={self.overlay!r})'.format(self=self))
 
 
@@ -297,9 +298,9 @@ class BootParam(BootLine):
 
         The new value to assign to the overlay parameter.
     """
-    def __init__(self, path, linenum, conditions, overlay, param, value,
+    def __init__(self, filename, linenum, conditions, overlay, param, value,
                  comment=None):
-        super().__init__(path, linenum, conditions, comment)
+        super().__init__(filename, linenum, conditions, comment)
         self.overlay = overlay
         self.param = param
         self.value = value
@@ -318,15 +319,19 @@ class BootParam(BootLine):
 
     def __repr__(self):
         return (
-            'BootParam(path={self.path!r}, linenum={self.linenum!r}, '
+            'BootParam(filename={self.filename!r}, linenum={self.linenum!r}, '
             'overlay={self.overlay!r}, param={self.param!r}, '
             'value={self.value!r})'.format(self=self))
 
 
-class BootConditions(
-        namedtuple('BootConditions', (
-            'pi', 'hdmi', 'edid', 'serial', 'gpio', 'suppress_count'))
-):
+class BootConditions(namedtuple('BootConditions', (
+        'pi',
+        'hdmi',
+        'edid',
+        'serial',
+        'gpio',
+        'suppress_count'
+    ))):
     """
     Represents the state of conditional filters that apply to a given
     :class:`BootLine`.
@@ -557,9 +562,8 @@ class BootParser:
 
     * a :class:`~zipfile.ZipFile`
 
-    * a :class:`dict` mapping filenames to sequences of :class:`str` (for
-      configuration files), or :class:`bytes` strings for auxilliary binary
-      files; effectively the output of :attr:`files` after parsing
+    * a :class:`dict` mapping filenames to :class:`BootFile` instances;
+      effectively the output of :attr:`files` after parsing
     """
     def __init__(self, path):
         if isinstance(path, str):
