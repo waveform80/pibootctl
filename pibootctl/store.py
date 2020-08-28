@@ -66,14 +66,10 @@ from collections.abc import Mapping
 from zipfile import ZipFile, BadZipFile, ZIP_DEFLATED
 
 from .files import AtomicReplaceFile
-from .parser import BootParser, BootFile
+from .parser import BootParser, BootFile, BootComment, BootConditions
 from .setting import CommandIncludedFile
 from .settings import SETTINGS
-from .exc import (
-    InvalidConfiguration,
-    IneffectiveConfiguration,
-    MissingInclude,
-)
+from .exc import InvalidConfiguration, IneffectiveConfiguration
 
 _ = gettext.gettext
 
@@ -144,30 +140,30 @@ class Store(Mapping):
         The path (relative to *boot_path*) under which stored configurations
         will be saved.
 
-    :param str config_read:
+    :param str config_root:
         The filename of the "root" of the configuration, i.e. the first file
-        read by the parser. Currently, this should always be "config.txt", the
-        default.
+        read by the parser, and the file in which certain commands (e.g.
+        start_x) *must* be placed. Currently, this should always be
+        "config.txt", the default.
 
-    :param str config_write:
-        The filename of the configuration file which should be re-written by
-        mutable configurations. By default this is "config.txt" but
-        distributions may wish to include another file from "config.txt",
-        leaving "config.txt" to be managed by the distribution itself.
+    :param set mutable_files:
+        The set of filenames which :class:`MutableConfiguration` instances are
+        permitted to change. By default this is just "config.txt".
 
-    :param str config_template:
-        The template to use when re-writing *config_write*. By default this
-        is just "{config}", but this parameter can be used to add headers or
-        footers to the generated configuration (or for that matter, additional
-        fixed includes, or even configuration lines).
+    :param bool comment_lines:
+        If :data:`True`, then :class:`MutableConfiguration` will comment out
+        lines no longer required with a # prefix. When :data:`False` (the
+        default), such lines will be deleted instead. When adding lines,
+        regardless of this setting, the utility will search for, and uncomment,
+        commented out lines which match the required output.
     """
-    def __init__(self, boot_path, store_path, config_read='config.txt',
-                 config_write='config.txt', config_template='{config}'):
+    def __init__(self, boot_path, store_path, config_root='config.txt',
+                 mutable_files=frozenset({'config.txt'}), comment_lines=False):
         self._boot_path = Path(boot_path)
         self._store_path = self._boot_path / store_path
-        self._config_read = config_read
-        self._config_write = config_write
-        self._config_template = config_template
+        self._config_root = config_root
+        self._mutable_files = mutable_files
+        self._comment_lines = comment_lines
 
     def _path_of(self, name):
         return (self._store_path / name).with_suffix('.zip')
@@ -205,12 +201,10 @@ class Store(Mapping):
             return DefaultConfiguration()
         elif key is Current:
             return BootConfiguration(
-                self._boot_path, self._config_read, self._config_write,
-                self._config_template)
+                self._boot_path, self._config_root, self._mutable_files)
         elif key in self:
             return StoredConfiguration(
-                self._path_of(key), self._config_read, self._config_write,
-                self._config_template)
+                self._path_of(key), self._config_root, self._mutable_files)
         else:
             raise KeyError(_(
                 "No stored configuration named {key}").format(key=key))
@@ -228,14 +222,14 @@ class Store(Mapping):
 
             old_files = set(self[Current].files.keys())
             for path, file in item.files.items():
-                if path != self._config_read:
+                if path != self._config_root:
                     replace_file(path, file)
             # config.txt is deliberately dealt with last. This ensures that,
             # in the case of systems using os_prefix to switch boot directories
             # the switch is effectively atomic
             try:
-                path = self._config_read
-                file = item.files[self._config_read]
+                path = self._config_root
+                file = item.files[self._config_root]
             except KeyError:
                 pass
             else:
@@ -335,40 +329,30 @@ class DefaultConfiguration:
 
 class BootConfiguration:
     """
-    Represents the current boot configuration, as parsed from *filename*
-    (default "config.txt") on the boot partition (presumably mounted at
-    *path*, a :class:`~pathlib.Path` instance).
-
-    The file named by *rewrite* (default "config.txt") is the file within the
-    configuration that should be considered mutable, i.e. this is the file that
-    gets re-written within a :meth:`mutable` configuration.
-
-    Finally, the *template* string specifies the template used to format the
-    *rewrite* file. By default this is simple "{config}" indicating that the
-    generated configuration alone should be placed in the file, but headers
-    and footers (or even additional includes) can be added by means of this
-    parameter.
+    Represents a boot configuration, as parsed from *config_root* (default
+    "config.txt") on the boot partition (presumably mounted at *path*, a
+    :class:`~pathlib.Path` instance).
     """
-    def __init__(self, path, filename='config.txt', rewrite='config.txt',
-                 template='{config}'):
+    def __init__(self, path, config_root='config.txt',
+                 mutable_files=frozenset({'config.txt'}), comment_lines=False):
         self._path = path
-        self._filename = filename
+        self._config_root = config_root
+        self._mutable_files = mutable_files
+        self._comment_lines = comment_lines
         self._settings = None
         self._files = None
         self._hash = None
         self._timestamp = None
-        self._rewrite = rewrite
-        self._template = template
 
     def _parse(self):
-        assert self._settings is None
         parser = BootParser(self._path)
-        parser.parse(self._filename)
+        parser.parse(self._config_root)
         self._settings = Settings()
         for setting in self._settings.values():
             lines = []
             for item, value in setting.extract(parser.config):
-                setting._value = value
+                if item.conditions.enabled:
+                    setting._value = value
                 lines.append(item)
             setting._lines = tuple(lines[::-1])
         for setting in self._settings.values():
@@ -377,6 +361,7 @@ class BootConfiguration:
         self._files = parser.files
         self._hash = parser.hash
         self._timestamp = parser.timestamp
+        return parser
 
     @property
     def path(self):
@@ -387,12 +372,12 @@ class BootConfiguration:
         return self._path
 
     @property
-    def filename(self):
+    def config_root(self):
         """
         The root file of the boot configuration. This is currently always
         "config.txt".
         """
-        return self._filename
+        return self._config_root
 
     @property
     def timestamp(self):
@@ -443,19 +428,20 @@ class BootConfiguration:
         so nothing is actually re-written until the updated mutable
         configuration is assigned back to something in the :class:`Store`.
         """
-        return MutableConfiguration(self.files.copy(), self._filename,
-                                    self._rewrite, self._template)
+        return MutableConfiguration(self.files.copy(), self._config_root,
+                                    self._mutable_files)
 
 
 class StoredConfiguration(BootConfiguration):
     """
     Represents a boot configuration stored in a :class:`~zipfile.ZipFile`
     specified by *path*. The starting file of the configuration is given by
-    *filename*. All other parameters are as in :class:`BootConfiguration`.
+    *config_root*. All other parameters are as in :class:`BootConfiguration`.
     """
-    def __init__(self, path, filename='config.txt', rewrite='config.txt',
-                 template='{config}'):
-        super().__init__(ZipFile(str(path), 'r'), filename, rewrite, template)
+    def __init__(self, path, config_root='config.txt',
+                 mutable_files=frozenset({'config.txt'}), comment_lines=False):
+        super().__init__(
+            ZipFile(str(path), 'r'), config_root, mutable_files, comment_lines)
         # We can grab the hash and timestamp from the arc's meta-data without
         # any decompression work (it's all in the uncompressed footer)
         comment = self.path.comment
@@ -489,10 +475,6 @@ class MutableConfiguration(BootConfiguration):
     constructed from a *base* :class:`BootConfiguration`, by calling
     :meth:`~BootConfiguration.mutable`.
 
-    Only one file in the configuration, specified by *rewrite*, is permitted to
-    be re-written and its contents are (partially) dictated by the specified
-    *template*.
-
     Mutable configurations can be changed with the :meth:`update` method which
     will also validate the new configuration, and check that the settings were
     not overridden by later files. No link is maintained between the original
@@ -501,21 +483,24 @@ class MutableConfiguration(BootConfiguration):
     resulting configuration must be assigned back to something in the
     :class:`Store` in order to re-write disk files.
     """
-    def update(self, values):
+    def update(self, values, context):
         """
         Given a mapping of setting names to new values, updates the values of
         the corresponding settings in this configuration. If a value is
         :data:`None`, the setting is reset to its default value.
         """
+        # Generate the "desired" settings. Note that this is a "pure" copy of
+        # the settings without any actual configuration files backing it. We'll
+        # use this firstly to validate the new settings are coherent, and later
+        # to determine whether the configuration we generate matches the
+        # desired settings.
+        updated = self.settings.copy()
         for name, value in values.items():
-            item = self.settings[name]
+            item = updated[name]
             item._value = item.update(value)
             item._lines = ()
-
-        # Validate the new configuration; aggregate all exceptions for the
-        # user's convenience
         errors = {}
-        for item in self.settings.values():
+        for item in updated.values():
             try:
                 item.validate()
             except ValueError as exc:
@@ -523,37 +508,130 @@ class MutableConfiguration(BootConfiguration):
         if errors:
             raise InvalidConfiguration(errors)
 
-        # Regenerate the dict forming our "path". First, blank out the file we
-        # intend to re-write and re-parse the settings to see what they are
-        # without that file
-        updated = self.settings.copy()
-        self._path.pop(self._rewrite, None)
-        self._settings = self._files = self._hash = None
+        # Generate a clean configuration devoid of all the lines that affected
+        # "values", then build a final configuration from the desired settings
+        # we generated above, and validate it results in the desired settings
+        self._update_path(self._clean_config(values, context))
         self._parse()
-
-        # Diff the re-parsed settings with the updated copy to figure out
-        # which settings actually need writing, and re-construct the _rewrite
-        # file from these
-        content = []
-        # XXX Can new ever be None? Would that be an error?
-        for old, new in sorted(self.settings.diff(updated),
-                               key=lambda i: i[1].key):
-            content.extend(new.output())
-        content = self._template.format(config='\n'.join(content))
-        self._path[self._rewrite] = BootFile(
-            self._rewrite, datetime.now(),
-            content.encode('ascii'),
-            'ascii', 'replace')
-        self._settings = self._files = self._hash = None
+        self._update_path(self._final_config(updated, context))
         self._parse()
-
-        # Check whether any settings were overridden by files later than the
-        # _rewrite file
-        if self._rewrite not in self.files:
-            raise MissingInclude(self._rewrite)
         diff = updated.diff(self.settings)
         if diff:
             raise IneffectiveConfiguration(diff)
+
+    def _parse(self):
+        # Save the parsed lines of the boot configuration; the final phase of
+        # the update method (_final_config) requires this information
+        parser = super()._parse()
+        self._config = parser.config
+
+    def _update_path(self, new_path):
+        # Update self._path from *new_path*, a dict mapping filenames to
+        # lists of lines.
+        for filename, lines in new_path.items():
+            try:
+                old_file = self._path[filename]
+            except KeyError:
+                old_file = BootFile.empty(
+                    filename, encoding='ascii', errors='replace')
+            new_content = ''.join(lines).encode(
+                old_file.encoding, old_file.errors)
+            self._path[filename] = BootFile(
+                filename, datetime.now(), new_content,
+                old_file.encoding, old_file.errors)
+
+    def _clean_config(self, values, context):
+        # Generate a "clean" configuration in which all lines which affected
+        # (or would potentially affect, under *context*) the settings mentioned
+        # in *values* are disabled or deleted
+        files = {
+            line.filename
+            for name in values
+            for line in self.settings[name].lines
+        }
+        new_path = {
+            filename: list(self._path[filename].lines())
+            for filename in files
+        }
+        for name in values:
+            for line in self.settings[name].lines:
+                if line.filename in self._mutable_files and (
+                        line.conditions.enabled or line.conditions <= context):
+                    if self._comment_lines:
+                        new_path[line.filename][line.linenum - 1] = (
+                            '#' + new_path[line.filename][line.linenum - 1])
+                    else:
+                        new_path[line.filename][line.linenum - 1] = ''
+        return new_path
+
+    def _final_config(self, updated, context):
+        # Diff the new settings to figure out which settings actually need
+        # writing; search for comments that can be "uncommented" instead of
+        # writing new lines, and otherwise record which new lines are required
+        new_path = {}
+        new_lines = []
+        # XXX Can new ever be None? Would that be an error?
+        for old, new in sorted(self.settings.diff(updated),
+                               key=lambda i:i[1].key):
+            for new_line in new.output():
+                for old_line in self._config:
+                    # XXX The search below for lines to uncomment isn't
+                    # *entirely* safe when dealing with dt-params, because
+                    # anything we uncomment still has to occur *after* the
+                    # related dtoverlay= line (if any)
+                    if (
+                            isinstance(old_line, BootComment) and
+                            old_line.conditions == context and
+                            old_line.comment == new_line):
+                        try:
+                            new_file = new_path[old_line.filename]
+                        except KeyError:
+                            new_file = new_path[old_line.filename] = (
+                                list(self._path[old_line.filename].lines()))
+                        new_file[old_line.linenum - 1] = old_line.comment
+                        break
+                else:
+                    new_lines.append(new_line)
+
+        # Find the insertion-point for new_lines; ideally, this is the last
+        # line of any section in the root configuration file which matches our
+        # desired context. Failing that, it'll be the last line of the root
+        # configuration file
+        insert_at = None
+        for line in reversed(self._config):
+            if line.filename == self.config_root:
+                if insert_at is None:
+                    # Set a tentative insertion-point at the last line in the
+                    # root configuration file
+                    insert_at = line
+                if line.conditions == context:
+                    # If we find a line which has conditions matching our
+                    # required context, we're done
+                    insert_at = line
+                    break
+        if insert_at is None:
+            # This can only happen if there's no root configuration file so
+            # we need to generate one with the appropriate context
+            insert_at = BootComment(self.config_root, 0, BootConditions())
+
+        # Insert the new content, prefixed with any necessary
+        # sections to adjust the context of the insertion point (ip)
+        if insert_at.conditions != context:
+            # Two cases are relevant here: the above case where no root
+            # configuration file exists, and the case where no lines in the
+            # existing configuration match the desired context
+            new_lines = list(context.generate(insert_at.conditions)) + new_lines
+        try:
+            new_file = new_path[self.config_root]
+        except KeyError:
+            try:
+                new_file = new_path[self.config_root] = (
+                    list(self._path[self.config_root].lines()))
+            except KeyError:
+                new_file = new_path[self.config_root] = []
+        new_file[insert_at.linenum:insert_at.linenum] = [
+            line + '\n' for line in new_lines]
+        return new_path
 
 
 class Settings(Mapping):
@@ -573,8 +651,6 @@ class Settings(Mapping):
         return len(self._visible)
 
     def __iter__(self):
-        # This curious ordering is necessary to ensure the sorting order of
-        # _items is preserved
         for key in self._items:
             if key in self._visible:
                 yield key

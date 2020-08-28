@@ -23,8 +23,6 @@ application:
 .. autoexception:: InvalidConfiguration
 
 .. autoexception:: IneffectiveConfiguration
-
-.. autoexception:: MissingInclude
 """
 
 import gettext
@@ -62,18 +60,3 @@ class IneffectiveConfiguration(ValueError):
     def __str__(self):
         return _("Failed to set {count} setting(s)").format(
             count=len(self.diff))
-
-
-class MissingInclude(ValueError):
-    """
-    Error raised when the file that's re-written by pibootctl isn't included in
-    the configuration.
-    """
-    def __init__(self, rewrite):
-        self.rewrite = rewrite
-        super().__init__(str(self))
-
-    def __str__(self):
-        return _(
-            "{rewrite} was not included in the new configuration").format(
-                rewrite=self.rewrite)

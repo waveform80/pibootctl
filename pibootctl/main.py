@@ -52,15 +52,13 @@ from pathlib import Path
 import pkg_resources
 
 from .setting import Command
+from .parser import BootConditions
 from .store import Store, Current, Default
 from .term import ErrorHandler, pager
 from .userstr import UserStr
 from .output import Output
-from .exc import (
-    InvalidConfiguration,
-    IneffectiveConfiguration,
-    MissingInclude
-)
+from .info import get_board_type, get_board_serial
+from .exc import InvalidConfiguration, IneffectiveConfiguration
 
 try:
     import argcomplete
@@ -118,7 +116,6 @@ class Application:
             sys.excepthook = ErrorHandler()
             sys.excepthook[InvalidConfiguration] = (self.invalid_config, 3)
             sys.excepthook[IneffectiveConfiguration] = (self.overridden_config, 4)
-            sys.excepthook[MissingInclude] = (sys.excepthook.exc_message, 5)
             sys.excepthook[PermissionError] = (self.permission_error, 6)
             sys.excepthook[Exception] = (sys.excepthook.exc_message, 1)
         with pager():
@@ -168,8 +165,7 @@ class Application:
         if self._store is None:
             self._store = Store(
                 self.config.boot_path, self.config.store_path,
-                self.config.config_read, self.config.config_write,
-                self.config.config_template)
+                self.config.config_root)
         return self._store
 
     @staticmethod
@@ -178,9 +174,7 @@ class Application:
             defaults={
                 'boot_path':             '/boot',
                 'store_path':            'pibootctl',
-                'config_read':           'config.txt',
-                'config_write':          'config.txt',
-                'config_template':       'pibootctl.template',
+                'config_root':           'config.txt',
                 'backup':                'on',
                 'package_name':          'pibootctl',
                 'reboot_required':       '/var/run/reboot-required',
@@ -203,21 +197,11 @@ class Application:
         config = argparse.Namespace(
             boot_path=section['boot_path'],
             store_path=section['store_path'],
-            config_read=section['config_read'],
-            config_write=section['config_write'],
-            config_template='{config}',
+            config_root=section['config_root'],
             backup=section.getboolean('backup'),
             package_name=section['package_name'],
             reboot_required=section['reboot_required'],
             reboot_required_pkgs=section['reboot_required_pkgs'])
-        # Read the specific template file(s)
-        template_path = Path(section['config_template'])
-        for filename in read:
-            path = Path(filename).parent.joinpath(template_path)
-            try:
-                config.config_template = path.read_text()
-            except FileNotFoundError:
-                pass
         return config
 
     def _get_parser(self):
@@ -304,6 +288,27 @@ class Application:
             help=_(
                 "Don't take an automatic backup of the current boot "
                 "configuration if one doesn't exist"))
+        group = set_cmd.add_mutually_exclusive_group(required=False)
+        group.add_argument(
+            "--all", dest="context", action="store_const", const="all",
+            help=_(
+                "Set the specified settings on all Pis this SD card is used "
+                "with. This is the default context."))
+        group.add_argument(
+            "--this-model", dest="context", action="store_const",
+            const="model", help=_(
+                "Set the specified settings for this model of Pi."))
+        group.add_argument(
+            "--this-serial", dest="context", action="store_const",
+            const="serial", help=_(
+                "Set the specified settings for this Pi's serial number "
+                "only."))
+        # TODO
+        #group.add_argument(
+        #    "--this-display", dest="context", action="store_const",
+        #    const="edid", help=_(
+        #        "Set the specified settings for the EDID of the specified "
+        #        "monitor only."))
         group = Output.add_style_arg(set_cmd, required=True)
         group.add_argument(
             "set_vars", nargs="*", metavar="name=[value]", default=[],
@@ -311,7 +316,7 @@ class Application:
                 "Specify one or more settings to change on the command "
                 "line; to reset a setting to its default omit the value")
         ).completer = self._complete_set_vars
-        set_cmd.set_defaults(func=self.do_set, backup=True)
+        set_cmd.set_defaults(func=self.do_set, backup=True, context="all")
 
         save_cmd = commands.add_parser(
             "save",
@@ -471,7 +476,7 @@ class Application:
                     template = _(
                         "{expected.name} is not set in the generated "
                         "configuration although it was set in "
-                        "{expected.lines[0].path} line "
+                        "{expected.lines[0].filename} line "
                         "{expected.lines[0].linenum}")
                 else:
                     template = _(
@@ -481,7 +486,7 @@ class Application:
                 template = _(
                     "Expected {expected.name} to be {expected.value}, but was "
                     "{actual.value} after being overridden by "
-                    "{actual.lines[0].path} line {actual.lines[0].linenum}")
+                    "{actual.lines[0].filename} line {actual.lines[0].linenum}")
             msg.append(template.format(expected=expected, actual=actual))
         return msg
 
@@ -623,7 +628,16 @@ class Application:
                 settings[name] = UserStr(value)
         else:
             settings = self._output.load_settings(sys.stdin)
-        mutable.update(settings)
+        context = {
+            'all': lambda: BootConditions(),
+            'model':
+                lambda: BootConditions(pi=get_model_type()),
+            'serial':
+                lambda: BootConditions(serial=int(get_board_serial(), base=16)),
+            'display':
+                lambda: BootConditions(display=get_display_id()),
+        }[self._args.context]()
+        mutable.update(settings, context)
         self.backup_if_needed()
         self.store[Current] = mutable
         self.mark_reboot_required()

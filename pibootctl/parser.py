@@ -330,6 +330,7 @@ class BootConditions(namedtuple('BootConditions', (
         'edid',
         'serial',
         'gpio',
+        'none',
         'suppress_count'
     ))):
     """
@@ -339,49 +340,40 @@ class BootConditions(namedtuple('BootConditions', (
     __slots__ = ()
 
     def __new__(cls, pi=None, hdmi=None, edid=None, serial=None, gpio=None,
-                suppress_count=0):
+                none=False, suppress_count=0):
         return super().__new__(
-            cls, pi, hdmi, edid, serial, gpio, suppress_count)
+            cls, pi, hdmi, edid, serial, gpio, none, suppress_count)
 
     def __eq__(self, other):
         if not isinstance(other, BootConditions):
             return NotImplemented
-        if self.gpio != other.gpio:
-            return False
-        if self.serial != other.serial:
-            return False
-        if self.edid != other.edid:
-            return False
-        if self.hdmi != other.hdmi:
-            return False
-        if self.pi != other.pi:
-            return False
-        # NOTE: suppress_count is deliberately excluded here; it is nothing to
-        # do with the conditional filters themselves but is an artefact of
-        # their effect on includes
-        return True
+        return (
+            self.pi == other.pi and
+            self.hdmi == other.hdmi and
+            self.edid == other.edid and
+            self.serial == other.serial and
+            self.gpio == other.gpio and
+            self.none == other.none
+            # NOTE: suppress_count is deliberately excluded here; it is nothing
+            # to do with the conditional filters themselves but is an artefact
+            # of their effect on includes
+        )
 
     def __le__(self, other):
         if not isinstance(other, BootConditions):
             return NotImplemented
-        if self.gpio != other.gpio and other.gpio is not None:
-            return False
-        if self.serial != other.serial and other.serial is not None:
-            return False
-        if self.edid != other.edid and other.edid is not None:
-            return False
-        if self.hdmi != other.hdmi and other.hdmi is not None:
-            return False
-        if self.pi != other.pi and other.pi is not None and (
-                # Former are subsets of the latter for conditional matching
-                # purposes; see [COND] for details:
-                (self.pi, other.pi) not in {
+        return (
+            (self.pi == other.pi or other.pi is None or (self.pi, other.pi) in {
                 ('pi3+', 'pi3'),
                 ('pi0w', 'pi0'),
-        }):
-            return False
-        # See note above regarding suppress_count
-        return True
+            }) and
+            (self.hdmi == other.hdmi or other.hdmi is None) and
+            (self.edid == other.edid or other.edid is None) and
+            (self.serial == other.serial or other.serial is None) and
+            (self.gpio == other.gpio or other.gpio is None) and
+            (self.none == other.none or not other.none)
+            # See note above regarding suppress_count
+        )
 
     def __ne__(self, other):
         return not (self == other)
@@ -404,9 +396,9 @@ class BootConditions(namedtuple('BootConditions', (
         # Derived from information at [COND]
         if section == 'all':
             return self._replace(pi=None, hdmi=None, edid=None, serial=None,
-                                 gpio=None)
+                                 gpio=None, none=False)
         elif section == 'none':
-            return self._replace(pi=False)
+            return self._replace(none=True)
         elif section.startswith('HDMI:'):
             try:
                 return self._replace(hdmi={
@@ -444,7 +436,59 @@ class BootConditions(namedtuple('BootConditions', (
             return self
         assert False  # pragma: no cover
 
+    def generate(self, context=None):
+        """
+        Given *context*, a :class:`BootConditions` instance representing the
+        currently active conditional sections, this method yields the
+        conditional secitons required to set the conditions to this instance.
+        If *context* is not specified, it defaults to conditions equivalent
+        to ``[any]``, which is the default in the Pi bootloader.
+
+        For example:
+
+            >>> current = BootConditions(pi='pi2', gpio=(4, True))
+            >>> wanted = BootConditions()
+            >>> print('\n'.join(wanted.generate(current)))
+            [all]
+            >>> wanted = BootConditions(pi='pi4')
+            >>> print('\n'.join(wanted.generate(current)))
+            [all]
+            [pi4]
+            >>> current = BootConditions(pi='pi2')
+            >>> print('\n'.join(wanted.generate(current)))
+            [pi4]
+            >>> current = BootConditions(none=True)
+            >>> print('\n'.join(wanted.generate(current)))
+            [all]
+            [pi3]
+        """
+        if context is None:
+            context = BootConditions()
+        # If we have to "undo" any conditionals (because the context conditions
+        # limit gpio, for example but our conditions don't) then reset
+        # everything with [all]
+        if context.none or any(
+                old is not None and new is None
+                for old, new in zip(context[:-2], self[:-2])):
+            yield '[all]'
+        if self.pi is not None:
+            yield '[{self.pi}]'.format(self=self)
+        if self.hdmi is not None:
+            yield '[HDMI:{self.hdmi}]'.format(self=self)
+        if self.edid is not None:
+            yield '[EDID={self.edid}]'.format(self=self)
+        if self.serial is not None:
+            yield '[0x{self.serial:X}]'.foramt(self=self)
+        if self.gpio is not None:
+            yield '[gpio{self.gpio[0]:d}={self.gpio[1]:d}]'.format(self=self)
+
     def suppress(self):
+        """
+        If the current boot conditions are not :attr:`enabled`, returns a
+        new :class:`BootConditions` instance with the suppression count
+        incremented by one. This is used during parsing to disable all
+        conditionals in suppressed includes.
+        """
         if not self.enabled:
             return self._replace(suppress_count=self.suppress_count + 1)
         else:
@@ -458,6 +502,7 @@ class BootConditions(namedtuple('BootConditions', (
         """
         return (
             # Cannot currently assess HDMI, EDID, or GPIO criteria
+            not self.none and
             (self.pi is None or self.pi in get_board_types()) and
             (self.serial is None or self.serial == get_board_serial()) and
             (self.suppress_count == 0)

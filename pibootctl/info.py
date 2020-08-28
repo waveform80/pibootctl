@@ -153,3 +153,7 @@ def get_board_mem():
             }[rev]
     except KeyError:
         return 0
+
+
+def get_display_id(display=None):
+    raise NotImplementedError

@@ -38,6 +38,10 @@ def store_path(request, boot_path):
     return boot_path / 'pibootctl'
 
 
+cond_all = BootConditions()
+cond_none = cond_all.evaluate('none')
+
+
 def test_singleton_reprs():
     assert repr(Current) == 'Current'
     assert repr(Default) == 'Default'
@@ -106,7 +110,7 @@ hdmi_mode=4
     (boot_path / 'config.txt').write_bytes(content)
     current = store[Current]
     assert current.path == boot_path
-    assert current.filename == 'config.txt'
+    assert current.config_root == 'config.txt'
     d = datetime.fromtimestamp(
         (boot_path / 'config.txt').stat().st_mtime)
     d = d.replace(
@@ -122,6 +126,43 @@ hdmi_mode=4
     assert current.settings['video.hdmi1.group'].value == 0
     assert current.settings['video.hdmi1.mode'].value == 0
     assert current.files['config.txt'].content == content
+
+
+def test_store_getitem_with_includes(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    config_txt = b"""\
+[all]
+dtparam=i2c=on
+dtparam=spi=on
+[none]
+include inc.txt
+"""
+    inc_txt = b"""\
+[all]
+hdmi_group=1
+hdmi_mode=4
+"""
+    (boot_path / 'config.txt').write_bytes(config_txt)
+    (boot_path / 'inc.txt').write_bytes(inc_txt)
+    current = store[Current]
+    assert current.path == boot_path
+    assert current.config_root == 'config.txt'
+    d = datetime.fromtimestamp(
+        (boot_path / 'inc.txt').stat().st_mtime)
+    d = d.replace(
+        year=max(1980, d.year),
+        second=d.second // 2 * 2, microsecond=0)
+    assert current.timestamp == d
+    assert current.hash == 'e76f44e09c3e3e36022c248cb71924e2af76a18b'
+    assert current.settings['i2c.enabled'].value
+    assert current.settings['spi.enabled'].value
+    assert not current.settings['audio.enabled'].value
+    assert current.settings['video.hdmi0.group'].value == 0
+    assert current.settings['video.hdmi0.mode'].value == 0
+    assert current.settings['video.hdmi1.group'].value == 0
+    assert current.settings['video.hdmi1.mode'].value == 0
+    assert current.files['config.txt'].content == config_txt
+    assert current.files['inc.txt'].content == inc_txt
 
 
 def test_store_setitem(boot_path, store_path):
@@ -205,48 +246,34 @@ dtparam=spi=on
 
 
 def test_store_mutable_update(boot_path, store_path):
-    store = Store(boot_path, store_path, config_template="""\
-# Header goes here
-{config}
-
-# And then the footer plus another include
-include usercfg.txt
-""")
+    store = Store(boot_path, store_path,
+                  mutable_files={'config.txt', 'syscfg.txt'})
     (boot_path / 'config.txt').write_text("""\
+# Header goes here
+
+include syscfg.txt
+""")
+    (boot_path / 'syscfg.txt').write_text("""\
 dtparam=i2c=on
 dtparam=spi=on
 """)
     current = store[Current]
     mutable = current.mutable()
-    mutable.update({'i2c.enabled': None, 'camera.enabled': True})
+    mutable.update({'i2c.enabled': None, 'camera.enabled': True}, cond_all)
     assert mutable.files['config.txt'].content.decode('ascii') == """\
 # Header goes here
-start_x=1
-dtparam=spi=on
 
-# And then the footer plus another include
-include usercfg.txt
+include syscfg.txt
+start_x=1
+"""
+    assert mutable.files['syscfg.txt'].content.decode('ascii') == """\
+dtparam=spi=on
 """
 
 
-def test_store_mutable_invalid(boot_path, store_path):
-    store = Store(boot_path, store_path)
-    (boot_path / 'config.txt').write_text("""\
-dtparam=i2c=on
-dtparam=spi=on
-""")
-    current = store[Current]
-    mutable = current.mutable()
-    with pytest.raises(InvalidConfiguration) as exc_info:
-        mutable.update({'video.hdmi0.mode': 1})
-    assert len(exc_info.value.errors) == 1
-    assert isinstance(exc_info.value.errors['video.hdmi0.mode'], ValueError)
-    assert str(exc_info.value) == (
-        "Configuration failed to validate with 1 error(s)")
-
-
 def test_store_mutable_ineffective(boot_path, store_path):
-    store = Store(boot_path, store_path, config_write='syscfg.txt')
+    store = Store(boot_path, store_path,
+                  mutable_files={'config.txt', 'syscfg.txt'})
     (boot_path / 'config.txt').write_text("""\
 include syscfg.txt
 include usercfg.txt
@@ -261,27 +288,16 @@ dtparam=i2c=on
     current = store[Current]
     mutable = current.mutable()
     with pytest.raises(IneffectiveConfiguration) as exc_info:
-        mutable.update({'i2c.enabled': None})
+        mutable.update({'i2c.enabled': None}, cond_all)
     assert len(exc_info.value.diff) == 1
     assert str(exc_info.value) == "Failed to set 1 setting(s)"
-
-
-def test_mutable_missing_include(boot_path, store_path):
-    store = Store(boot_path, store_path, config_write='syscfg.txt')
-    (boot_path / 'config.txt').write_text("""\
+    assert mutable.files['config.txt'].content.decode('ascii') == """\
+include syscfg.txt
 include usercfg.txt
-""")
-    (boot_path / 'syscfg.txt').write_text("""\
-dtparam=i2c=on
+"""
+    assert mutable.files['syscfg.txt'].content.decode('ascii') == """\
 dtparam=spi=on
-""")
-    current = store[Current]
-    mutable = current.mutable()
-    with pytest.raises(MissingInclude) as exc_info:
-        mutable.update({'i2c.enabled': None})
-    assert exc_info.value.rewrite == 'syscfg.txt'
-    assert str(exc_info.value) == (
-        "syscfg.txt was not included in the new configuration")
+"""
 
 
 def test_settings_container():

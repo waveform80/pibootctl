@@ -31,6 +31,11 @@ import pytest
 from pibootctl.store import Store, Current, Default
 from pibootctl.term import ErrorHandler
 from pibootctl.main import Application
+from pibootctl.parser import BootConditions
+
+
+cond_all = BootConditions()
+cond_none = cond_all.evaluate('none')
 
 
 @pytest.fixture()
@@ -126,7 +131,7 @@ def test_help_config_multi(main, capsys, distro):
 
 def test_dump_show(main, capsys, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store[Current] = current
 
     main(['status', '--json'])
@@ -137,9 +142,9 @@ def test_dump_show(main, capsys, store, distro):
 
 def test_dump_show_name(main, capsys, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store[Current] = current
-    current.update({'camera.enabled': True, 'gpu.mem': 128})
+    current.update({'camera.enabled': True, 'gpu.mem': 128}, cond_all)
     store['cam'] = current
 
     main(['show', '--json', 'cam'])
@@ -151,7 +156,7 @@ def test_dump_show_name(main, capsys, store, distro):
 
 def test_dump_show_filters(main, capsys, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store[Current] = current
 
     main(['status', '--json', '--all'])
@@ -165,7 +170,7 @@ def test_dump_show_filters(main, capsys, store, distro):
 
 def test_get(main, capsys, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store[Current] = current
 
     main(['get', 'video.hdmi0.group'])
@@ -178,7 +183,7 @@ def test_get(main, capsys, store, distro):
 
 def test_get_multi(main, capsys, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store[Current] = current
 
     main(['get', '--json', 'video.hdmi0.group', 'spi.enabled'])
@@ -191,7 +196,7 @@ def test_get_multi(main, capsys, store, distro):
 
 def test_set(main, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store[Current] = current
 
     changes = {'video.hdmi0.mode': 3}
@@ -204,7 +209,7 @@ def test_set(main, store, distro):
 
 def test_set_user(main, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store[Current] = current
 
     main(['set', 'video.hdmi0.mode=3'])
@@ -223,7 +228,7 @@ def test_set_user(main, store, distro):
 
 def test_save(main, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store[Current] = current
 
     assert 'foo' not in store
@@ -237,7 +242,7 @@ def test_save(main, store, distro):
 
 def test_load(main, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store['foo'] = current
 
     assert not store[Current].settings['video.hdmi0.group'].modified
@@ -250,7 +255,7 @@ def test_load(main, store, distro):
 
 def test_load_no_backup(main, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store['foo'] = current
 
     assert not store[Current].settings['video.hdmi0.group'].modified
@@ -261,9 +266,9 @@ def test_load_no_backup(main, store, distro):
 
 def test_diff(main, capsys, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store['foo'] = current
-    current.update({'video.hdmi0.mode': 5, 'spi.enabled': True})
+    current.update({'video.hdmi0.mode': 5, 'spi.enabled': True}, cond_all)
     store['bar'] = current
 
     main(['diff', 'foo', 'bar', '--json'])
@@ -278,9 +283,9 @@ def test_list(main, capsys, store, distro):
     with mock.patch('pibootctl.store.datetime') as dt:
         dt.now.return_value = datetime(2000, 1, 1)
         current = store[Current].mutable()
-        current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+        current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
         store['foo'] = current
-        current.update({'video.hdmi0.mode': 5, 'spi.enabled': True})
+        current.update({'video.hdmi0.mode': 5, 'spi.enabled': True}, cond_all)
         store['bar'] = current
         store[Current] = store['bar']
 
@@ -294,7 +299,7 @@ def test_list(main, capsys, store, distro):
 
 def test_remove(main, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store['foo'] = current
 
     assert store.keys() == {Current, Default, 'foo'}
@@ -307,7 +312,7 @@ def test_remove(main, store, distro):
 
 def test_rename(main, store, distro):
     current = store[Current].mutable()
-    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+    current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
     store['foo'] = current
     store['bar'] = current
 
@@ -326,7 +331,7 @@ def test_backup_fallback(main, store, distro):
         dt.now.return_value = datetime(2000, 1, 1)
 
         current = store[Current].mutable()
-        current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+        current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
         store['foo'] = current
 
         # Causes a backup to be taken with timestamp 2000-01-01
@@ -337,7 +342,7 @@ def test_backup_fallback(main, store, distro):
         # Modify the current and cause another backup to be taken without
         # advancing our fake timestamp
         current = store[Current].mutable()
-        current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 5})
+        current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 5}, cond_all)
         store[Current] = current
         main(['load', 'foo'])
         assert store.keys() == {
@@ -360,7 +365,7 @@ def test_reboot_required(main, tmpdir, distro):
     with mock.patch('configparser.ConfigParser.read', my_read):
         store = Store(boot_path, store_path)
         current = store[Current].mutable()
-        current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4})
+        current.update({'video.hdmi0.group': 1, 'video.hdmi0.mode': 4}, cond_all)
         store['foo'] = current
 
         assert not (var_run_path / 'reboot-required').exists()
@@ -398,8 +403,7 @@ def test_invalid_config(main, tmpdir, distro):
     def my_read(self, *args, **kwargs):
         self['defaults']['boot_path'] = str(boot_path)
         self['defaults']['store_path'] = str(store_path)
-        self['defaults']['config_read'] = 'config.txt'
-        self['defaults']['config_write'] = 'syscfg.txt'
+        self['defaults']['config_root'] = 'config.txt'
         return []
     with mock.patch('configparser.ConfigParser.read', my_read):
         try:
@@ -425,8 +429,33 @@ def test_overridden_config(main, tmpdir, distro):
     def my_read(self, *args, **kwargs):
         self['defaults']['boot_path'] = str(boot_path)
         self['defaults']['store_path'] = str(store_path)
-        self['defaults']['config_read'] = 'config.txt'
-        self['defaults']['config_write'] = 'syscfg.txt'
+        self['defaults']['config_root'] = 'config.txt'
+        return []
+    with mock.patch('configparser.ConfigParser.read', my_read):
+        try:
+            main(['set', 'spi.enabled='])
+        except:
+            msg = Application.overridden_config(*sys.exc_info())
+            assert len(msg) == 2
+            assert msg == [
+                "Failed to set 1 setting(s)",
+                "Expected spi.enabled to be False, but was True after being "
+                "overridden by usercfg.txt line 1",
+            ]
+
+
+def test_overridden_config(main, tmpdir, distro):
+    boot_path = Path(str(tmpdir))
+    (boot_path / 'config.txt').write_text(
+        'include syscfg.txt\ninclude usercfg.txt\n')
+    (boot_path / 'usercfg.txt').write_text(
+        'dtparam=spi=on\n')
+    store_path = boot_path / 'store'
+    store_path.mkdir()
+    def my_read(self, *args, **kwargs):
+        self['defaults']['boot_path'] = str(boot_path)
+        self['defaults']['store_path'] = str(store_path)
+        self['defaults']['config_root'] = 'config.txt'
         return []
     with mock.patch('configparser.ConfigParser.read', my_read):
         try:
