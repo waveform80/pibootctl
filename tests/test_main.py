@@ -32,6 +32,7 @@ from pibootctl.store import Store, Current, Default
 from pibootctl.term import ErrorHandler
 from pibootctl.main import Application
 from pibootctl.parser import BootConditions
+from pibootctl.exc import IneffectiveConfiguration
 
 
 cond_all = BootConditions()
@@ -391,8 +392,7 @@ def test_permission_error(store):
             raise PermissionError('permission denied')
         except PermissionError:
             msg = Application.permission_error(*sys.exc_info())
-            assert len(msg) == 1
-            assert msg[0] == 'permission denied'
+            assert msg == ['permission denied']
 
 
 def test_invalid_config(main, tmpdir, distro):
@@ -410,7 +410,6 @@ def test_invalid_config(main, tmpdir, distro):
             main(['set', 'video.hdmi0.group=1'])
         except:
             msg = Application.invalid_config(*sys.exc_info())
-            assert len(msg) == 2
             assert msg == [
                 "Configuration failed to validate with 1 error(s)",
                 "video.hdmi0.mode must be between 1 and 59 when "
@@ -436,12 +435,91 @@ def test_overridden_config(main, tmpdir, distro):
             main(['set', 'spi.enabled='])
         except:
             msg = Application.overridden_config(*sys.exc_info())
-            assert len(msg) == 2
             assert msg == [
                 "Failed to set 1 setting(s)",
                 "Expected spi.enabled to be False, but was True after being "
                 "overridden by usercfg.txt line 1",
             ]
+
+
+def test_ineffective_config(main, tmpdir, distro):
+    # TODO: Improve the uncommenting code so that this test breaks and the
+    # utility does the "right" thing (presumably warns about or deletes the
+    # commented start_x=1 in usercfg.txt and writes it in config.txt)
+    boot_path = Path(str(tmpdir))
+    (boot_path / 'config.txt').write_text('include usercfg.txt\n')
+    (boot_path / 'usercfg.txt').write_text('#start_x=1')
+    store_path = boot_path / 'store'
+    store_path.mkdir()
+    def my_read(self, *args, **kwargs):
+        self['defaults']['boot_path'] = str(boot_path)
+        self['defaults']['store_path'] = str(store_path)
+        self['defaults']['config_root'] = 'config.txt'
+        return []
+    with mock.patch('configparser.ConfigParser.read', my_read):
+        try:
+            main(['set', 'camera.enabled=on'])
+        except:
+            msg = Application.overridden_config(*sys.exc_info())
+            assert set(msg) == {
+                "Failed to set 3 setting(s)",
+                "Expected camera.enabled to be True, but was False with no "
+                "valid lines; this usually means a setting like start_x or "
+                "gpu_mem is in a file other than config.txt",
+                "Expected boot.firmware.fixup to be fixup_x.dat, but was "
+                "fixup.dat with no valid lines; this usually means a setting "
+                "like start_x or gpu_mem is in a file other than config.txt",
+                "Expected boot.firmware.filename to be start_x.elf, but was "
+                "start.elf with no valid lines; this usually means a setting "
+                "like start_x or gpu_mem is in a file other than config.txt",
+            }
+
+
+def test_ineffective_bugs(main, tmpdir):
+    boot_path = Path(str(tmpdir))
+    (boot_path / 'config.txt').write_text("""\
+kernel=vmlinuz
+enable_uart=1
+""")
+    store_path = boot_path / 'pibootctl'
+    store = Store(boot_path, store_path)
+    current = store[Current]
+
+    try:
+        raise IneffectiveConfiguration(
+            {(None, current.settings['boot.kernel.filename'])}
+        )
+    except:
+        msg = Application.overridden_config(*sys.exc_info())
+        assert msg == [
+            "Failed to set 1 setting(s)",
+            "boot.kernel.filename appears unexpectedly as vmlinuz in the "
+            "generated configuration; please report this bug"
+        ]
+
+    try:
+        raise IneffectiveConfiguration(
+            {(current.settings['serial.enabled'], None)}
+        )
+    except:
+        msg = Application.overridden_config(*sys.exc_info())
+        assert msg == [
+            "Failed to set 1 setting(s)",
+            "serial.enabled is not set in the generated configuration "
+            "although it was set in config.txt line 2; please report this bug"
+        ]
+
+    try:
+        raise IneffectiveConfiguration(
+            {(current.settings['bluetooth.enabled'], None)}
+        )
+    except:
+        msg = Application.overridden_config(*sys.exc_info())
+        assert msg == [
+            "Failed to set 1 setting(s)",
+            "bluetooth.enabled is not set in the generated configuration; "
+            "please report this bug"
+        ]
 
 
 def test_debug_run(main, capsys, distro):

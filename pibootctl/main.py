@@ -469,24 +469,30 @@ class Application:
         for expected, actual in exc[1].diff:
             if expected is None and actual is not None:
                 template = _(
-                    "{actual.name} appears unexpectedly in the generated "
-                    "configuration")
+                    "{actual.name} appears unexpectedly as {actual.value} in "
+                    "the generated configuration; please report this bug")
             elif expected is not None and actual is None:
                 if expected.lines:
                     template = _(
                         "{expected.name} is not set in the generated "
                         "configuration although it was set in "
                         "{expected.lines[0].filename} line "
-                        "{expected.lines[0].linenum}")
+                        "{expected.lines[0].linenum}; please report this bug")
                 else:
                     template = _(
                         "{expected.name} is not set in the generated "
-                        "configuration")
-            else:
+                        "configuration; please report this bug")
+            elif actual.lines:
                 template = _(
                     "Expected {expected.name} to be {expected.value}, but was "
                     "{actual.value} after being overridden by "
                     "{actual.lines[0].filename} line {actual.lines[0].linenum}")
+            else:
+                template = _(
+                    "Expected {expected.name} to be {expected.value}, but was "
+                    "{actual.value} with no valid lines; this usually means "
+                    "a setting like start_x or gpu_mem is in a file other "
+                    "than config.txt")
             msg.append(template.format(expected=expected, actual=actual))
         return msg
 
