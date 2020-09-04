@@ -434,7 +434,7 @@ class BootConditions(namedtuple('BootConditions', (
             warnings.warn(
                 BootInvalid('unrecognized conditional: {}'.format(section)))
             return self
-        assert False  # pragma: no cover
+        assert False, 'invalid evaluate state'
 
     def generate(self, context=None):
         """
@@ -825,7 +825,7 @@ class BootParser:
             except KeyError:
                 file = None
         else:
-            assert False  # pragma: no cover
+            assert False, 'invalid path type'
 
         if file is None:
             # It is *not* an error if filename doesn't exist under path; e.g.

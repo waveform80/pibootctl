@@ -502,7 +502,7 @@ class TransTemplate(str):
 class TransMap:
     """
     Used with :meth:`str.format_map` to substitute only a subset of values
-    in a given template, passing the reset through for later processing. For
+    in a given template, passing the rest through for later processing. For
     example:
 
         >>> '{foo}{bar}'.format_map(TransMap(foo=1))
@@ -706,14 +706,9 @@ def parse(text):
                     yield 'para', ' '.join(para)
                     state = switch[token]()
             else:
-                assert False, 'invalid state'  # pragma: no cover
+                assert False, 'invalid state'
     except KeyError:
-        assert False, 'invalid token'  # pragma: no cover
-
-    # Deal with residual state (lists have indeterminate endings)
-    if state == 'list':
-        yield 'list', items
-        state = 'break'
+        assert False, 'invalid token'
 
     assert state == 'break'
 
@@ -778,5 +773,5 @@ def render(text, width=70, list_space=False, table_style=None):
         elif token == 'table':
             chunks.append(table_wrapper.fill(data))
         else:
-            assert False  # pragma: no cover
+            assert False, 'invalid render state'
     return '\n\n'.join(chunks)
