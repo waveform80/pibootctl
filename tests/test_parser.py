@@ -161,6 +161,21 @@ def test_bootconditions_comparisons():
     assert cond_pi3 > cond_hdmi
 
 
+def test_bootconditions_generate():
+    cond_pi3 = cond_all.evaluate('pi3')
+    cond_pi3p = cond_all.evaluate('pi3+')
+    cond_gpio = cond_pi3.evaluate('gpio4=1')
+    cond_edid = cond_pi3.evaluate('EDID=foo')
+    cond_hdmi = cond_pi3.evaluate('HDMI:1')
+    cond_serial = cond_pi3.evaluate('0xf000000d')
+    assert list(cond_pi3.generate()) == ['[pi3]']
+    assert list(cond_pi3p.generate()) == ['[pi3+]']
+    assert list(cond_gpio.generate()) == ['[pi3]', '[gpio4=1]']
+    assert list(cond_edid.generate()) == ['[pi3]', '[EDID=foo]']
+    assert list(cond_hdmi.generate()) == ['[pi3]', '[HDMI:1]']
+    assert list(cond_serial.generate()) == ['[pi3]', '[0xF000000D]']
+
+
 def test_parse_basic(tmpdir):
     tmpdir.join('config.txt').write("""\
 # This is a comment

@@ -444,32 +444,6 @@ def test_overridden_config(main, tmpdir, distro):
             ]
 
 
-def test_overridden_config(main, tmpdir, distro):
-    boot_path = Path(str(tmpdir))
-    (boot_path / 'config.txt').write_text(
-        'include syscfg.txt\ninclude usercfg.txt\n')
-    (boot_path / 'usercfg.txt').write_text(
-        'dtparam=spi=on\n')
-    store_path = boot_path / 'store'
-    store_path.mkdir()
-    def my_read(self, *args, **kwargs):
-        self['defaults']['boot_path'] = str(boot_path)
-        self['defaults']['store_path'] = str(store_path)
-        self['defaults']['config_root'] = 'config.txt'
-        return []
-    with mock.patch('configparser.ConfigParser.read', my_read):
-        try:
-            main(['set', 'spi.enabled='])
-        except:
-            msg = Application.overridden_config(*sys.exc_info())
-            assert len(msg) == 2
-            assert msg == [
-                "Failed to set 1 setting(s)",
-                "Expected spi.enabled to be False, but was True after being "
-                "overridden by usercfg.txt line 1",
-            ]
-
-
 def test_debug_run(main, capsys, distro):
     sys.excepthook = sys.__excepthook__
     os.environ['DEBUG'] = '1'

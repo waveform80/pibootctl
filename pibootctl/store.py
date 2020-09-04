@@ -201,10 +201,12 @@ class Store(Mapping):
             return DefaultConfiguration()
         elif key is Current:
             return BootConfiguration(
-                self._boot_path, self._config_root, self._mutable_files)
+                self._boot_path, self._config_root, self._mutable_files,
+                self._comment_lines)
         elif key in self:
             return StoredConfiguration(
-                self._path_of(key), self._config_root, self._mutable_files)
+                self._path_of(key), self._config_root, self._mutable_files,
+                self._comment_lines)
         else:
             raise KeyError(_(
                 "No stored configuration named {key}").format(key=key))
@@ -429,7 +431,7 @@ class BootConfiguration:
         configuration is assigned back to something in the :class:`Store`.
         """
         return MutableConfiguration(self.files.copy(), self._config_root,
-                                    self._mutable_files)
+                                    self._mutable_files, self._comment_lines)
 
 
 class StoredConfiguration(BootConfiguration):
@@ -588,7 +590,7 @@ class MutableConfiguration(BootConfiguration):
                         except KeyError:
                             new_file = new_path[old_line.filename] = (
                                 list(self._path[old_line.filename].lines()))
-                        new_file[old_line.linenum - 1] = old_line.comment
+                        new_file[old_line.linenum - 1] = old_line.comment + '\n'
                         break
                 else:
                     new_lines.append(new_line)

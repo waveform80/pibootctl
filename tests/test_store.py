@@ -300,6 +300,117 @@ dtparam=spi=on
 """
 
 
+def test_store_new_section(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
+[pi4]
+max_framebuffers=2
+""")
+    current = store[Current]
+    mutable = current.mutable()
+    mutable.update({'camera.enabled': True}, cond_all)
+    assert mutable.files['config.txt'].content.decode('ascii') == """\
+[pi4]
+max_framebuffers=2
+[all]
+start_x=1
+"""
+
+
+def test_store_new_sections(boot_path, store_path):
+    with mock.patch('pibootctl.parser.get_board_serial') as get_board_serial:
+        get_board_serial.return_value = 0xf000000d
+        store = Store(boot_path, store_path)
+        (boot_path / 'config.txt').write_text("""\
+[pi4]
+max_framebuffers=2
+""")
+        current = store[Current]
+        mutable = current.mutable()
+        cond_serial = cond_all._replace(serial=0xf000000d)
+        mutable.update({'gpu.mem': 128}, cond_serial)
+        assert mutable.files['config.txt'].content.decode('ascii') == """\
+[pi4]
+max_framebuffers=2
+[all]
+[0xF000000D]
+gpu_mem=128
+"""
+
+
+def test_store_comment_lines(boot_path, store_path):
+    store = Store(boot_path, store_path,
+                  mutable_files={'config.txt', 'syscfg.txt'},
+                  comment_lines=True)
+    (boot_path / 'config.txt').write_text("""\
+# Header goes here
+
+include syscfg.txt
+""")
+    (boot_path / 'syscfg.txt').write_text("""\
+# Enable I2C
+dtparam=i2c=on
+# Enable SPI
+dtparam=spi=on
+""")
+    current = store[Current]
+    mutable = current.mutable()
+    mutable.update({'i2c.enabled': None, 'camera.enabled': True}, cond_all)
+    assert mutable.files['config.txt'].content.decode('ascii') == """\
+# Header goes here
+
+include syscfg.txt
+start_x=1
+"""
+    assert mutable.files['syscfg.txt'].content.decode('ascii') == """\
+# Enable I2C
+#dtparam=i2c=on
+# Enable SPI
+dtparam=spi=on
+"""
+
+
+def test_store_uncomment_lines(boot_path, store_path):
+    store = Store(boot_path, store_path, comment_lines=True)
+    (boot_path / 'config.txt').write_text("""\
+# Header goes here
+
+# Enable the camera
+#start_x=1
+#gpu_mem=128
+""")
+    current = store[Current]
+    mutable = current.mutable()
+    mutable.update({'gpu.mem': 128, 'camera.enabled': True}, cond_all)
+    assert mutable.files['config.txt'].content.decode('ascii') == """\
+# Header goes here
+
+# Enable the camera
+start_x=1
+gpu_mem=128
+"""
+
+
+def test_store_uncomment_bad_section(boot_path, store_path):
+    store = Store(boot_path, store_path, comment_lines=True)
+    (boot_path / 'config.txt').write_text("""\
+[pi4]
+#start_x=1
+#gpu_mem=128
+""")
+    current = store[Current]
+    mutable = current.mutable()
+    mutable.update({'gpu.mem': 128, 'camera.enabled': True}, cond_all)
+    assert mutable.files['config.txt'].content.decode('ascii') == """\
+[pi4]
+#start_x=1
+#gpu_mem=128
+[all]
+start_x=1
+gpu_mem=128
+"""
+
+
 def test_settings_container():
     settings = Settings()
     assert len([s for s in settings]) == len(settings)

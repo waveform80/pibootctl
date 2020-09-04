@@ -478,7 +478,7 @@ class BootConditions(namedtuple('BootConditions', (
         if self.edid is not None:
             yield '[EDID={self.edid}]'.format(self=self)
         if self.serial is not None:
-            yield '[0x{self.serial:X}]'.foramt(self=self)
+            yield '[0x{self.serial:X}]'.format(self=self)
         if self.gpio is not None:
             yield '[gpio{self.gpio[0]:d}={self.gpio[1]:d}]'.format(self=self)
 
