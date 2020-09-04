@@ -852,11 +852,25 @@ def test_camera_firmware_extract(fw_settings):
         BootCommand('config.txt', 2, cond_all, 'start_x', '1', hdmi=0),
         BootCommand('config.txt', 3, cond_all, 'start_x', '0', hdmi=0),
         BootCommand('config.txt', 4, cond_all, 'start_debug', '1', hdmi=0),
+        BootCommand('syscfg.txt', 1, cond_all, 'start_debug', '1', hdmi=0),
     ]
     assert list(cam.extract(config)) == [
         (config[1], True),
         (config[2], None),
     ]
+
+
+def test_firmware_file_extract(fw_settings):
+    start = fw_settings['boot.firmware.filename']
+    fixup = fw_settings['boot.firmware.fixup']
+    config = [
+        BootCommand('config.txt', 1, cond_all, 'start_file', 'start.elf', hdmi=0),
+        BootCommand('config.txt', 2, cond_all, 'fixup_file', 'fixup.dat', hdmi=0),
+        BootCommand('usercfg.txt', 1, cond_all, 'start_file', 'start_x.elf', hdmi=0),
+        BootCommand('usercfg.txt', 2, cond_all, 'fixup_file', 'fixup_x.dat', hdmi=0),
+    ]
+    assert list(start.extract(config)) == [(config[0], 'start.elf')]
+    assert list(fixup.extract(config)) == [(config[1], 'fixup.dat')]
 
 
 def test_debug_firmware(fw_settings):
@@ -898,6 +912,7 @@ def test_debug_firmware_extract(fw_settings):
     config = [
         BootCommand('config.txt', 1, cond_all, 'start_debug', '1', hdmi=0),
         BootCommand('config.txt', 2, cond_all, 'start_debug', '0', hdmi=0),
+        BootCommand('syscfg.txt', 1, cond_all, 'start_debug', '1', hdmi=0),
     ]
     assert list(debug.extract(config)) == [
         (config[0], True),

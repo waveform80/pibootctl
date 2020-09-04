@@ -1373,13 +1373,10 @@ class CommandFirmwareCamera(CommandBool):
         }
 
     def extract(self, config):
-        for item in config:
-            if isinstance(item, BootCommand):
-                if item.command == 'start_x':
-                    if to_int(item.params):
-                        yield item, True
-                    else:
-                        yield item, None
+        for item, value in super().extract(config):
+            # NOTE: start_x is only valid in config.txt
+            if item.filename == 'config.txt' and item.command == 'start_x':
+                yield item, True if value else None
 
     def output(self):
         if self.modified and self.value:
@@ -1404,13 +1401,10 @@ class CommandFirmwareDebug(CommandBool):
         ) == (FW_START[pi4].debug, FW_FIXUP[pi4].debug)
 
     def extract(self, config):
-        for item in config:
-            if isinstance(item, BootCommand):
-                if item.command == 'start_debug':
-                    if to_int(item.params):
-                        yield item, True
-                    else:
-                        yield item, None
+        for item, value in super().extract(config):
+            # NOTE: start_debug is only valid in config.txt
+            if item.filename == 'config.txt' and item.command == 'start_debug':
+                yield item, True if value else None
 
     def output(self):
         if self.modified and self.value:
@@ -1437,12 +1431,18 @@ class CommandFirmwareFilename(CommandFilename):
         else:
             return FW_START[pi4].default
 
+    def extract(self, config):
+        for item, value in super().extract(config):
+            # NOTE: start_filename is only valid in config.txt
+            if item.filename == 'config.txt':
+                yield item, value
+
     # TODO validate() to check for pi4/non-pi4 compatible firmware
 
 
 class CommandFirmwareFixup(CommandFilename):
     """
-    Handles the ``start_file`` setting.
+    Handles the ``fixup_file`` setting.
     """
     @property
     def default(self):
@@ -1458,6 +1458,12 @@ class CommandFirmwareFixup(CommandFilename):
             return FW_FIXUP[pi4].camera
         else:
             return FW_FIXUP[pi4].default
+
+    def extract(self, config):
+        for item, value in super().extract(config):
+            # NOTE: fixup_file is only valid in config.txt
+            if item.filename == 'config.txt':
+                yield item, value
 
     # TODO validate() to check for pi4/non-pi4 compatible firmware
 
@@ -1974,7 +1980,8 @@ class CommandGPUMem(CommandInt):
         if override not in values:
             override = None
         for item in config:
-            if isinstance(item, BootCommand):
+            # NOTE: gpu_mem_XXX is only valid in config.txt
+            if isinstance(item, BootCommand) and item.filename == 'config.txt':
                 # The following convoluted logic deals with the fact that
                 # gpu_mem_1024 et al. override gpu_mem regardless of ordering
                 if item.command in values:
