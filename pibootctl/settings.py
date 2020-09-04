@@ -93,6 +93,40 @@ SETTINGS = {
             The name the Pi (as a CEC device) should provide to the connected
             display; defaults to "Raspberry Pi".
             """)),
+    setting.CommandVideoLicense(
+        'video.license.mpg2', command='decode_MPG2', doc=_(
+            """
+            On Pi 3 and earlier models, hardware decoding of MPEG-2 can be
+            enabled by purchasing [1] a license key which is locked to the
+            serial number of a Raspberry Pi. Multiple license keys (up to 8)
+            can be specified to permit switching the SD card between Pis.
+
+            On the Raspberry Pi 4, the hardware codecs for MPEG-2 are
+            permanently disabled and cannot be enabled even with a licence key;
+            on the Pi 4, thanks to its increased processing power compared to
+            earlier models, MPEG-2 and VC-1 can be decoded in software via
+            applications such as VLC. Therefore, a hardware codec licence key
+            is not needed if you're using a Pi 4.
+
+            [1]: http://swag.raspberrypi.org/collections/software
+            """)),
+    setting.CommandVideoLicense(
+        'video.license.vc1', command='decode_WVC1', doc=_(
+            """
+            On Pi 3 and earlier models, hardware decoding of VC-1 can be
+            enabled by purchasing [1] a license key which is locked to the
+            serial number of a Raspberry Pi. Multiple license keys (up to 8)
+            can be specified to permit switching the SD card between Pis.
+
+            On the Raspberry Pi 4, the hardware codecs for VC-1 are permanently
+            disabled and cannot be enabled even with a licence key; on the Pi
+            4, thanks to its increased processing power compared to earlier
+            models, MPEG-2 and VC-1 can be decoded in software via applications
+            such as VLC. Therefore, a hardware codec licence key is not needed
+            if you're using a Pi 4.
+
+            [1]: http://swag.raspberrypi.org/collections/software
+            """)),
     setting.CommandBool(
         'video.hdmi.safe', command='hdmi_safe', default=False, doc=_(
             """
@@ -1287,10 +1321,8 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
 
             {valid_cea}
 
-            In the table above, "wide" indicates a 16:9 wide-screen variant of
-            a mode which usually has a 4:3 aspect ratio. "2x" and "4x" indicate
-            a higher clock rate with pixel doubling or quadrupling
-            respectively.
+            Pixel doubling and quadrupling indicates a higher clock rate, with
+            each pixel repeated two or four times respectively.
 
             The following values are valid if video.hdmi.group is set to 2
             (DMT):
@@ -1298,7 +1330,11 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
             {valid_dmt}
 
             Note that there is a pixel clock limit [1]. The highest supported
-            mode is 1920x1200 at 60Hz which reduced blanking.
+            mode on models prior to the Raspberry Pi 4 is 1920x1200 at 60Hz
+            with reduced blanking, whilst the Raspberry Pi 4 can support up to
+            4096x2160 (known as 4k) at 60Hz. Also note that if you are using
+            both HDMI ports of the Raspberry Pi 4 for 4k output, then you are
+            limited to 30Hz on both.
 
             [1]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
             """)),

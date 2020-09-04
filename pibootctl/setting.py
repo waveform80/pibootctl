@@ -834,6 +834,23 @@ class CommandDisplayGroup(CommandInt):
                          })
 
 
+class DisplayMode(namedtuple('DisplayMode', (
+    'resolution', 'refresh', 'ratio', 'notes'))):
+    __slots__ = ()
+    def __new__(cls, resolution='', refresh='', ratio='', notes=''):
+        return super().__new__(cls, resolution, refresh, ratio, notes)
+
+    def __str__(self):
+        if self.resolution:
+            if self.notes:
+                template = '{self.resolution} @{self.refresh} ({self.notes})'
+            else:
+                template = '{self.resolution} @{self.refresh}'
+        else:
+            template = '{self.notes}'
+        return template.format(self=self)
+
+
 class CommandDisplayMode(CommandInt):
     """
     Represents settings that control the mode of a video output, e.g.
@@ -842,161 +859,213 @@ class CommandDisplayMode(CommandInt):
     def __init__(self, name, *, command=None, commands=None, default=0, doc='',
                  index=0):
         self._valid_cea = {
-            1:  'VGA (640x480)',
-            2:  '480p @60Hz',
-            3:  '480p @60Hz ' + _('wide'),
-            4:  '720p @60Hz',
-            5:  '1080i @60Hz',
-            6:  '480i @60Hz',
-            7:  '480i @60Hz ' + _('wide'),
-            8:  '240p @60Hz',
-            9:  '240p @60Hz ' + _('wide'),
-            10: '480i @60Hz 4x',
-            11: '480i @60Hz 4x, ' + _('wide'),
-            12: '240p @60Hz 4x',
-            13: '240p @60Hz 4x, ' + _('wide'),
-            14: '480p @60Hz 2x',
-            15: '480p @60Hz 2x, ' + _('wide'),
-            16: '1080p @60Hz',
-            17: '576p @50Hz',
-            18: '576p @50Hz ' + _('wide'),
-            19: '720p @50Hz',
-            20: '1080i @50Hz',
-            21: '576i @50Hz',
-            22: '576i @50Hz ' + _('wide'),
-            23: '288p @50Hz',
-            24: '288p @50Hz ' + _('wide'),
-            25: '576i @50Hz 4x',
-            26: '576i @50Hz 4x, ' + _('wide'),
-            27: '288p @50Hz 4x',
-            28: '288p @50Hz 4x, ' + _('wide'),
-            29: '576p @50Hz 2x',
-            30: '576p @50Hz 2x, ' + _('wide'),
-            31: '1080p @50Hz',
-            32: '1080p @24Hz',
-            33: '1080p @25Hz',
-            34: '1080p @30Hz',
-            35: '480p @60Hz 4x',
-            36: '480p @60Hz 4x, ' + _('wide'),
-            37: '576p @50Hz 4x',
-            38: '576p @50Hz 4x, ' + _('wide'),
-            39: '1080i @50Hz ' + _('reduced blanking'),
-            40: '1080i @100Hz',
-            41: '720p @100Hz',
-            42: '576p @100Hz',
-            43: '576p @100Hz ' + _('wide'),
-            44: '576i @100Hz',
-            45: '576i @100Hz ' + _('wide'),
-            46: '1080i @120Hz',
-            47: '720p @120Hz',
-            48: '480p @120Hz',
-            49: '480p @120Hz ' + _('wide'),
-            50: '480i @120Hz',
-            51: '480i @120Hz ' + _('wide'),
-            52: '576p @200Hz',
-            53: '576p @200Hz ' + _('wide'),
-            54: '576i @200Hz',
-            55: '576i @200Hz ' + _('wide'),
-            56: '480p @240Hz',
-            57: '480p @240Hz ' + _('wide'),
-            58: '480i @240Hz',
-            59: '480i @240Hz ' + _('wide'),
+            1:   DisplayMode('640x480', '60Hz',  '4:3',   'VGA'),
+            2:   DisplayMode('480p',    '60Hz',  '4:3'),
+            3:   DisplayMode('480p',    '60Hz',  '16:9'),
+            4:   DisplayMode('720p',    '60Hz',  '16:9'),
+            5:   DisplayMode('1080i',   '60Hz',  '16:9'),
+            6:   DisplayMode('480i',    '60Hz',  '4:3'),
+            7:   DisplayMode('480i',    '60Hz',  '16:9'),
+            8:   DisplayMode('240p',    '60Hz',  '4:3'),
+            9:   DisplayMode('240p',    '60Hz',  '16:9'),
+            10:  DisplayMode('480i',    '60Hz',  '4:3',   'pixel quadrupling'),
+            11:  DisplayMode('480i',    '60Hz',  '16:9',  'pixel quadrupling'),
+            12:  DisplayMode('240p',    '60Hz',  '4:3',   'pixel quadrupling'),
+            13:  DisplayMode('240p',    '60Hz',  '16:9',  'pixel quadrupling'),
+            14:  DisplayMode('480p',    '60Hz',  '4:3',   'pixel doubling'),
+            15:  DisplayMode('480p',    '60Hz',  '16:9',  'pixel doubling'),
+            16:  DisplayMode('1080p',   '60Hz',  '16:9'),
+            17:  DisplayMode('576p',    '50Hz',  '4:3'),
+            18:  DisplayMode('576p',    '50Hz',  '16:9'),
+            19:  DisplayMode('720p',    '50Hz',  '16:9'),
+            20:  DisplayMode('1080i',   '50Hz',  '16:9'),
+            21:  DisplayMode('576i',    '50Hz',  '4:3'),
+            22:  DisplayMode('576i',    '50Hz',  '16:9'),
+            23:  DisplayMode('288p',    '50Hz',  '4:3'),
+            24:  DisplayMode('288p',    '50Hz',  '16:9'),
+            25:  DisplayMode('576i',    '50Hz',  '4:3',   'pixel quadrupling'),
+            26:  DisplayMode('576i',    '50Hz',  '16:9',  'pixel quadrupling'),
+            27:  DisplayMode('288p',    '50Hz',  '4:3',   'pixel quadrupling'),
+            28:  DisplayMode('288p',    '50Hz',  '16:9',  'pixel quadrupling'),
+            29:  DisplayMode('576p',    '50Hz',  '4:3',   'pixel doubling'),
+            30:  DisplayMode('576p',    '50Hz',  '16:9',  'pixel doubling'),
+            31:  DisplayMode('1080p',   '50Hz',  '16:9'),
+            32:  DisplayMode('1080p',   '24Hz',  '16:9'),
+            33:  DisplayMode('1080p',   '25Hz',  '16:9'),
+            34:  DisplayMode('1080p',   '30Hz',  '16:9'),
+            35:  DisplayMode('480p',    '60Hz',  '4:3',   'pixel quadrupling'),
+            36:  DisplayMode('480p',    '60Hz',  '16:9',  'pixel quadrupling'),
+            37:  DisplayMode('576p',    '50Hz',  '4:3',   'pixel quadrupling'),
+            38:  DisplayMode('576p',    '50Hz',  '16:9',  'pixel quadrupling'),
+            39:  DisplayMode('1080i',   '50Hz',  '16:9',  'reduced blanking'),
+            40:  DisplayMode('1080i',   '100Hz', '16:9'),
+            41:  DisplayMode('720p',    '100Hz', '16:9'),
+            42:  DisplayMode('576p',    '100Hz', '4:3'),
+            43:  DisplayMode('576p',    '100Hz', '16:9'),
+            44:  DisplayMode('576i',    '100Hz', '4:3'),
+            45:  DisplayMode('576i',    '100Hz', '16:9'),
+            46:  DisplayMode('1080i',   '120Hz', '16:9'),
+            47:  DisplayMode('720p',    '120Hz', '16:9'),
+            48:  DisplayMode('480p',    '120Hz', '4:3'),
+            49:  DisplayMode('480p',    '120Hz', '16:9'),
+            50:  DisplayMode('480i',    '120Hz', '4:3'),
+            51:  DisplayMode('480i',    '120Hz', '16:9'),
+            52:  DisplayMode('576p',    '200Hz', '4:3'),
+            53:  DisplayMode('576p',    '200Hz', '16:9'),
+            54:  DisplayMode('576i',    '200Hz', '4:3'),
+            55:  DisplayMode('576i',    '200Hz', '16:9'),
+            56:  DisplayMode('480p',    '240Hz', '4:3'),
+            57:  DisplayMode('480p',    '240Hz', '16:9'),
+            58:  DisplayMode('480i',    '240Hz', '4:3'),
+            59:  DisplayMode('480i',    '240Hz', '16:9'),
+            60:  DisplayMode('720p',    '24Hz',  '16:9'),
+            61:  DisplayMode('720p',    '25Hz',  '16:9'),
+            62:  DisplayMode('720p',    '30Hz',  '16:9'),
+            63:  DisplayMode('1080p',   '120Hz', '16:9'),
+            64:  DisplayMode('1080p',   '100Hz', '16:9'),
+            65:  DisplayMode(notes='user timings'),
+            66:  DisplayMode('720p',      '25Hz',  '64:27',   'Pi 4'),
+            67:  DisplayMode('720p',      '30Hz',  '64:27',   'Pi 4'),
+            68:  DisplayMode('720p',      '50Hz',  '64:27',   'Pi 4'),
+            69:  DisplayMode('720p',      '60Hz',  '64:27',   'Pi 4'),
+            70:  DisplayMode('720p',      '100Hz', '64:27',   'Pi 4'),
+            71:  DisplayMode('720p',      '120Hz', '64:27',   'Pi 4'),
+            72:  DisplayMode('1080p',     '24Hz',  '64:27',   'Pi 4'),
+            73:  DisplayMode('1080p',     '25Hz',  '64:27',   'Pi 4'),
+            74:  DisplayMode('1080p',     '30Hz',  '64:27',   'Pi 4'),
+            75:  DisplayMode('1080p',     '50Hz',  '64:27',   'Pi 4'),
+            76:  DisplayMode('1080p',     '60Hz',  '64:27',   'Pi 4'),
+            77:  DisplayMode('1080p',     '100Hz', '64:27',   'Pi 4'),
+            78:  DisplayMode('1080p',     '120Hz', '64:27',   'Pi 4'),
+            79:  DisplayMode('1680x720',  '24Hz',  '64:27',   'Pi 4'),
+            80:  DisplayMode('1680x720',  '25Hz',  '64:27',   'Pi 4'),
+            81:  DisplayMode('1680x720',  '30Hz',  '64:27',   'Pi 4'),
+            82:  DisplayMode('1680x720',  '50Hz',  '64:27',   'Pi 4'),
+            83:  DisplayMode('1680x720',  '60Hz',  '64:27',   'Pi 4'),
+            84:  DisplayMode('1680x720',  '100Hz', '64:27',   'Pi 4'),
+            85:  DisplayMode('1680x720',  '120Hz', '64:27',   'Pi 4'),
+            86:  DisplayMode('2560x720',  '24Hz',  '64:27',   'Pi 4'),
+            87:  DisplayMode('2560x720',  '25Hz',  '64:27',   'Pi 4'),
+            88:  DisplayMode('2560x720',  '30Hz',  '64:27',   'Pi 4'),
+            89:  DisplayMode('2560x720',  '50Hz',  '64:27',   'Pi 4'),
+            90:  DisplayMode('2560x720',  '60Hz',  '64:27',   'Pi 4'),
+            91:  DisplayMode('2560x720',  '100Hz', '64:27',   'Pi 4'),
+            92:  DisplayMode('2560x720',  '120Hz', '64:27',   'Pi 4'),
+            93:  DisplayMode('2160p',     '24Hz',  '16:9',    'Pi 4'),
+            94:  DisplayMode('2160p',     '25Hz',  '16:9',    'Pi 4'),
+            95:  DisplayMode('2160p',     '30Hz',  '16:9',    'Pi 4'),
+            96:  DisplayMode('2160p',     '50Hz',  '16:9',    'Pi 4'),
+            97:  DisplayMode('2160p',     '60Hz',  '16:9',    'Pi 4'),
+            98:  DisplayMode('4096x2160', '24Hz',  '256:135', 'Pi 4'),
+            99:  DisplayMode('4096x2160', '25Hz',  '256:135', 'Pi 4'),
+            100: DisplayMode('4096x2160', '30Hz',  '256:135', 'Pi 4'),
+            101: DisplayMode('4096x2160', '50Hz',  '256:135', 'Pi 4'),
+            102: DisplayMode('4096x2160', '60Hz',  '256:135', 'Pi 4'),
+            103: DisplayMode('2160p',     '24Hz',  '64:27',   'Pi 4'),
+            104: DisplayMode('2160p',     '25Hz',  '64:27',   'Pi 4'),
+            105: DisplayMode('2160p',     '30Hz',  '64:27',   'Pi 4'),
+            106: DisplayMode('2160p',     '50Hz',  '64:27',   'Pi 4'),
+            107: DisplayMode('2160p',     '60Hz',  '64:27',   'Pi 4'),
         }
         self._valid_dmt = {
-            1:  '640x350 @85Hz',
-            2:  '640x400 @85Hz',
-            3:  '720x400 @85Hz',
-            4:  '640x480 @60Hz',
-            5:  '640x480 @72Hz',
-            6:  '640x480 @75Hz',
-            7:  '640x480 @85Hz',
-            8:  '800x600 @56Hz',
-            9:  '800x600 @60Hz',
-            10: '800x600 @72Hz',
-            11: '800x600 @75Hz',
-            12: '800x600 @85Hz',
-            13: '800x600 @120Hz',
-            14: '848x480 @60Hz',
-            15: '1024x768 @43Hz ' + _('incompatible with the Raspberry Pi'),
-            16: '1024x768 @60Hz',
-            17: '1024x768 @70Hz',
-            18: '1024x768 @75Hz',
-            19: '1024x768 @85Hz',
-            20: '1024x768 @120Hz',
-            21: '1152x864 @75Hz',
-            22: '1280x768 ' + _('reduced blanking'),
-            23: '1280x768 @60Hz',
-            24: '1280x768 @75Hz',
-            25: '1280x768 @85Hz',
-            26: '1280x768 @120Hz ' + _('reduced blanking'),
-            27: '1280x800 ' + _('reduced blanking'),
-            28: '1280x800 @60Hz',
-            29: '1280x800 @75Hz',
-            30: '1280x800 @85Hz',
-            31: '1280x800 @120Hz ' + _('reduced blanking'),
-            32: '1280x960 @60Hz',
-            33: '1280x960 @85Hz',
-            34: '1280x960 @120Hz ' + _('reduced blanking'),
-            35: '1280x1024 @60Hz',
-            36: '1280x1024 @75Hz',
-            37: '1280x1024 @85Hz',
-            38: '1280x1024 @120Hz ' + _('reduced blanking'),
-            39: '1360x768 @60Hz',
-            40: '1360x768 @120Hz ' + _('reduced blanking'),
-            41: '1400x1050 ' + _('reduced blanking'),
-            42: '1400x1050 @60Hz',
-            43: '1400x1050 @75Hz',
-            44: '1400x1050 @85Hz',
-            45: '1400x1050 @120Hz ' + _('reduced blanking'),
-            46: '1440x900 ' + _('reduced blanking'),
-            47: '1440x900 @60Hz',
-            48: '1440x900 @75Hz',
-            49: '1440x900 @85Hz',
-            50: '1440x900 @120Hz ' + _('reduced blanking'),
-            51: '1600x1200 @60Hz',
-            52: '1600x1200 @65Hz',
-            53: '1600x1200 @70Hz',
-            54: '1600x1200 @75Hz',
-            55: '1600x1200 @85Hz',
-            56: '1600x1200 @120Hz ' + _('reduced blanking'),
-            57: '1680x1050 ' + _('reduced blanking'),
-            58: '1680x1050 @60Hz',
-            59: '1680x1050 @75Hz',
-            60: '1680x1050 @85Hz',
-            61: '1680x1050 @120Hz ' + _('reduced blanking'),
-            62: '1792x1344 @60Hz',
-            63: '1792x1344 @75Hz',
-            64: '1792x1344 @120Hz ' + _('reduced blanking'),
-            65: '1856x1392 @60Hz',
-            66: '1856x1392 @75Hz',
-            67: '1856x1392 @120Hz ' + _('reduced blanking'),
-            68: '1920x1200 ' + _('reduced blanking'),
-            69: '1920x1200 @60Hz',
-            70: '1920x1200 @75Hz',
-            71: '1920x1200 @85Hz',
-            72: '1920x1200 @120Hz ' + _('reduced blanking'),
-            73: '1920x1440 @60Hz',
-            74: '1920x1440 @75Hz',
-            75: '1920x1440 @120Hz ' + _('reduced blanking'),
-            76: '2560x1600 ' + _('reduced blanking'),
-            77: '2560x1600 @60Hz',
-            78: '2560x1600 @75Hz',
-            79: '2560x1600 @85Hz',
-            80: '2560x1600 @120Hz ' + _('reduced blanking'),
-            81: '1366x768 @60Hz',
-            82: '1920x1080 @60Hz 1080p',
-            83: '1600x900 ' + _('reduced blanking'),
-            84: '2048x1152 ' + _('reduced blanking'),
-            85: '1280x720 @60Hz 720p',
-            86: '1366x768 ' + _('reduced blanking'),
-            87: _('User timings'),
+            1:  DisplayMode('640x350',   '85Hz',  '64:35'),
+            2:  DisplayMode('640x400',   '85Hz',  '16:10'),
+            3:  DisplayMode('720x400',   '85Hz',  '18:10'),
+            4:  DisplayMode('640x480',   '60Hz',  '4:3'),
+            5:  DisplayMode('640x480',   '72Hz',  '4:3'),
+            6:  DisplayMode('640x480',   '75Hz',  '4:3'),
+            7:  DisplayMode('640x480',   '85Hz',  '4:3'),
+            8:  DisplayMode('800x600',   '56Hz',  '4:3'),
+            9:  DisplayMode('800x600',   '60Hz',  '4:3'),
+            10: DisplayMode('800x600',   '72Hz',  '4:3'),
+            11: DisplayMode('800x600',   '75Hz',  '4:3'),
+            12: DisplayMode('800x600',   '85Hz',  '4:3'),
+            13: DisplayMode('800x600',   '120Hz', '4:3'),
+            14: DisplayMode('848x480',   '60Hz',  '16:9'),
+            15: DisplayMode('1024x768',  '43Hz',  '4:3',    'incompatible'),
+            16: DisplayMode('1024x768',  '60Hz',  '4:3'),
+            17: DisplayMode('1024x768',  '70Hz',  '4:3'),
+            18: DisplayMode('1024x768',  '75Hz',  '4:3'),
+            19: DisplayMode('1024x768',  '85Hz',  '4:3'),
+            20: DisplayMode('1024x768',  '120Hz', '4:3'),
+            21: DisplayMode('1152x864',  '75Hz',  '4:3'),
+            22: DisplayMode('1280x768',  '60Hz',  '15:9',   'reduced blanking'),
+            23: DisplayMode('1280x768',  '60Hz',  '15:9'),
+            24: DisplayMode('1280x768',  '75Hz',  '15:9'),
+            25: DisplayMode('1280x768',  '85Hz',  '15:9'),
+            26: DisplayMode('1280x768',  '120Hz', '15:9',   'reduced blanking'),
+            27: DisplayMode('1280x800',  '60',    '16:10',  'reduced blanking'),
+            28: DisplayMode('1280x800',  '60Hz',  '16:10'),
+            29: DisplayMode('1280x800',  '75Hz',  '16:10'),
+            30: DisplayMode('1280x800',  '85Hz',  '16:10'),
+            31: DisplayMode('1280x800',  '120Hz', '16:10',  'reduced blanking'),
+            32: DisplayMode('1280x960',  '60Hz',  '4:3'),
+            33: DisplayMode('1280x960',  '85Hz',  '4:3'),
+            34: DisplayMode('1280x960',  '120Hz', '4:3',    'reduced blanking'),
+            35: DisplayMode('1280x1024', '60Hz',  '5:4'),
+            36: DisplayMode('1280x1024', '75Hz',  '5:4'),
+            37: DisplayMode('1280x1024', '85Hz',  '5:4'),
+            38: DisplayMode('1280x1024', '120Hz', '5:4',    'reduced blanking'),
+            39: DisplayMode('1360x768',  '60Hz',  '16:9'),
+            40: DisplayMode('1360x768',  '120Hz', '16:9',   'reduced blanking'),
+            41: DisplayMode('1400x1050', '60Hz',  '4:3',    'reduced blanking'),
+            42: DisplayMode('1400x1050', '60Hz',  '4:3'),
+            43: DisplayMode('1400x1050', '75Hz',  '4:3'),
+            44: DisplayMode('1400x1050', '85Hz',  '4:3'),
+            45: DisplayMode('1400x1050', '120Hz', '4:3',    'reduced blanking'),
+            46: DisplayMode('1440x900',  '60Hz',  '16:10',  'reduced blanking'),
+            47: DisplayMode('1440x900',  '60Hz',  '16:10'),
+            48: DisplayMode('1440x900',  '75Hz',  '16:10'),
+            49: DisplayMode('1440x900',  '85Hz',  '16:10'),
+            50: DisplayMode('1440x900',  '120Hz', '16:10',  'reduced blanking'),
+            51: DisplayMode('1600x1200', '60Hz',  '4:3'),
+            52: DisplayMode('1600x1200', '65Hz',  '4:3'),
+            53: DisplayMode('1600x1200', '70Hz',  '4:3'),
+            54: DisplayMode('1600x1200', '75Hz',  '4:3'),
+            55: DisplayMode('1600x1200', '85Hz',  '4:3'),
+            56: DisplayMode('1600x1200', '120Hz', '4:3',    'reduced blanking'),
+            57: DisplayMode('1680x1050', '60Hz',  '16:10',  'reduced blanking'),
+            58: DisplayMode('1680x1050', '60Hz',  '16:10'),
+            59: DisplayMode('1680x1050', '75Hz',  '16:10'),
+            60: DisplayMode('1680x1050', '85Hz',  '16:10'),
+            61: DisplayMode('1680x1050', '120Hz', '16:10',  'reduced blanking'),
+            62: DisplayMode('1792x1344', '60Hz',  '4:3'),
+            63: DisplayMode('1792x1344', '75Hz',  '4:3'),
+            64: DisplayMode('1792x1344', '120Hz', '4:3',    'reduced blanking'),
+            65: DisplayMode('1856x1392', '60Hz',  '4:3'),
+            66: DisplayMode('1856x1392', '75Hz',  '4:3'),
+            67: DisplayMode('1856x1392', '120Hz', '4:3',    'reduced blanking'),
+            68: DisplayMode('1920x1200', '60Hz',  '16:10',  'reduced blanking'),
+            69: DisplayMode('1920x1200', '60Hz',  '16:10'),
+            70: DisplayMode('1920x1200', '75Hz',  '16:10'),
+            71: DisplayMode('1920x1200', '85Hz',  '16:10'),
+            72: DisplayMode('1920x1200', '120Hz', '16:10',  'reduced blanking'),
+            73: DisplayMode('1920x1440', '60Hz',  '4:3'),
+            74: DisplayMode('1920x1440', '75Hz',  '4:3'),
+            75: DisplayMode('1920x1440', '120Hz', '4:3',    'reduced blanking'),
+            76: DisplayMode('2560x1600', '60Hz',  '16:10',  'reduced blanking'),
+            77: DisplayMode('2560x1600', '60Hz',  '16:10'),
+            78: DisplayMode('2560x1600', '75Hz',  '16:10'),
+            79: DisplayMode('2560x1600', '85Hz',  '16:10'),
+            80: DisplayMode('2560x1600', '120Hz', '16:10',  'reduced blanking'),
+            81: DisplayMode('1366x768',  '60Hz',  '16:9'),
+            82: DisplayMode('1920x1080', '60Hz',  '16:9',   '1080p'),
+            83: DisplayMode('1600x900',  '60Hz',  '16:9',   'reduced blanking'),
+            84: DisplayMode('2048x1152', '60Hz',  '16:9',   'reduced blanking'),
+            85: DisplayMode('1280x720',  '60Hz',  '16:9',   '720p'),
+            86: DisplayMode('1366x768',  '60Hz',  '16:9',   'reduced blanking'),
+            87: DisplayMode(notes='user timings'),
         }
         doc = dedent(doc).format_map(
             TransMap(
-                valid_cea=FormatDict(self._valid_cea, key_title=_('Mode'),
-                                     value_title=_('Meaning')),
-                valid_dmt=FormatDict(self._valid_dmt, key_title=_('Mode'),
-                                     value_title=_('Meaning'))
+                valid_cea=FormatDict(
+                    self._valid_cea, key_title=_('Mode'),
+                    value_title=(_('Resolution'), _('Refresh'),
+                                 _('Ratio'), _('Notes'))),
+                valid_dmt=FormatDict(
+                    self._valid_dmt, key_title=_('Mode'),
+                    value_title=(_('Resolution'), _('Refresh'),
+                                 _('Ratio'), _('Notes'))),
             ))
         super().__init__(name, command=command, commands=commands,
                          default=default, doc=doc, index=index)
@@ -1005,22 +1074,22 @@ class CommandDisplayMode(CommandInt):
     def hint(self):
         return {
             0: _('auto from EDID'),
-            1: self._valid_cea.get(self.value, '?'),
-            2: self._valid_dmt.get(self.value, '?'),
+            1: str(self._valid_cea.get(self.value, '?')),
+            2: str(self._valid_dmt.get(self.value, '?')),
         }.get(self._query(self._relative('.group')).value, '?')
 
     def validate(self):
         group = self._query(self._relative('.group'))
-        min_, max_ = {
-            0: (0, 0),
-            1: (1, 59),
-            2: (1, 87),
+        valid = {
+            0: {0},
+            1: self._valid_cea.keys(),
+            2: self._valid_dmt.keys(),
         }[group.value]
-        if not min_ <= self.value <= max_:
+        if self.value not in valid:
             raise ValueError(_(
-                '{self.name} must be between {min} and {max} when '
-                '{group.name} is {group.value}'
-            ).format(self=self, min=min_, max=max_, group=group))
+                '{self.name} must be {valid} when {group.name} is '
+                '{group.value}'
+            ).format(self=self, valid=int_ranges(valid), group=group))
 
 
 class CommandDisplayTimings(Command):
@@ -1976,7 +2045,7 @@ class CommandTotalMem(CommandInt):
     """
     @property
     def default(self):
-        return get_board_mem()
+        return get_board_mem() or 1024
 
     def extract(self, config):
         for item, value in super().extract(config):
@@ -2054,3 +2123,29 @@ class CommandTVOut(CommandBool):
             raise ValueError(_(
                 '{self.name} and {other.name} cannot both be on').format(
                     self=self, other=other))
+
+
+class CommandVideoLicense(Command):
+    """
+    Handles the ``decode_MPG2`` and ``decode_WVC1`` commands.
+    """
+    def __init__(self, name, *, command=None, commands=None, doc=''):
+        super().__init__(name, command=command, commands=commands,
+                         default=[], doc=doc, index=0)
+
+    def extract(self, config):
+        for item, value in super().extract(config):
+            yield item, to_list(value, sep=',')
+
+    def update(self, value):
+        return to_list(value)
+
+    def validate(self):
+        if self.modified and len(self.value) > 8:
+            raise ValueError(_('Maximum of 8 licenses may be specified'))
+
+    def output(self):
+        if self.modified:
+            new_value = ','.join(self.value)
+            with self._override(new_value):
+                yield from super().output()

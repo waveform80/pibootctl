@@ -524,6 +524,17 @@ def test_display_mode_hint():
     assert group.hint == 'CEA'
     assert mode.hint == '720p @60Hz'
 
+    mode._value = 94
+    mode.validate()
+    assert group.hint == 'CEA'
+    assert mode.hint == '2160p @25Hz (Pi 4)'
+
+    group._value = 2
+    mode._value = 87
+    mode.validate()
+    assert group.hint == 'DMT'
+    assert mode.hint == 'user timings'
+
 
 def test_display_timings_extract():
     t = CommandDisplayTimings('video.timings', command='video_timings')
@@ -1458,6 +1469,23 @@ def test_gpu_mem():
             mem.validate()
 
 
+def test_total_mem():
+    with mock.patch('pibootctl.setting.get_board_mem') as get_board_mem:
+        mem = CommandTotalMem('total.mem', command='total_mem')
+        assert mem.hint == 'Mb'
+
+        config = [
+            BootCommand('config.txt', 1, cond_all, 'total_mem', '256', hdmi=0),
+            BootCommand('syscfg.txt', 1, cond_all, 'total_mem', '512', hdmi=0),
+        ]
+
+        get_board_mem.return_value = 1024
+        assert list(mem.extract(config)) == [(config[0], 256)]
+        mem._value = 8
+        with pytest.raises(ValueError):
+            mem.validate()
+
+
 def test_overlay_dwc2():
     with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
         settings = make_settings(OverlayDWC2('usb.dwc2.enabled'))
@@ -1550,3 +1578,21 @@ def test_output_order():
         'dtparam=spi=on',
         'dtoverlay=disable-bt',
     ]
+
+
+def test_video_license():
+    lic = CommandVideoLicense('video.license.mpg2', command='decode_MPG2')
+
+    config = [
+        BootCommand('config.txt', 1, cond_all, 'decode_MPG2', '0x12345678', hdmi=0),
+    ]
+
+    assert list(lic.extract(config)) == [(config[0], ['0x12345678'])]
+
+    assert list(lic.output()) == []
+    lic._value = lic.update(UserStr('1,2,3'))
+    assert lic.value == ['1', '2', '3']
+    assert list(lic.output()) == ['decode_MPG2=1,2,3']
+    lic._value = [0] * 10
+    with pytest.raises(ValueError):
+        lic.validate()

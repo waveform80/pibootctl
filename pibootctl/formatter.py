@@ -549,7 +549,7 @@ class FormatDict:
     different kinds of output, for instance::
 
         >>> f = FormatDict({'foo': 100, 'bar': 200})
-        >>> print('An example list:\\n\\n{f:list}'.format(f=f)
+        >>> print('An example list:\\n\\n{f:list}'.format(f=f))
         An example list:
 
         * foo = 100
@@ -562,36 +562,71 @@ class FormatDict:
 
     The default format specification is "table", naturally.
 
+    If the values are tuples that should be expanded into multiple columns,
+    set *value_title* to a tuple with the corresponding column titles::
+
+        >>> from pibootctl.formatter import FormatDict
+        >>> d = {'foo': (1, 100), 'bar': (2, 200)}
+        >>> print('An example table:\\n\\n{s}'.format(s=FormatDict(d,
+        ... value_title=('col1', 'col2'))))
+        An example table:
+
+        | Key | col1 | col2 |
+        | foo | 1 | 100 |
+        | bar | 2 | 200 |
+
+    Tuple values are only supported for table output.
+
     .. note::
 
         In Python versions before 3.7, you may need to use
         :class:`collections.OrderedDict` to ensure output of the elements of
-        *data* in a particular order.
+        *data* in a particular order. Alternatively, you may specify a
+        *sort_key* value which will be applied to the key values of the dict to
+        sort them prior to output.
     """
-
-    def __init__(self, data, key_title='Key', value_title='Value'):
+    def __init__(self, data, key_title='Key', value_title='Value',
+                 sort_key=None):
         self.data = data
         self.key_title = key_title
         self.value_title = value_title
+        self.sort_key = sort_key
 
     def __format__(self, spec):
-        if not spec or spec == 'table':
-            return '\n'.join(
-                '| {key} | {value} |'.format(key=key, value=value)
-                for key, value in chain(
-                    [(self.key_title, self.value_title)],
-                    self.data.items()
-                )
+        if self.sort_key is None:
+            items = self.data.items()
+        else:
+            items = (
+                (key, self.data[key])
+                for key in sorted(self.data.keys(), key=self.sort_key)
             )
+        if not spec or spec == 'table':
+            if isinstance(self.value_title, tuple):
+                return '\n'.join(
+                    '| {key} | {values} |'.format(
+                        key=key, values=' | '.join(values))
+                    for key, values in chain(
+                        [(self.key_title, self.value_title)],
+                        items
+                    )
+                )
+            else:
+                return '\n'.join(
+                    '| {key} | {value} |'.format(key=key, value=value)
+                    for key, value in chain(
+                        [(self.key_title, self.value_title)],
+                        items
+                    )
+                )
         elif spec == 'list':
             return '\n'.join(
                 '* {key} = {value}'.format(key=key, value=value)
-                for key, value in self.data.items()
+                for key, value in items
             )
         elif spec == 'refs':
             return '\n'.join(
                 '[{key}]: {value}'.format(key=key, value=value)
-                for key, value in self.data.items()
+                for key, value in items
             )
         else:
             raise ValueError('Unknown format spec. {!r}'.format(spec))

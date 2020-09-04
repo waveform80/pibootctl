@@ -412,7 +412,7 @@ def test_invalid_config(main, tmpdir, distro):
             msg = Application.invalid_config(*sys.exc_info())
             assert msg == [
                 "Configuration failed to validate with 1 error(s)",
-                "video.hdmi0.mode must be between 1 and 59 when "
+                "video.hdmi0.mode must be 1-107 when "
                 "video.hdmi0.group is 1",
             ]
 
