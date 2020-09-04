@@ -162,7 +162,7 @@ class Store(Mapping):
         self._boot_path = Path(boot_path)
         self._store_path = self._boot_path / store_path
         self._config_root = config_root
-        self._mutable_files = mutable_files
+        self._mutable_files = frozenset(mutable_files)
         self._comment_lines = comment_lines
 
     def _path_of(self, name):

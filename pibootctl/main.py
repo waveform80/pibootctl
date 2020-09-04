@@ -165,7 +165,8 @@ class Application:
         if self._store is None:
             self._store = Store(
                 self.config.boot_path, self.config.store_path,
-                self.config.config_root)
+                self.config.config_root, self.config.mutable_files,
+                self.config.comment_lines)
         return self._store
 
     @staticmethod
@@ -175,11 +176,14 @@ class Application:
                 'boot_path':             '/boot',
                 'store_path':            'pibootctl',
                 'config_root':           'config.txt',
+                'mutable_files':         'config.txt',
+                'comment_lines':         'off',
                 'backup':                'on',
                 'package_name':          'pibootctl',
                 'reboot_required':       '/var/run/reboot-required',
                 'reboot_required_pkgs':  '/var/run/reboot-required.pkgs',
             },
+            empty_lines_in_values=False,
             default_section='defaults',
             delimiters=('=',),
             comment_prefixes=('#',),
@@ -198,7 +202,10 @@ class Application:
             boot_path=section['boot_path'],
             store_path=section['store_path'],
             config_root=section['config_root'],
+            mutable_files=[
+                f.strip() for f in section['mutable_files'].splitlines()],
             backup=section.getboolean('backup'),
+            comment_lines=section.getboolean('comment_lines'),
             package_name=section['package_name'],
             reboot_required=section['reboot_required'],
             reboot_required_pkgs=section['reboot_required_pkgs'])
@@ -297,7 +304,7 @@ class Application:
         group.add_argument(
             "--this-model", dest="context", action="store_const",
             const="model", help=_(
-                "Set the specified settings for this model of Pi."))
+                "Set the specified settings for this model of Pi only."))
         group.add_argument(
             "--this-serial", dest="context", action="store_const",
             const="serial", help=_(
