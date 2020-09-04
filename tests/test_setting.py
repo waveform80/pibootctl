@@ -88,6 +88,7 @@ def test_overlay_extract():
         BootOverlay('config.txt', 4, cond_all, 'sensehat')]
     assert list(o.extract(config)) == [(config[1], True)]
 
+
 def test_overlay_output():
     o = Overlay('sense.enabled', overlay='sensehat')
 
@@ -97,7 +98,7 @@ def test_overlay_output():
 
 
 def test_param_init():
-    p = OverlayParam('i2c.enabled', param='i2c_arm')
+    p = OverlayParamStr('i2c.enabled', param='i2c_arm')
 
     assert p.overlay == 'base'
     assert p.param == 'i2c_arm'
@@ -106,7 +107,7 @@ def test_param_init():
 
 
 def test_param_extract():
-    p = OverlayParam('i2c.enabled', param='i2c_arm')
+    p = OverlayParamStr('i2c.enabled', param='i2c_arm')
 
     config = [
         BootOverlay('config.txt', 1, cond_all, 'sensehat'),
@@ -120,11 +121,26 @@ def test_param_extract():
 
 
 def test_param_output():
-    p = OverlayParam('i2c.enabled', param='i2c_arm')
+    p = OverlayParamStr('i2c.enabled', param='i2c_arm')
 
     assert list(p.output()) == []
     p._value = 'on'
     assert list(p.output()) == ['dtparam=i2c_arm=on']
+
+
+def test_param_validate():
+    p = OverlayParamStr('usb.dwc2.mode', overlay='dwc2', param='dr_mode', default='otg', valid={
+        'host': 'Host mode always',
+        'peripheral': 'Device mode always',
+        'otg': 'Host/device mode',
+    })
+
+    p._value = 'host'
+    p.validate()
+    assert p.hint == 'Host mode always'
+    p._value = 'foo'
+    with pytest.raises(ValueError):
+        p.validate()
 
 
 def test_int_param_init():
@@ -146,6 +162,26 @@ def test_int_param_extract():
         (config[1], None),
         (config[2], 100000),
     ]
+
+
+def test_int_param_validate():
+    p = OverlayParamInt('draws.ch4.gain', overlay='draws', param='draws_adc_ch4_gain', valid={
+        0: '+/- 6.144V',
+        1: '+/- 4.096V',
+        2: '+/- 2.048V',
+        3: '+/- 1.024V',
+        4: '+/- 0.512V',
+        5: '+/- 0.256V',
+        6: '+/- 0.256V',
+        7: '+/- 0.256V',
+    })
+
+    p._value = 4
+    p.validate()
+    assert p.hint == '+/- 0.512V'
+    p._value = 8
+    with pytest.raises(ValueError):
+        p.validate()
 
 
 def test_bool_param_init():
@@ -178,7 +214,7 @@ def test_bool_param_output():
 
 
 def test_command_init():
-    c = Command('video.cec.name', commands=('foo', 'bar'), default='RPi', index=1)
+    c = CommandStr('video.cec.name', commands=('foo', 'bar'), default='RPi', index=1)
 
     assert c.commands == ('foo', 'bar')
     assert c.index == 1
@@ -191,7 +227,7 @@ def test_command_init():
 
 
 def test_command_extract():
-    c = Command('video.cec.name', command='cec_osd_name', default='RPi')
+    c = CommandStr('video.cec.name', command='cec_osd_name', default='RPi')
 
     config = [
         BootCommand('config.txt', 1, cond_all, 'cec_osd_name', 'FOO', hdmi=0),
@@ -202,7 +238,7 @@ def test_command_extract():
 
 
 def test_command_output():
-    c = Command('video.cec.name', command='cec_osd_name', default='RPi')
+    c = CommandStr('video.cec.name', command='cec_osd_name', default='RPi')
 
     assert list(c.output()) == []
     c._value = 'FOO'
@@ -210,6 +246,24 @@ def test_command_output():
     c = Command('video.cec.name', command='cec_osd_name', default='RPi', index=1)
     c._value = 'FOO'
     assert list(c.output()) == ['cec_osd_name:1=FOO']
+
+
+def test_str_command_init():
+    c = CommandStr('gpio.1.pull', command='gpio0pull', default='np',
+                   valid={'up': 'pull up', 'dn': 'pull down', 'np': 'no pull'})
+
+    assert c.commands == ('gpio0pull',)
+    assert c.default == 'np'
+    assert c.hint == 'no pull'
+    c.validate()
+
+    c._value = 'up'
+    assert c.hint == 'pull up'
+    c.validate()
+
+    c._value = 'foo'
+    with pytest.raises(ValueError):
+        c.validate()
 
 
 def test_int_command_init():
@@ -1387,6 +1441,45 @@ def test_gpu_mem():
         mem._value = 256
         with pytest.raises(ValueError):
             mem.validate()
+
+
+def test_overlay_dwc2():
+    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+        settings = make_settings(OverlayDWC2('usb.dwc2.enabled'))
+        dwc2 = settings['usb.dwc2.enabled']
+
+        get_board_type.return_value = 'pi2'
+        assert not dwc2.default
+        assert not dwc2.value
+        dwc2.validate()
+
+        get_board_type.return_value = 'pi0w'
+        assert dwc2.default
+        assert dwc2.value
+        dwc2._value = dwc2.update(UserStr('no'))
+        assert not dwc2.value
+        dwc2.validate()
+
+
+def test_overlay_dwc2_extract():
+    settings = make_settings(OverlayDWC2('usb.dwc2.enabled'))
+    dwc2 = settings['usb.dwc2.enabled']
+    config = [BootOverlay('config.txt', 1, cond_all, 'miniuart-bt')]
+    assert list(dwc2.extract(config)) == []
+    config = [BootOverlay('config.txt', 1, cond_all, 'dwc-otg')]
+    assert list(dwc2.extract(config)) == [(config[0], False)]
+    config = [BootOverlay('config.txt', 1, cond_all, 'dwc2')]
+    assert list(dwc2.extract(config)) == [(config[0], True)]
+
+
+def test_overlay_dwc2_output():
+    settings = make_settings(OverlayDWC2('usb.dwc2.enabled'))
+    dwc2 = settings['usb.dwc2.enabled']
+    assert list(dwc2.output()) == []
+    dwc2._value = False
+    assert list(dwc2.output()) == ['dtoverlay=dwc-otg']
+    dwc2._value = True
+    assert list(dwc2.output()) == ['dtoverlay=dwc2']
 
 
 def test_overlay_kms():

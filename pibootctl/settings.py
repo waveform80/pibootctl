@@ -967,6 +967,38 @@ SETTINGS = {
             Note that disabling the module can affect the default state of
             serial.enabled and serial.uart.
             """)),
+    setting.OverlayDWC2(
+        'usb.dwc2.enabled', doc=_(
+            """
+            Selects the USB controller driver for the DWC2 driven USB port.
+
+            On the Raspberry Pi 4 this is the USB-C (power) port. On the A+ and
+            3A+ this is the single USB type A ("full size") port. On the Pi
+            Zero this is the micro-USB port labelled "USB". On all other
+            models, this USB port is not (directly) accessible as it sits
+            behind the combined USB hub and ethernet controller.
+
+            On the Raspberry Pi Zero, this setting defaults to enabled meaning
+            the "dwc2" driver is selected permitting dual-role (gadget)
+            operation (depending on the setting of usb.dwc2.mode). On all other
+            models, this setting defaults to disabled which results in the
+            "dwc-otg" driver (which supports fast interrupts) being used.
+            """)),
+    setting.OverlayParamStr(
+        'usb.dwc2.mode', overlay='dwc2', param='dr_mode', default='otg',
+        valid={
+            'host':       'Host mode always',
+            'peripheral': 'Device mode always',
+            'otg':        'Dual-role host/device',
+        }, doc=_(
+            """
+            Selects the dual-role mode of the DWC2 USB port, when
+            usb.dwc2.enabled is true.
+
+            This can be one of:
+
+            {valid}
+            """)),
     setting.CommandFirmwareCamera(
         'camera.enabled',
         commands=('start_x', 'start_debug', 'start_file', 'fixup_file'),

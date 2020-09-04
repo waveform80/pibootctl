@@ -32,6 +32,13 @@ cond_all = BootConditions()
 cond_none = cond_all.evaluate('none')
 
 
+def test_coalesce():
+    assert coalesce(1) == 1
+    assert coalesce(None, 1) == 1
+    assert coalesce(None, None, 1) == 1
+    assert coalesce() is None
+
+
 def test_str():
     assert str(BootSection('config.txt', 1, cond_all, 'all')) == '[all]'
     assert str(BootCommand(

@@ -1700,6 +1700,39 @@ class OverlayKMS(Setting):
         }[self.value]
 
 
+class OverlayDWC2(Setting):
+    """
+    Represents the dwc-otg and dwc2 overlays. The former is default on all
+    pi models except the 0 where the latter is default.
+    """
+    @property
+    def default(self):
+        return get_board_type() in {'pi0', 'pi0w'}
+
+    @property
+    def key(self):
+        return ('overlays', 'dwc2' if self.value else 'dwc-otg')
+
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootOverlay):
+                if item.overlay == 'dwc-otg':
+                    yield item, False
+                elif item.overlay == 'dwc2':
+                    yield item, True
+                # XXX What happens if both overlays are specified?
+
+    def update(self, value):
+        return to_bool(value)
+
+    def output(self):
+        if self.modified:
+            if self.value:
+                yield 'dtoverlay=dwc2'
+            else:
+                yield 'dtoverlay=dwc-otg'
+
+
 class CommandCPUL2Cache(CommandBoolInv):
     """
     Handles the ``disable_l2cache`` command.
