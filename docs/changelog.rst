@@ -16,12 +16,24 @@
 .. You should have received a copy of the GNU General Public License
 .. along with pibootctl.  If not, see <https://www.gnu.org/licenses/>.
 
-==========
-Change log
-==========
+=========
+Changelog
+=========
 
 .. currentmodule:: pibootctl
 
+
+Release 0.5 (2020-09-05)
+========================
+
+* Rewrote the configuration setting code to always target :file:`config.txt`
+  as several settings don't work in included files (e.g. ``start_x``).
+* Added ``comment_lines`` configuration option to permit commenting out lines
+  instead of deleting them
+* Enhanced the configuration setting code to search for and uncomment existing
+  lines in preference to writing new ones
+* Added ``--this-model`` and ``--this-serial`` options to permit adding
+  settings in new conditional sections
 
 Release 0.4 (2020-03-31)
 ========================
