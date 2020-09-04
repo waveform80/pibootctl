@@ -247,17 +247,18 @@ SETTINGS = {
         'video.firmware.mode', doc=_(
             """
             Specifies the means by which the Linux kernel communicates with the
-            video firmware. By default this is 0 (legacy mode).
+            video firmware. By default this is 'legacy' (no kernel mode
+            setting).
 
-            When this is 1 the FKMS ("fake" kernel mode setting) overlay is
-            loaded and the Linux kernel talks to the video firmware via the
+            When this is 'fkms' ("fake" kernel mode setting), the fkms overlay
+            is loaded and the Linux kernel talks to the video firmware via the
             mailbox APIs for composition and output.
 
-            When this is 2 the KMS (kernel mode setting) overlay is loaded and
-            the Linux kernel drives the video hardware registers directly,
-            bypassing the firmware. However, this means that facilities still
-            running on the firmware (e.g. the camera) no longer operate
-            correctly. [1]
+            When this is 'kms' (kernel mode setting), the full kms overlay is
+            loaded and the Linux kernel drives the video hardware registers
+            directly, bypassing the firmware. However, this means that
+            facilities still running on the firmware (e.g. the camera) no
+            longer operate correctly. [1]
 
             [1]: https://www.raspberrypi.org/forums/viewtopic.php?t=243564
             """)),

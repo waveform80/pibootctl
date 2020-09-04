@@ -88,10 +88,21 @@ from contextlib import contextmanager
 
 from .formatter import FormatDict, TransMap, int_ranges
 from .parser import BootOverlay, BootParam, BootCommand, coalesce
-from .userstr import UserStr, to_bool, to_int, to_float, to_list
+from .userstr import UserStr, to_bool, to_int, to_float, to_list, to_str
 from .info import get_board_type, get_board_mem
 
 _ = gettext.gettext
+
+
+def format_valid_table(doc, valid):
+    """
+    A small utility function that replaces instances of ``{valid}`` in *doc*
+    with a formatted table containing the keys and values of the :class:`dict`
+    *valid*.
+    """
+    return dedent(doc).format_map(
+        TransMap(valid=FormatDict(
+            valid, key_title=_('Value'), value_title=_('Meaning'))))
 
 
 class ValueWarning(Warning):
@@ -409,13 +420,54 @@ class OverlayParam(Overlay):
             yield 'dtparam={self.param}={self.value}'.format(self=self)
 
 
+class OverlayParamStr(OverlayParam):
+    """
+    Represents a string parameter to a device-tree overlay.
+
+    The *valid* parameter may optionally provide a dictionary mapping
+    valid string values for the command to explanations, to be provided by
+    the basic :attr:`~Setting.hint` implementation.
+    """
+    def __init__(self, name, *, overlay='base', param, default=None, doc='',
+                 valid=None):
+        if valid is None:
+            valid = {}
+        doc = format_valid_table(doc, valid)
+        super().__init__(name, overlay=overlay, param=param, default=default,
+                         doc=doc)
+        self._valid = valid
+
+    @property
+    def hint(self):
+        return self._valid.get(self.value)
+
+    def validate(self):
+        if self._valid and self.value not in self._valid:
+            raise ValueError(_(
+                '{self.name} must be one of {valid}'
+            ).format(self=self, valid=', '.join(self._valid)))
+
+
 class OverlayParamInt(OverlayParam):
     """
     Represents an integer parameter to a device-tree overlay.
+
+    The *valid* parameter may optionally provide a dictionary mapping valid
+    integer values for the command to string explanations, to be provided by
+    the basic :attr:`~Setting.hint` implementation.
     """
-    def __init__(self, name, *, overlay='base', param, default=0, doc=''):
+    def __init__(self, name, *, overlay='base', param, default=0, doc='',
+                 valid=None):
+        if valid is None:
+            valid = {}
+        doc = format_valid_table(doc, valid)
         super().__init__(name, overlay=overlay, param=param, default=default,
                          doc=doc)
+        self._valid = valid
+
+    @property
+    def hint(self):
+        return self._valid.get(self.value)
 
     def extract(self, config):
         for item, value in super().extract(config):
@@ -423,6 +475,12 @@ class OverlayParamInt(OverlayParam):
 
     def update(self, value):
         return to_int(super().update(value))
+
+    def validate(self):
+        if self._valid and self.value not in self._valid:
+            raise ValueError(_(
+                '{self.name} must be in the range {valid}'
+            ).format(self=self, valid=int_ranges(self._valid)))
 
 
 class OverlayParamBool(OverlayParam):
@@ -504,6 +562,34 @@ class Command(Setting):
             yield template.format(self=self, fmt=fmt)
 
 
+class CommandStr(Command):
+    """
+    Represents a string-valued configuration *command* or *commands*.
+
+    The *valid* parameter may optionally provide a dictionary mapping
+    valid string values for the command to explanations, to be provided by
+    the basic :attr:`~Setting.hint` implementation.
+    """
+    def __init__(self, name, *, command=None, commands=None, default=None,
+                 doc='', index=0, valid=None):
+        if valid is None:
+            valid = {}
+        doc = format_valid_table(doc, valid)
+        super().__init__(name, command=command, commands=commands,
+                         default=default, doc=doc, index=index)
+        self._valid = valid
+
+    @property
+    def hint(self):
+        return self._valid.get(self.value)
+
+    def validate(self):
+        if self._valid and self.value not in self._valid:
+            raise ValueError(_(
+                '{self.name} must be one of {valid}'
+            ).format(self=self, valid=', '.join(self._valid)))
+
+
 class CommandInt(Command):
     """
     Represents an integer-valued configuration *command* or *commands*.
@@ -516,9 +602,7 @@ class CommandInt(Command):
                  index=0, valid=None):
         if valid is None:
             valid = {}
-        doc = dedent(doc).format_map(
-            TransMap(valid=FormatDict(
-                valid, key_title=_('Value'), value_title=_('Meaning'))))
+        doc = format_valid_table(doc, valid)
         super().__init__(name, command=command, commands=commands,
                          default=default, doc=doc, index=index)
         self._valid = valid
@@ -1566,13 +1650,13 @@ class OverlayBluetoothEnabled(Setting):
 
 class OverlayKMS(Setting):
     """
-    Represents the framebuffer driver as 0 (legacy, when no overlays are used),
-    1 (FKMS, when the vc4-fkms-v3d overlay is loaded), or 2 (KMS, when the
+    Represents the framebuffer driver as 'legacy' (when no overlays are used),
+    'fkms' (when the vc4-fkms-v3d overlay is loaded), or 'kms' (when the
     vc4-kms-v3d overlay is loaded).
     """
     @property
     def default(self):
-        return 0
+        return 'legacy'
 
     @property
     def key(self):
@@ -1583,25 +1667,26 @@ class OverlayKMS(Setting):
             if isinstance(item, BootOverlay):
                 try:
                     yield item, {
-                        'vc4-fkms-v3d': 1,
-                        'vc4-kms-v3d':  2,
+                        'vc4-fkms-v3d': 'fkms',
+                        'vc4-kms-v3d':  'kms',
                     }[item.overlay]
                 except KeyError:
                     pass
 
     def update(self, value):
-        return to_int(value)
+        return to_str(value)
 
     def validate(self):
-        if not 0 <= self.value <= 2:
+        if self.value not in {'legacy', 'kms', 'fkms'}:
             raise ValueError(
-                _('{self.name} must be 0, 1, or 2').format(self=self))
+                _("{self.name} must be one of 'legacy', 'kms', "
+                  "'fkms'").format(self=self))
 
     def output(self):
         try:
             yield 'dtoverlay=' + {
-                1: 'vc4-fkms-v3d',
-                2: 'vc4-kms-v3d',
+                'fkms': 'vc4-fkms-v3d',
+                'kms':  'vc4-kms-v3d',
             }[self.value]
         except KeyError:
             pass
@@ -1609,9 +1694,9 @@ class OverlayKMS(Setting):
     @property
     def hint(self):
         return {
-            0: 'legacy',
-            1: 'FKMS',
-            2: 'KMS',
+            'legacy': 'no KMS',
+            'fkms':   'Fake KMS',
+            'kms':    'Full KMS',
         }[self.value]
 
 

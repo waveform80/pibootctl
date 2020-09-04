@@ -1393,16 +1393,16 @@ def test_overlay_kms():
     settings = make_settings(OverlayKMS('video.firmware.mode'))
     kms = settings['video.firmware.mode']
 
-    assert kms.default == 0
-    assert kms.value == 0
-    assert kms.hint == 'legacy'
+    assert kms.default == 'legacy'
+    assert kms.value == 'legacy'
+    assert kms.hint == 'no KMS'
     kms.validate()
 
-    kms._value = kms.update(1)
-    assert kms.hint == 'FKMS'
+    kms._value = kms.update('fkms')
+    assert kms.hint == 'Fake KMS'
     kms.validate()
 
-    kms._value = 3
+    kms._value = 'blah'
     with pytest.raises(ValueError):
         kms.validate()
 
@@ -1413,18 +1413,18 @@ def test_overlay_kms_extract():
     config = [BootOverlay('config.txt', 1, cond_all, 'miniuart-bt')]
     assert list(kms.extract(config)) == []
     config = [BootOverlay('config.txt', 1, cond_all, 'vc4-kms-v3d')]
-    assert list(kms.extract(config)) == [(config[0], 2)]
+    assert list(kms.extract(config)) == [(config[0], 'kms')]
     config = [BootOverlay('config.txt', 1, cond_all, 'vc4-fkms-v3d')]
-    assert list(kms.extract(config)) == [(config[0], 1)]
+    assert list(kms.extract(config)) == [(config[0], 'fkms')]
 
 
 def test_overlay_kms_output():
     settings = make_settings(OverlayKMS('video.firmware.mode'))
     kms = settings['video.firmware.mode']
     assert list(kms.output()) == []
-    kms._value = 1
+    kms._value = 'fkms'
     assert list(kms.output()) == ['dtoverlay=vc4-fkms-v3d']
-    kms._value = 2
+    kms._value = 'kms'
     assert list(kms.output()) == ['dtoverlay=vc4-kms-v3d']
 
 
