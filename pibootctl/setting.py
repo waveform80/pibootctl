@@ -1970,10 +1970,38 @@ class CommandGPUFreqMin(CommandInt):
         return 'MHz'
 
 
+class CommandTotalMem(CommandInt):
+    """
+    Handles the ``total_mem`` command.
+    """
+    @property
+    def default(self):
+        return get_board_mem()
+
+    def extract(self, config):
+        for item, value in super().extract(config):
+            if item.filename == 'config.txt':
+                # NOTE: total_mem is only valid in config.txt
+                yield item, value
+
+    def validate(self):
+        if self.value < 128:
+            raise ValueError(_(
+                '{self.name} must be at least 128Mb').format(self=self))
+
+    @property
+    def hint(self):
+        return 'Mb'
+
+
 class CommandGPUMem(CommandInt):
     """
     Handles the ``gpu_mem`` command.
     """
+    @property
+    def default(self):
+        return 64 if get_board_mem() < 1024 else 76
+
     def extract(self, config):
         values = {name: None for name in self.commands}
         override = 'gpu_mem_{mem}'.format(mem=min(1024, get_board_mem()))
@@ -1999,9 +2027,9 @@ class CommandGPUMem(CommandInt):
                 '{self.name} must be at least 16Mb').format(self=self))
         mem = get_board_mem()
         max_gpu_mem = {
-            256: 192,
-            512: 448,
-        }.get(mem, 944)
+            256: 128,
+            512: 384,
+        }.get(mem, 512)
         if self.value > max_gpu_mem:
             raise ValueError(_(
                 '{self.name} must be less than {max_gpu_mem}Mb').format(

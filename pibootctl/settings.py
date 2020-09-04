@@ -827,6 +827,19 @@ SETTINGS = {
             default firmware but at a performance cost, ergo it should only be
             used when required.
             """)),
+    setting.CommandTotalMem(
+        'boot.mem', command='total_mem',
+        doc=_(
+            """
+            This parameter, which is primarily intended for debugging, can be
+            used to force a Raspberry Pi to limit its memory capacity: specify
+            the total amount of RAM, in megabytes, you wish the Pi to use. For
+            example, to make a 4GB Raspberry Pi 4B behave as though it were a
+            1GB model, use 1024.
+
+            This value will be clamped between a minimum of 128MB, and a
+            maximum of the total memory installed on the board.
+            """)),
     setting.CommandFirmwareFilename(
         'boot.firmware.filename', command='start_file', doc=_(
             """
@@ -1173,38 +1186,35 @@ SETTINGS = {
             clocking. The default value is 250, or 500 on Pi 4B.
             """)),
     setting.CommandGPUMem(
-        'gpu.mem', default=64,
+        'gpu.mem',
         commands=('gpu_mem', 'gpu_mem_256', 'gpu_mem_512', 'gpu_mem_1024'),
         doc=_(
             """
-            Sets the memory split between the CPU and GPU in megabytes; the CPU
-            gets the remaining memory. The minimum value is 16; the technical
-            maximum value is 192, 448, or 944, depending on whether you are
-            using a 256MB, 512MB, or 1024MB Pi. The default value is 64, values
-            above 512 will not provide increased performance and should not be
-            used. For the Raspberry Pi 4, which is available in 1GB, 2GB and
-            4GB versions, the minimum and maximum values are the same as for a
-            1GB device.
+            Specifies how much memory, in megabytes, to reserve for the
+            exclusive use of the GPU: the remaining memory is allocated to the
+            CPU. For models with less than 1GB of memory, the default is 64;
+            for model with 1GB or more of memory the default is 76. To ensure
+            the best performance of Linux, you should set this to the lowest
+            possible value. If a particular graphics feature is not working
+            correctly, try increasing the value, being mindful of the
+            recommended maximums shown below. There is no performance advantage
+            from specifying values larger than is necessary.
 
-            This setting refers to memory that is addressable from the GPU,
-            which includes the VPU, HVS, legacy codecs (e.g. H264), camera, and
-            on devices before the Raspberry Pi 4, the 3D system. The Raspberry
-            Pi 4 3D system has it's own Memory Mangement Unit (MMU) so textures
-            and other GL resources are not allocated from the GPU memory but
-            Linux system memory instead. This means that gpu.mem can be set to
-            a lower value, so even if you are using the H264 and camera then
-            128MB will probably be enough. On earlier models without the 3D
-            MMU, you may need up to 256 or 512 in some highly unusual cases.
+            The maximum values are as follows:
 
-            For performance reasons, you should set this as low as possible to
-            give the Linux system as much memory as possible. However, setting
-            gpu.mem too low may automatically disable certain firmware
-            features, as there are some things the GPU cannot do if it has
-            access to too little memory. If a feature you are trying to use
-            isn't working, try setting a larger GPU memory split.
+            | Total RAM | Maximum |
+            | 256MB | 128 |
+            | 512MB | 384 |
+            | 1GB+ | 512 |
 
-            Values over 512 are not recommended, will provide no performance
-            improvements, and are untested.
+            The minimum value is 16, however this disables certain GPU
+            features.
+
+            On the Raspberry Pi 4 the 3D component of the GPU has its own
+            memory management unit (MMU), and does not use memory from this
+            allocation. Instead memory is allocated dynamically within Linux.
+            This may allow a smaller value to be specified for on the Pi 4,
+            compared to previous models.
             """)),
 }
 

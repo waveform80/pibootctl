@@ -130,6 +130,7 @@ def get_board_mem():
                 2: 1024,
                 3: 2048,
                 4: 4096,
+                5: 8192,
             }[rev >> 20 & 0x7]
         else:
             return {
