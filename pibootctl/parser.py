@@ -36,6 +36,9 @@ instances.
 .. autoclass:: BootInclude
 
 .. autoclass:: BootFile
+
+.. autoclass:: BootConditions
+    :members:
 """
 
 import io
@@ -334,8 +337,68 @@ class BootConditions(namedtuple('BootConditions', (
         'suppress_count'
     ))):
     """
-    Represents the state of conditional filters that apply to a given
-    :class:`BootLine`.
+    Represents the set of conditional filters that apply to a given
+    :class:`BootLine`. The class implements methods necessary to compare
+    instances as if they were sets.
+
+    For example::
+
+        >>> cond_all = BootConditions()
+        >>> cond_pi3 = BootConditions(pi='pi3')
+        >>> cond_pi3p = BootConditions(pi='pi3p')
+        >>> cond_serial = BootConditions(pi='pi3', serial=0x12345678)
+        >>> cond_all == cond_pi3
+        False
+        >>> cond_all >= cond_pi3
+        True
+        >>> cond_pi3 > cond_pi3p
+        True
+        >>> cond_serial < cond_pi3
+        True
+        >>> cond_serial < cond_pi3p
+        False
+
+    .. attribute:: pi
+
+        The model of pi that the section applies to. See `conditional
+        filters`_ for details of valid values. This represents sections
+        like ``[pi3]``.
+
+    .. attribute:: hdmi
+
+        The index of the HDMI port (0 or 1) that settings within this section
+        will apply to, if no index-suffix is provided by the setting itself.
+        This represents sections like ``[HDMI:0]``.
+
+    .. attribute:: edid
+
+        The EDID of the display that the section applies to. This represents
+        sections like ``[EDID=VSC-TD2220]``.
+
+    .. attribute:: serial
+
+        The serial number of the Pi that settings within this section will
+        apply to, stored as an :class:`int`. This represents sections like
+        ``[0x12345678]``.
+
+    .. attribute:: gpio
+
+        The GPIO number and state that must be matched for settings in this
+        section to apply, stored as a (gpio, state) tuple. This represents
+        sections like ``[gpio2=0]``.
+
+    .. attribute:: none
+
+        If this is :data:`True` then a ``[none]`` section has been encountered
+        and no settings apply.
+
+    .. attribute:: suppress_count
+
+        This is a "suppression count" used to track sections within included
+        files that are currently disabled (because the include occurred within
+        a section that itself is disabled).
+
+    .. _conditional filters: https://www.raspberrypi.org/documentation/configuration/config-txt/conditional.md
     """
     __slots__ = ()
 
@@ -444,23 +507,27 @@ class BootConditions(namedtuple('BootConditions', (
         If *context* is not specified, it defaults to conditions equivalent
         to ``[any]``, which is the default in the Pi bootloader.
 
-        For example:
+        For example::
 
             >>> current = BootConditions(pi='pi2', gpio=(4, True))
             >>> wanted = BootConditions()
-            >>> print('\n'.join(wanted.generate(current)))
+            >>> print('\\n'.join(wanted.generate(current)))
             [all]
             >>> wanted = BootConditions(pi='pi4')
-            >>> print('\n'.join(wanted.generate(current)))
+            >>> print('\\n'.join(wanted.generate(current)))
             [all]
             [pi4]
             >>> current = BootConditions(pi='pi2')
-            >>> print('\n'.join(wanted.generate(current)))
+            >>> print('\\n'.join(wanted.generate(current)))
             [pi4]
             >>> current = BootConditions(none=True)
-            >>> print('\n'.join(wanted.generate(current)))
+            >>> print('\\n'.join(wanted.generate(current)))
             [all]
             [pi3]
+
+        .. note::
+
+            The yielded strings do *not* end with a line terminator.
         """
         if context is None:
             context = BootConditions()

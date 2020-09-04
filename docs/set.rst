@@ -28,8 +28,9 @@ Synopsis
 
 .. code-block:: text
 
-    pibootctl set [-h] [--no-backup] [--json] [--yaml] [--shell]
-                   [name=[value] [name=[value] ...]]
+    pibootctl set [-h] [--no-backup] [--all | --this-model | --this-serial]
+                  [--json] [--yaml] [--shell]
+                  [name=[value] [name=[value] ...]]
 
 
 Description
@@ -55,6 +56,19 @@ Options
 
     Don't take an automatic backup of the current boot configuration if one
     doesn't exist.
+
+.. option:: --all
+
+    Set the specified settings on all Pis this SD card is used with. This is
+    the default context.
+
+.. option:: --this-model
+
+    Set the specified settings for this model of Pi only.
+
+.. option:: --this-serial
+
+    Set the specified settings for this Pi's serial number only.
 
 .. option:: --json
 
@@ -88,6 +102,18 @@ value by omitting the new value after the "=" sign:
 .. code-block:: console
 
     $ sudo pibootctl set --no-backup serial.enabled=on serial.uart=
+
+By default, settings are written into an "[all]" section in :file:`config.txt`
+meaning that they will apply everywhere the SD card is moved. However, you can
+opt to make settings specific to the current model of Pi, or even the current
+Pi's serial number:
+
+.. code-block:: console
+
+    $ sudo pibootctl set --this-serial camera.enabled=on gpu.mem=128
+
+In this case an appropriate section like "[0x123456789]" will be added and the
+settings written under there.
 
 For those wishing to build an interface on top of pibootctl, JSON, YAML, and
 shell-friendly formats can also be used to feed new values to the

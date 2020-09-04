@@ -60,23 +60,11 @@ section titled "defaults". A typical configuration file might look like this:
     :caption: pibootctl.conf
 
     [defaults]
-    boot_path=/boot
-    store_path=pibootctl
-
-    config_read=config.txt
-    config_write=config.txt
-    config_template=pibootctl.template
-
-    reboot_required=/var/run/reboot-required
-    reboot_required_pkgs=/var/run/reboot-required.pkgs
-    package_name=pibootctl
-    backup=on
-
-.. code-block:: text
-    :caption: pibootctl.template
-
-    # This file is changed by pibootctl; manual edits may be lost!
-    {config}
+    boot_path = /boot
+    store_path = pibootctl
+    package_name = pibootctl
+    comment_lines = on
+    backup = on
 
 The configuration specifies several settings, but the most important are:
 
@@ -87,27 +75,35 @@ The configuration specifies several settings, but the most important are:
     The path under which to store saved boot configurations, relative to
     ``boot_path`` (defaults to :file:`pibootctl`).
 
-``config_read``
+``config_root``
     The "root" configuration file which is read first, relative to
-    ``boot_path`` (defaults to :file:`config.txt`).
+    ``boot_path`` (defaults to :file:`config.txt`). This is also the primary
+    file that gets re-written when settings are changed.
 
-``config_write``
-    The configuration file which pibootctl is permitted to re-write (also
-    defaults to :file:`config.txt`). This is used in cases where the default
-    configuration includes several files. In this case, pibootctl needs to know
-    which file it is allowed to re-write, and assume all other files are
-    distribution maintained. This is also relative to ``boot_path``.
+``mutable_files``
+    The set of files within a configuration that may be modified by the
+    utility (defaults to :file:`config.txt`). List multiple files on separate
+    lines. Currently, this *must* include :file:`config.txt`.
 
-``config_template``
-    The location of the file, relative to this configuration file, containing
-    the template to be used when writing the file specified by
-    ``config_write``. The specified text file must contain the substitution
-    marker "{config}" and whatever else is desired (header or footer comments,
-    or for that matter additional includes or other configuration settings).
+``comment_lines``
+    If this is on, when lines in configuration files are no longer required,
+    they will be commented out with a "#" prefix instead of being deleted.
+    Defaults to off.
+
+    Note that, regardless of this setting, the utility will always search for
+    commented lines to uncomment before writing new ones.
 
 ``reboot_required``
     The file which should be created in the event that the active boot
     configuration is changed.
+
+``reboot_required_pkgs``
+    The file to which the value of ``package_name`` should be appended in the
+    event that the active boot configuration is changed.
+
+``package_name``
+    The name of the package which contains the utility. Used by
+    ``reboot_required_pkgs``.
 
 ``backup``
     If this is on (the default), any attempt to change the active boot
@@ -115,3 +111,20 @@ The configuration specifies several settings, but the most important are:
     one does not already exist.
 
 Line comments can be included in the configuration file with a ``#`` prefix.
+Another example configuration, typical for Ubuntu on the Raspberry Pi, is shown
+below:
+
+.. code-block:: ini
+    :caption: pibootctl.conf
+
+    [defaults]
+    boot_path = /boot
+    store_path = pibootctl
+    mutable_files =
+      config.txt
+      syscfg.txt
+
+    reboot_required = /var/run/reboot-required
+    reboot_required_pkgs = /var/run/reboot-required.pkgs
+    package_name = pibootctl
+    backup = on

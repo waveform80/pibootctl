@@ -95,8 +95,7 @@ following command should install all required dependencies:
 
 .. code-block:: console
 
-    $ sudo apt install texlive-latex-recommended texlive-latex-extra \
-        texlive-fonts-recommended graphviz gnuplot inkscape
+    $ sudo apt install texlive-xetex fonts-freefont-otf graphviz gnuplot inkscape
 
 Once these are installed, you can use the "doc" target to build the
 documentation:
