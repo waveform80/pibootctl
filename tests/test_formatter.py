@@ -82,6 +82,30 @@ def test_table_wrap_thin(table_data):
     assert wrap.fill(table_data) == '\n'.join(expected)
 
 
+def test_table_wrap_equal():
+    wrap = TableWrapper(width=40)
+    table_data = [
+        ("aaaaa" + " aaaaa" * 4,) * 3
+    ] * 4
+    expected = [
+        'aaaaa aaaaa  aaaaa aaaaa   aaaaa aaaaa  ',
+        'aaaaa aaaaa  aaaaa aaaaa   aaaaa aaaaa  ',
+        'aaaaa        aaaaa         aaaaa        ',
+        '------------ ------------- -------------',
+        'aaaaa aaaaa  aaaaa aaaaa   aaaaa aaaaa  ',
+        'aaaaa aaaaa  aaaaa aaaaa   aaaaa aaaaa  ',
+        'aaaaa        aaaaa         aaaaa        ',
+        'aaaaa aaaaa  aaaaa aaaaa   aaaaa aaaaa  ',
+        'aaaaa aaaaa  aaaaa aaaaa   aaaaa aaaaa  ',
+        'aaaaa        aaaaa         aaaaa        ',
+        'aaaaa aaaaa  aaaaa aaaaa   aaaaa aaaaa  ',
+        'aaaaa aaaaa  aaaaa aaaaa   aaaaa aaaaa  ',
+        'aaaaa        aaaaa         aaaaa        ',
+    ]
+    assert wrap.wrap(table_data) == expected
+    assert wrap.fill(table_data) == '\n'.join(expected)
+
+
 def test_table_wrap_pretty_thin(table_data):
     wrap = TableWrapper(width=40, **pretty_table)
     expected = [
