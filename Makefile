@@ -93,6 +93,7 @@ doc: $(DOC_SOURCES)
 	$(MAKE) -C docs html
 	$(MAKE) -C docs epub
 	$(MAKE) -C docs latexpdf
+	$(MAKE) $(MAN_PAGES)
 
 source: $(DIST_TAR) $(DIST_ZIP)
 
@@ -117,12 +118,13 @@ test:
 	$(PYTHON) -m $(PYTEST)
 
 clean:
-	dh_clean
-	rm -fr dist/ $(NAME).egg-info/ tags
+	-[ -d debian ] && dh_clean
+	rm -fr build/ dist/ man/ $(NAME).egg-info/ tags
 	for dir in $(SUBDIRS); do \
 		$(MAKE) -C $$dir clean; \
 	done
 	find $(CURDIR) -name "*.pyc" -delete
+	find $(CURDIR) -name "__pycache__" -delete
 
 tags: $(PY_SOURCES)
 	ctags -R --exclude="build/*" --exclude="debian/*" --exclude="docs/*" --languages="Python"
