@@ -49,8 +49,7 @@ import configparser
 from datetime import datetime
 from pathlib import Path
 
-import pkg_resources
-
+from . import __version__
 from .setting import Command
 from .parser import BootConditions
 from .store import Store, Current, Default
@@ -212,14 +211,12 @@ class Application:
         return config
 
     def _get_parser(self):
-        pkg = pkg_resources.require('pibootctl')[0]
-
         parser = argparse.ArgumentParser(
             description=_(
                 "%(prog)s is a tool for querying and modifying the boot "
                 "configuration of the Raspberry Pi."))
         parser.add_argument(
-            '--version', action='version', version=pkg.version)
+            '--version', action='version', version=__version__)
         parser.set_defaults(func=self.do_help)
         commands = parser.add_subparsers(title=_("commands"))
 
