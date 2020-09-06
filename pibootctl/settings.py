@@ -67,10 +67,38 @@ SETTINGS = {
             """
             Enables the ALSA audio interface.
             """)),
+    setting.CommandForceIgnore(
+        'audio.dither',
+        force='enable_audio_dither', ignore='disable_audio_dither', doc=_(
+            """
+            By default, a 1.0LSB dither is applied to the audio stream if it is
+            routed to the analogue audio output. This can create audible
+            background "hiss" in some situations, for example when the ALSA
+            volume is set to a low level. Audio dither is normally disabled
+            when audio samples are larger than 16-bits.
+
+            Set this option to either force the use of dithering for all bit
+            depths (on), or disable dithering entirely (off).
+            """)),
+    setting.CommandInt(
+        'audio.depth', command='pwm_sample_bits', default=11, doc=_(
+            """
+            Adjusts the bit depth of the analogue audio output. The default bit
+            depth is 11. Selecting bit depths below 8 will result in
+            nonfunctional audio, as settings below 8 result in a PLL frequency
+            too low to support. This is generally only useful as a
+            demonstration of how bit depth affects quantisation noise.
+            """)),
     setting.OverlayParamBool(
         'watchdog.enabled', param='watchdog', doc=_(
             """
             Enables the hardware watchdog.
+            """)),
+    setting.CommandBool(
+        'hat.enabled', command='force_eeprom_read', default=True, doc=_(
+            """
+            Switch this option off to prevent the firmware from trying to read
+            an I2C HAT EEPROM (connected to pins GPIO0 and GPIO1) at powerup.
             """)),
     setting.CommandBoolInv(
         'video.cec.enabled', command='hdmi_ignore_cec', default=True, doc=_(
@@ -861,6 +889,22 @@ SETTINGS = {
             default firmware but at a performance cost, ergo it should only be
             used when required.
             """)),
+    # TODO uart_2ndstage is only valid in config.txt
+    setting.CommandBool(
+        'boot.debug.serial', command='uart_2ndstage', doc=_(
+            """
+            Setting boot.debug.serial to on causes the second-stage loader
+            (bootcode.bin on devices prior to the Raspberry Pi 4, or the boot
+            code in the EEPROM for Raspberry Pi 4 devices) and the main
+            firmware (start*.elf) to output diagnostic information to UART0.
+
+            Be aware that output is likely to interfere with Bluetooth
+            operation unless it is disabled (bluetooth.enabled is off) or
+            switched to the other UART (serial.uart is 0), and if the UART is
+            accessed simultaneously to output from Linux then data loss can
+            occur leading to corrupted output. This feature should only be
+            required when trying to diagnose an early boot loading problem.
+            """)),
     setting.CommandTotalMem(
         'boot.mem', command='total_mem',
         doc=_(
@@ -924,6 +968,7 @@ SETTINGS = {
             Note: the bootloader has a strict line-length of 80 characters. If
             many ramfs files are specified, it's possible to exceed this limit.
             """)),
+    # TODO bootcode_delay is only valid in config.txt
     setting.CommandInt(
         'boot.delay.1', command='bootcode_delay', default=0, doc=_(
             """
