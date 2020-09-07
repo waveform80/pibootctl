@@ -62,6 +62,7 @@ from pathlib import Path
 from copy import deepcopy
 from fnmatch import fnmatch
 from datetime import datetime
+from operator import itemgetter
 from collections.abc import Mapping
 from zipfile import ZipFile, BadZipFile, ZIP_DEFLATED
 
@@ -69,7 +70,7 @@ from .files import AtomicReplaceFile
 from .parser import BootParser, BootFile, BootComment, BootConditions
 from .setting import CommandIncludedFile
 from .settings import SETTINGS
-from .exc import InvalidConfiguration, IneffectiveConfiguration
+from .exc import InvalidConfiguration, IneffectiveConfiguration, DelegatedOutput
 
 _ = gettext.gettext
 
@@ -559,28 +560,46 @@ class MutableConfiguration(BootConfiguration):
             for line in self.settings[name].lines:
                 if line.filename in self._mutable_files and (
                         line.conditions.enabled or line.conditions <= context):
+                    new_file = new_path[line.filename]
                     if self._comment_lines:
-                        new_path[line.filename][line.linenum - 1] = (
-                            '#' + new_path[line.filename][line.linenum - 1])
+                        if not new_file[line.linenum - 1].startswith('#'):
+                            new_file[line.linenum - 1] = (
+                                '#' + new_file[line.linenum - 1])
                     else:
-                        new_path[line.filename][line.linenum - 1] = ''
+                        new_file[line.linenum - 1] = ''
         return new_path
 
     def _final_config(self, updated, context):
         # Diff the new settings to figure out which settings actually need
-        # writing; search for comments that can be "uncommented" instead of
-        # writing new lines, and otherwise record which new lines are required
-        new_path = {}
-        new_lines = []
+        # writing, and generate content from changed settings. Here we handle
+        # the case of settings delegating their output to other settings and
+        # track which ones have been done to avoid duplication
+        done = set()
+        new_lines = {}
         # XXX Can new ever be None? Would that be an error?
-        for old, new in sorted(self.settings.diff(updated),
-                               key=lambda i:i[1].key):
-            for new_line in new.output():
+        for old, new in self.settings.diff(updated):
+            if new.name in done:
+                continue
+            setting = new
+            while True:
+                try:
+                    done.add(setting.name)
+                    new_lines[setting.key] = list(setting.output())
+                except DelegatedOutput as exc:
+                    setting = updated[exc.master]
+                else:
+                    break
+
+        # Search for comments that can be "uncommented" instead of writing new
+        # lines, and otherwise record which new lines are required
+        new_path = {}
+        new_config = []
+        for key, lines in sorted(new_lines.items(), key=itemgetter(0)):
+            for new_line in lines:
                 for old_line in self._config:
-                    # XXX The search below for lines to uncomment isn't
-                    # *entirely* safe when dealing with dt-params, because
-                    # anything we uncomment still has to occur *after* the
-                    # related dtoverlay= line (if any)
+                    # XXX This isn't *entirely* safe when dealing with
+                    # dt-params, because anything we uncomment is potentially
+                    # out of key order in the final output
                     if (
                             isinstance(old_line, BootComment) and
                             old_line.conditions == context and
@@ -593,9 +612,9 @@ class MutableConfiguration(BootConfiguration):
                         new_file[old_line.linenum - 1] = old_line.comment + '\n'
                         break
                 else:
-                    new_lines.append(new_line)
+                    new_config.append(new_line)
 
-        # Find the insertion-point for new_lines; ideally, this is the last
+        # Find the insertion-point for new_config; ideally, this is the last
         # line of any section in the root configuration file which matches our
         # desired context. Failing that, it'll be the last line of the root
         # configuration file
@@ -622,7 +641,7 @@ class MutableConfiguration(BootConfiguration):
             # Two cases are relevant here: the above case where no root
             # configuration file exists, and the case where no lines in the
             # existing configuration match the desired context
-            new_lines = list(context.generate(insert_at.conditions)) + new_lines
+            new_config[0:0] = list(context.generate(insert_at.conditions))
         try:
             new_file = new_path[self.config_root]
         except KeyError:
@@ -631,8 +650,8 @@ class MutableConfiguration(BootConfiguration):
                     list(self._path[self.config_root].lines()))
             except KeyError:
                 new_file = new_path[self.config_root] = []
-        new_file[insert_at.linenum:insert_at.linenum] = [
-            line + '\n' for line in new_lines]
+        new_config = [line + '\n' for line in new_config]
+        new_file[insert_at.linenum:insert_at.linenum] = new_config
         return new_path
 
 

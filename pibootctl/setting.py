@@ -88,6 +88,7 @@ from itertools import groupby, chain
 from operator import or_, itemgetter
 from contextlib import contextmanager
 
+from .exc import DelegatedOutput
 from .formatter import FormatDict, TransMap, int_ranges
 from .parser import BootOverlay, BootParam, BootCommand, coalesce
 from .userstr import UserStr, to_bool, to_int, to_float, to_list, to_str
@@ -175,6 +176,11 @@ class Setting:
         """
         Returns a tuple of strings which will be used to order the output of
         :meth:`output` in the generated configuration.
+
+        .. note::
+
+            The output of this property *must* be unique for each setting,
+            unless a setting delegates all its output to another setting.
         """
         raise NotImplementedError
 
@@ -287,6 +293,12 @@ class Setting:
         setting (taking in account the context of other
         :class:`~pibootctl.store.Settings`).
         """
+        # If a setting's output is handled by another setting (e.g. for cases
+        # where a single command is broken up into multiple settings), raise
+        # DeletedOutput(master) where master is the setting that handles all
+        # output for the subordinate settings. This is necessary to permit the
+        # containing configuration to track which settings have actually
+        # generated output (to avoid duplication of lines in such cases).
         raise NotImplementedError
 
     @contextmanager
@@ -826,7 +838,11 @@ class CommandMaskDummy(CommandMaskMaster):
     :class:`CommandMaskMaster` setting.
     """
     def output(self):
-        return ()
+        # Override with appropriate DelegatedOutput in sub-classes
+        if self.modified:
+            raise DelegatedOutput('some.setting')
+        else:
+            return ()
 
 
 class CommandFilename(Command):
@@ -1249,7 +1265,10 @@ class CommandDisplayFlip(CommandInt):
 
     def output(self):
         # See CommandDisplayRotate.output above
-        return ()
+        if self.modified:
+            raise DelegatedOutput(self._relative('.rotate'))
+        else:
+            return ()
 
 
 class CommandDPIOutput(CommandMaskMaster):
@@ -1268,6 +1287,11 @@ class CommandDPIDummy(CommandMaskDummy):
     """
     Represents the non-format portions of ``dpi_output_format``.
     """
+    def output(self):
+        if self.modified:
+            raise DelegatedOutput('video.dpi.format')
+        else:
+            return ()
 
 
 class CommandHDMIBoost(CommandInt):
@@ -1764,8 +1788,10 @@ class OverlaySerialUART(Setting):
                 'serial.uart must be 0 when bluetooth.enabled is off'))
 
     def output(self):
-        # Output is handled by bluetooth.enabled setting
-        return ()
+        if self.modified:
+            raise DelegatedOutput('bluetooth.enabled')
+        else:
+            return ()
 
 
 class OverlayBluetoothEnabled(Setting):
@@ -1971,7 +1997,7 @@ class CommandCoreFreqMax(CommandInt):
             board_type = get_board_type()
             if board_type == 'pi4':
                 return (
-                    432 if self._query('video.tv.enabled').value else
+                    360 if self._query('video.tv.enabled').value else
                     550 if self._query('video.hdmi.4kp60').value else
                     500)
             else:
@@ -2050,27 +2076,32 @@ class CommandGPUFreqMax(CommandInt):
     """
     @property
     def default(self):
-        return {
-            'pi0':  300,
-            'pi0w': 300,
-            'pi1':  250,
-            'pi2':  250,
-            'pi3':  300,
-            'pi3+': 300,
-            'pi4':  500,
-        }.get(get_board_type(), 0)
+        board_type = get_board_type()
+        if board_type == 'pi4':
+            return (
+                360 if self._query('video.tv.enabled').value else
+                550 if self._query('video.hdmi.4kp60').value else
+                500)
+        else:
+            return {
+                'pi0':  300,
+                'pi0w': 300,
+                'pi1':  250,
+                'pi2':  250,
+                'pi3':  400,
+                'pi3+': 400,
+            }.get(board_type, 0)
 
     def output(self):
-        blocks = [self] + [
+        blocks = [
             self._query(self._relative(
                 '...{block}.frequency.max'.format(block=block)
             ))
-            for block in ('h264', 'isp', 'v3d')
+            for block in ('core', 'h264', 'isp', 'v3d')
         ]
         if any(block.modified for block in blocks):
             if all(self.value == block.value for block in blocks):
-                # Handled by gpu.core.frequency.max in this case
-                pass
+                raise DelegatedOutput(self._relative('...core.frequency.max'))
             else:
                 yield from super().output()
 
@@ -2100,16 +2131,15 @@ class CommandGPUFreqMin(CommandInt):
             return 500 if board_type == 'pi4' else 250 if board_type else 0
 
     def output(self):
-        blocks = [self] + [
+        blocks = [
             self._query(self._relative(
                 '...{block}.frequency.min'.format(block=block)
             ))
-            for block in ('h264', 'isp', 'v3d')
+            for block in ('core', 'h264', 'isp', 'v3d')
         ]
         if any(block.modified for block in blocks):
             if all(self.value == block.value for block in blocks):
-                # Handled by gpu.core.frequency.min in this case
-                pass
+                raise DelegatedOutput(self._relative('...core.frequency.min'))
             else:
                 yield from super().output()
 
@@ -2377,26 +2407,36 @@ class CommandGPIOMode(CommandStr):
     def output(self):
         # Only gpio0 gets to write output, and does so on behalf of all GPIO
         # settings
-        if self.index == 0:
-            states = {
+        if self.index > 0:
+            if self.modified:
+                raise DelegatedOutput('gpio0.mode')
+        else:
+            gpios = {
                 gpio: (
-                    self._query('gpio{}.mode'.format(gpio)).value,
-                    self._query('gpio{}.state'.format(gpio)).value,
+                    self._query('gpio{}.mode'.format(gpio)),
+                    self._query('gpio{}.state'.format(gpio)),
                 )
                 for gpio in range(28)
-                if self._query('gpio{}.mode'.format(gpio)).modified
-                or self._query('gpio{}.state'.format(gpio)).modified
             }
-            states = sorted(states.items(), key=itemgetter(1))
-            states = {
-                state: set(gpio for gpio, _state in gpios)
-                for state, gpios in groupby(states, key=itemgetter(1))
-            }
-            for (mode, state), gpios in states.items():
-                yield 'gpio={gpios}={mode},{state}'.format(
-                    gpios=int_ranges(gpios, list_sep=','),
-                    mode=GPIO_MODES_MAP[mode],
-                    state=GPIO_STATES_MAP[state])
+            if any(
+                    mode.modified or state.modified
+                    for mode, state in gpios.values()
+            ):
+                states = {
+                    gpio: (mode.value, state.value)
+                    for gpio, (mode, state) in gpios.items()
+                    if mode.modified or state.modified
+                }
+                states = sorted(states.items(), key=itemgetter(1))
+                states = {
+                    state: set(gpio for gpio, _state in gpios)
+                    for state, gpios in groupby(states, key=itemgetter(1))
+                }
+                for (mode, state), gpios in states.items():
+                    yield 'gpio={gpios}={mode},{state}'.format(
+                        gpios=int_ranges(gpios, list_sep=','),
+                        mode=GPIO_MODES_MAP[mode],
+                        state=GPIO_STATES_MAP[state])
 
 
 class CommandGPIOState(CommandStr):
@@ -2429,5 +2469,7 @@ class CommandGPIOState(CommandStr):
                         yield item, state
 
     def output(self):
-        # See CommandGPIOMode.output
-        return ()
+        if self.modified:
+            raise DelegatedOutput('gpio0.mode')
+        else:
+            return ()

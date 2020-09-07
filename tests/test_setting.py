@@ -499,11 +499,15 @@ def test_mask_command_output():
     cm = settings['video.dpi.format']
     cd = settings['video.dpi.clock']
 
-    assert list(chain(cm.output(), cd.output())) == []
+    assert list(cm.output()) == []
+    assert list(cd.output()) == []
     cm._value = 8
-    assert list(chain(cm.output(), cd.output())) == ['dpi_format=0x8']
+    assert list(cm.output()) == ['dpi_format=0x8']
+    assert list(cd.output()) == []
     cd._value = True
-    assert list(chain(cm.output(), cd.output())) == ['dpi_format=0x18']
+    assert list(cm.output()) == ['dpi_format=0x18']
+    with pytest.raises(DelegatedOutput):
+        list(cd.output())
 
 
 def test_filename_command_hint():
@@ -660,11 +664,16 @@ def test_rotate_flip_output():
     rot = settings['video.rotate']
     flip = settings['video.flip']
 
-    assert list(chain(rot.output(), flip.output())) == []
+    assert list(rot.output()) == []
+    assert list(flip.output()) == []
     rot._value = 90
-    assert list(chain(rot.output(), flip.output())) == ['hdmi_rotate=0x1']
+    assert list(rot.output()) == ['hdmi_rotate=0x1']
+    assert list(flip.output()) == []
     flip._value = 1
-    assert list(chain(rot.output(), flip.output())) == ['hdmi_rotate=0x10001']
+    assert list(rot.output()) == ['hdmi_rotate=0x10001']
+    with pytest.raises(DelegatedOutput) as exc:
+        list(flip.output())
+        assert exc.value.master == 'video.rotate'
 
 
 def test_rotate_flip_indexed_output():
@@ -674,11 +683,16 @@ def test_rotate_flip_indexed_output():
     rot = settings['video.rotate']
     flip = settings['video.flip']
 
-    assert list(chain(rot.output(), flip.output())) == []
+    assert list(rot.output()) == []
+    assert list(flip.output()) == []
     rot._value = 90
-    assert list(chain(rot.output(), flip.output())) == ['hdmi_rotate:1=0x1']
+    assert list(rot.output()) == ['hdmi_rotate:1=0x1']
+    assert list(flip.output()) == []
     flip._value = 1
-    assert list(chain(rot.output(), flip.output())) == ['hdmi_rotate:1=0x10001']
+    assert list(rot.output()) == ['hdmi_rotate:1=0x10001']
+    with pytest.raises(DelegatedOutput) as exc:
+        list(flip.output())
+        assert exc.value.master == 'video.rotate'
 
 
 def test_rotate_flip_lcd_output():
@@ -688,11 +702,16 @@ def test_rotate_flip_lcd_output():
     rot = settings['video.rotate']
     flip = settings['video.flip']
 
-    assert list(chain(rot.output(), flip.output())) == []
+    assert list(rot.output()) == []
+    assert list(flip.output()) == []
     rot._value = 90
-    assert list(chain(rot.output(), flip.output())) == ['lcd_rotate=1']
+    assert list(rot.output()) == ['lcd_rotate=1']
+    assert list(flip.output()) == []
     flip._value = 1
-    assert list(chain(rot.output(), flip.output())) == ['hdmi_rotate=0x10001']
+    assert list(rot.output()) == ['hdmi_rotate=0x10001']
+    with pytest.raises(DelegatedOutput) as exc:
+        list(flip.output())
+        assert exc.value.master == 'video.rotate'
 
 
 def test_dpi_output():
@@ -708,9 +727,12 @@ def test_dpi_output():
     assert list(chain(enable.output(), fmt.output(), col.output())) == []
     fmt._value = 8
     col._value = True
-    assert list(chain(enable.output(), fmt.output(), col.output())) == []
+    assert list(chain(enable.output(), fmt.output())) == []
+    with pytest.raises(DelegatedOutput) as exc:
+        list(col.output())
+        assert exc.value.master == 'video.dpi.format'
     enable._value = True
-    assert list(chain(enable.output(), fmt.output(), col.output())) == [
+    assert list(chain(enable.output(), fmt.output())) == [
         'dpi_enabled=1',
         'dpi_format=0x18',
     ]
@@ -1214,19 +1236,23 @@ def test_serial_bt_output():
         bt._value = True
         assert list(chain(enable.output(), bt.output(), uart.output())) == []
         enable._value = True
-        assert list(chain(enable.output(), bt.output(), uart.output())) == [
-            'enable_uart=1'
-        ]
+        assert list(chain(enable.output(), bt.output(), uart.output())) == ['enable_uart=1']
         uart._value = 0
-        assert list(chain(enable.output(), bt.output(), uart.output())) == [
+        assert list(chain(enable.output(), bt.output())) == [
             'enable_uart=1',
             'dtoverlay=miniuart-bt',
         ]
+        with pytest.raises(DelegatedOutput) as exc:
+            list(uart.output())
+            assert exc.value.master == 'bluetooth.enabled'
         bt._value = False
-        assert list(chain(enable.output(), bt.output(), uart.output())) == [
+        assert list(chain(enable.output(), bt.output())) == [
             'enable_uart=1',
             'dtoverlay=disable-bt',
         ]
+        with pytest.raises(DelegatedOutput) as exc:
+            list(uart.output())
+            assert exc.value.master == 'bluetooth.enabled'
 
 
 def test_l2_cache():
@@ -1398,7 +1424,7 @@ def test_gpu_freq():
         assert (
             settings['gpu.core.frequency.min'].default,
             settings['gpu.core.frequency.max'].default,
-        ) == (250, 432)
+        ) == (250, 360)
 
         # Can't have TV and HDMI4kp60
         settings['video.hdmi.4kp60']._value = True
@@ -1434,54 +1460,62 @@ def test_gpu_freq_output():
             CommandGPUFreqMin('gpu.isp.frequency.min', commands=('isp_freq_min', 'gpu_freq_min')),
             CommandGPUFreqMax('gpu.v3d.frequency.max', commands=('v3d_freq', 'gpu_freq')),
             CommandGPUFreqMin('gpu.v3d.frequency.min', commands=('v3d_freq_min', 'gpu_freq_min')),
-            CommandBool('cpu.turbo.force', command='force_turbo'))
+            CommandBool('cpu.turbo.force', command='force_turbo'),
+            OverlayBluetoothEnabled('bluetooth.enabled'),
+            OverlaySerialUART('serial.uart'),
+            CommandSerialEnabled('serial.enabled', command='enable_uart'))
+
+        def get_gpu_output():
+            lines = []
+            errors = []
+            for setting in sorted(settings.values(), key=attrgetter('key')):
+                if setting.name.startswith('gpu.'):
+                    try:
+                        lines.extend(setting.output())
+                    except DelegatedOutput as exc:
+                        errors.append(exc)
+            return lines, errors
 
         get_board_type.return_value = None
-        assert list(chain(*(
-            setting.output()
-            for setting in sorted(settings.values(), key=attrgetter('key'))
-        ))) == []
+        lines, errors = get_gpu_output()
+        assert lines == []
+        assert errors == []
 
         get_board_type.return_value = 'pi3'
-        settings['gpu.core.frequency.max']._value = 600
         settings['gpu.h264.frequency.max']._value = 600
-        assert list(chain(*(
-            setting.output()
-            for setting in sorted(settings.values(), key=attrgetter('key'))
-        ))) == [
-            'core_freq=600',
-            'h264_freq=600',
-        ]
+        lines, errors = get_gpu_output()
+        assert lines == ['h264_freq=600']
+        assert errors == []
+
+        settings['gpu.core.frequency.max']._value = 600
+        lines, errors = get_gpu_output()
+        assert lines == ['core_freq=600', 'h264_freq=600']
+        assert errors == []
 
         settings['gpu.isp.frequency.max']._value = 600
         settings['gpu.v3d.frequency.max']._value = 600
-        assert list(chain(*(
-            setting.output()
-            for setting in sorted(settings.values(), key=attrgetter('key'))
-        ))) == [
-            'gpu_freq=600',
-        ]
+        lines, errors = get_gpu_output()
+        assert lines == ['gpu_freq=600']
+        assert len(errors) == 3
+        assert all(isinstance(exc, DelegatedOutput) for exc in errors)
+        assert {exc.master for exc in errors} == {'gpu.core.frequency.max'}
 
         settings['gpu.core.frequency.min']._value = 400
         settings['gpu.h264.frequency.min']._value = 400
-        assert list(chain(*(
-            setting.output()
-            for setting in sorted(settings.values(), key=attrgetter('key'))
-        ))) == [
-            'gpu_freq=600',
-            'core_freq_min=400',
-            'h264_freq_min=400',
-        ]
+        lines, errors = get_gpu_output()
+        assert lines == ['gpu_freq=600', 'core_freq_min=400', 'h264_freq_min=400']
+        assert len(errors) == 3
+        assert all(isinstance(exc, DelegatedOutput) for exc in errors)
+        assert {exc.master for exc in errors} == {'gpu.core.frequency.max'}
 
         settings['gpu.isp.frequency.min']._value = 400
         settings['gpu.v3d.frequency.min']._value = 400
-        assert list(chain(*(
-            setting.output()
-            for setting in sorted(settings.values(), key=attrgetter('key'))
-        ))) == [
-            'gpu_freq=600',
-            'gpu_freq_min=400',
-        ]
+        lines, errors = get_gpu_output()
+        assert lines == ['gpu_freq=600', 'gpu_freq_min=400']
+        assert len(errors) == 6
+        assert all(isinstance(exc, DelegatedOutput) for exc in errors)
+        assert {exc.master for exc in errors} == {
+            'gpu.core.frequency.max', 'gpu.core.frequency.min'}
 
 
 def test_gpu_mem():
@@ -1712,8 +1746,12 @@ def test_gpio_settings():
         'gpio=5-7=op,dh',
     }
     assert list(s['gpio0.state'].output()) == []
-    assert list(s['gpio2.mode'].output()) == []
-    assert list(s['gpio2.state'].output()) == []
+    with pytest.raises(DelegatedOutput) as exc:
+        list(s['gpio2.mode'].output())
+        assert exc.value.master == 'gpio0.mode'
+    with pytest.raises(DelegatedOutput) as exc:
+        list(s['gpio2.state'].output())
+        assert exc.value.master == 'gpio0.mode'
 
 
 def test_parse_gpio():

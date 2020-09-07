@@ -60,3 +60,14 @@ class IneffectiveConfiguration(ValueError):
     def __str__(self):
         return _("Failed to set {count} setting(s)").format(
             count=len(self.diff))
+
+
+class DelegatedOutput(Exception):
+    """
+    Exception raised when output is requested from a setting, but that
+    setting's output is actually handled by another setting.
+    """
+    def __init__(self, master):
+        self.master = master
+        # Not intended to be a user-seen message, hence no translation
+        super().__init__("Output handled by {master}".format(master=master))

@@ -370,6 +370,28 @@ dtparam=spi=on
 """
 
 
+def test_store_no_recomment_lines(boot_path, store_path):
+    store = Store(boot_path, store_path, comment_lines=True)
+    (boot_path / 'config.txt').write_text("""\
+# Header goes here
+
+gpio=5-7=op,dl
+""")
+    current = store[Current]
+    mutable = current.mutable()
+    mutable.update({
+        'gpio5.state': 'high',
+        'gpio6.state': 'high',
+        'gpio7.state': 'high',
+    }, cond_all)
+    assert mutable.files['config.txt'].content.decode('ascii') == """\
+# Header goes here
+
+#gpio=5-7=op,dl
+gpio=5-7=op,dh
+"""
+
+
 def test_store_uncomment_lines(boot_path, store_path):
     store = Store(boot_path, store_path, comment_lines=True)
     (boot_path / 'config.txt').write_text("""\
