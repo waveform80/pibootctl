@@ -157,11 +157,16 @@ def test_int_param_extract():
         BootOverlay('config.txt', 1, cond_all, 'sensehat'),
         BootOverlay('config.txt', 2, cond_all, 'base'),
         BootParam('config.txt', 3, cond_all, 'base', 'i2c_baud', '100000'),
+        BootParam('config.txt', 3, cond_all, 'base', 'i2c_baud', 'foo'),
     ]
-    assert list(p.extract(config)) == [
-        (config[1], None),
-        (config[2], 100000),
-    ]
+    with warnings.catch_warnings(record=True) as w:
+        assert list(p.extract(config)) == [
+            (config[1], None),
+            (config[2], 100000),
+            (config[3], None),
+        ]
+        assert len(w) == 1
+        assert issubclass(w[0].category, ParseWarning)
 
 
 def test_int_param_validate():
@@ -291,10 +296,15 @@ def test_int_command_extract():
 
     config = [
         BootCommand('config.txt', 1, cond_all, 'hdmi_drive', '2', hdmi=1),
+        BootCommand('config.txt', 1, cond_all, 'hdmi_drive', 'foo', hdmi=1),
     ]
-    assert list(c.extract(config)) == [
-        (config[0], 2),
-    ]
+    with warnings.catch_warnings(record=True) as w:
+        assert list(c.extract(config)) == [
+            (config[0], 2),
+            (config[1], None),
+        ]
+        assert len(w) == 1
+        assert issubclass(w[0].category, ParseWarning)
 
 
 def test_int_command_output():
@@ -344,10 +354,15 @@ def test_bool_command_extract():
 
     config = [
         BootCommand('config.txt', 1, cond_all, 'test_mode', '1', hdmi=0),
+        BootCommand('config.txt', 1, cond_all, 'test_mode', 'foo', hdmi=0),
     ]
-    assert list(c.extract(config)) == [
-        (config[0], True),
-    ]
+    with warnings.catch_warnings(record=True) as w:
+        assert list(c.extract(config)) == [
+            (config[0], True),
+            (config[1], None),
+        ]
+        assert len(w) == 1
+        assert issubclass(w[0].category, ParseWarning)
 
 
 def test_bool_command_output():
@@ -400,11 +415,16 @@ def test_force_ignore_command_extract():
     config = [
         BootCommand('config.txt', 1, cond_all, 'hdmi_force', '1', hdmi=0),
         BootCommand('config.txt', 2, cond_all, 'hdmi_ignore', '1', hdmi=0),
+        BootCommand('config.txt', 2, cond_all, 'hdmi_ignore', 'blah', hdmi=0),
     ]
-    assert list(c.extract(config)) == [
-        (config[0], True),
-        (config[1], False),
-    ]
+    with warnings.catch_warnings(record=True) as w:
+        assert list(c.extract(config)) == [
+            (config[0], True),
+            (config[1], False),
+            (config[2], False),
+        ]
+        assert len(w) == 1
+        assert issubclass(w[0].category, ParseWarning)
 
 
 def test_force_ignore_command_output():
@@ -541,13 +561,19 @@ def test_display_timings_extract():
 
     config = [
         BootCommand('config.txt', 1, cond_all, 'video_timings', '', hdmi=0),
-        BootCommand('config.txt', 1, cond_all, 'video_timings',
+        BootCommand('config.txt', 2, cond_all, 'video_timings',
                     ' '.join(['0'] * 17), hdmi=0),
+        BootCommand('config.txt', 3, cond_all, 'video_timings',
+                    '0 1 0 0 foo 1 2 3 4 5', hdmi=0),
     ]
-    assert list(t.extract(config)) == [
-        (config[0], []),
-        (config[1], [0] * 17),
-    ]
+    with warnings.catch_warnings(record=True) as w:
+        assert list(t.extract(config)) == [
+            (config[0], []),
+            (config[1], [0] * 17),
+            (config[2], []),
+        ]
+        assert len(w) == 1
+        assert issubclass(w[0].category, ParseWarning)
 
 
 def test_display_timings_update():
@@ -740,12 +766,20 @@ def test_boot_delay2():
         BootCommand('config.txt', 1, cond_all, 'boot_delay', '1', hdmi=0),
         BootCommand('config.txt', 2, cond_all, 'boot_delay_ms', '500', hdmi=0),
         BootCommand('config.txt', 3, cond_all, 'boot_delay', '2', hdmi=0),
+        BootCommand('config.txt', 4, cond_all, 'boot_delay', 'foo', hdmi=0),
+        BootCommand('config.txt', 5, cond_all, 'boot_delay_ms', 'bar', hdmi=0),
     ]
-    assert list(delay.extract(config)) == [
-        (config[0], 1.0),
-        (config[1], 1.5),
-        (config[2], 2.5),
-    ]
+    with warnings.catch_warnings(record=True) as w:
+        assert list(delay.extract(config)) == [
+            (config[0], 1.0),
+            (config[1], 1.5),
+            (config[2], 2.5),
+            (config[3], 0.5),
+            (config[4], 0.0),
+        ]
+        assert len(w) == 2
+        assert issubclass(w[0].category, ParseWarning)
+        assert issubclass(w[1].category, ParseWarning)
 
     assert list(delay.output()) == []
     delay._value = delay.update(UserStr('2.5'))
@@ -781,19 +815,27 @@ def test_kernel_address():
 
     config = [
         BootCommand('config.txt', 1, cond_all, 'arm_64bit', '0', hdmi=0),
-        BootCommand('config.txt', 2, cond_all, 'arm_control', '0x202', hdmi=0),
-        BootCommand('config.txt', 3, cond_all, 'kernel_address', '0x100', hdmi=0),
-        BootCommand('config.txt', 4, cond_all, 'kernel_old', '0', hdmi=0),
-        BootCommand('config.txt', 5, cond_all, 'kernel_old', '1', hdmi=0),
+        BootCommand('config.txt', 2, cond_all, 'arm_64bit', 'erm', hdmi=0),
+        BootCommand('config.txt', 3, cond_all, 'arm_control', '0x202', hdmi=0),
+        BootCommand('config.txt', 4, cond_all, 'kernel_address', 'f00', hdmi=0),
+        BootCommand('config.txt', 5, cond_all, 'kernel_address', '0xf00', hdmi=0),
+        BootCommand('config.txt', 6, cond_all, 'kernel_old', '0', hdmi=0),
+        BootCommand('config.txt', 7, cond_all, 'kernel_old', '1', hdmi=0),
     ]
-    assert list(arm8.extract(config)) == [
-        (config[0], False),
-        (config[1], True),
-    ]
-    assert list(addr.extract(config)) == [
-        (config[2], 0x100),
-        (config[4], 0),
-    ]
+    with warnings.catch_warnings(record=True) as w:
+        assert list(arm8.extract(config)) == [
+            (config[0], False),
+            (config[1], None),
+            (config[2], True),
+        ]
+        assert list(addr.extract(config)) == [
+            (config[3], None),
+            (config[4], 0xf00),
+            (config[6], 0),
+        ]
+        assert len(w) == 2
+        assert issubclass(w[0].category, ParseWarning)
+        assert issubclass(w[1].category, ParseWarning)
 
 
 def test_kernel_filename():
@@ -1005,12 +1047,17 @@ def test_initrd_addr_extract():
         BootCommand('config.txt', 1, cond_all, 'initramfs', ('initrd.img', 'followkernel'), hdmi=0),
         BootCommand('config.txt', 2, cond_all, 'initramfs', ('initrd.img', '0x2400000'), hdmi=0),
         BootCommand('config.txt', 3, cond_all, 'ramfsaddr', '0x2700000', hdmi=0),
+        BootCommand('config.txt', 4, cond_all, 'ramfsaddr', 'f000000', hdmi=0)
     ]
-    assert list(initrd_addr.extract(config)) == [
-        (config[0], None),
-        (config[1], 0x2400000),
-        (config[2], 0x2700000),
-    ]
+    with warnings.catch_warnings(record=True) as w:
+        assert list(initrd_addr.extract(config)) == [
+            (config[0], None),
+            (config[1], 0x2400000),
+            (config[2], 0x2700000),
+            (config[3], None),
+        ]
+        assert len(w) == 1
+        assert issubclass(w[0].category, ParseWarning)
 
 
 def test_initrd_filename():
@@ -1449,21 +1496,43 @@ def test_gpu_mem():
             BootCommand('config.txt', 2, cond_all, 'gpu_mem_512', '192', hdmi=0),
             BootCommand('config.txt', 3, cond_all, 'gpu_mem', '96', hdmi=0),
             BootCommand('config.txt', 4, cond_all, 'gpu_mem_256', '64', hdmi=0),
+            BootCommand('config.txt', 5, cond_all, 'gpu_mem', 'a0', hdmi=0),
         ]
 
-        get_board_mem.return_value = 1024
-        assert list(mem.extract(config)) == [(config[0], 256), (config[2], 256)]
+        with warnings.catch_warnings(record=True) as w:
+            get_board_mem.return_value = 1024
+            assert list(mem.extract(config)) == [
+                (config[0], 256),
+                (config[2], 256),
+                (config[4], 256),
+            ]
+            assert len(w) == 1
+            assert issubclass(w[0].category, ParseWarning)
         mem._value = 8
         with pytest.raises(ValueError):
             mem.validate()
 
-        get_board_mem.return_value = 512
-        assert list(mem.extract(config)) == [(config[1], 192), (config[2], 192)]
+        with warnings.catch_warnings(record=True) as w:
+            get_board_mem.return_value = 512
+            assert list(mem.extract(config)) == [
+                (config[1], 192),
+                (config[2], 192),
+                (config[4], 192),
+            ]
+            assert len(w) == 1
+            assert issubclass(w[0].category, ParseWarning)
         mem._value = 256
         mem.validate()
 
-        get_board_mem.return_value = 256
-        assert list(mem.extract(config)) == [(config[2], 96), (config[3], 64)]
+        with warnings.catch_warnings(record=True) as w:
+            get_board_mem.return_value = 256
+            assert list(mem.extract(config)) == [
+                (config[2], 96),
+                (config[3], 64),
+                (config[4], 64),
+            ]
+            assert len(w) == 1
+            assert issubclass(w[0].category, ParseWarning)
         mem._value = 256
         with pytest.raises(ValueError):
             mem.validate()
@@ -1596,3 +1665,68 @@ def test_video_license():
     lic._value = [0] * 10
     with pytest.raises(ValueError):
         lic.validate()
+
+
+def test_gpio_settings():
+    s = make_settings(*(
+        spec
+        for index in range(28)
+        for spec in (
+            CommandGPIOMode('gpio{}.mode'.format(index), command='gpio', index=index),
+            CommandGPIOState('gpio{}.state'.format(index), command='gpio', index=index),
+        )
+    ))
+
+    config = [
+        BootCommand('config.txt', 1, cond_all, 'gpio', '2,5-7=op,dh'),
+        BootCommand('config.txt', 2, cond_all, 'gpio', '2,3=ip,op,ip,pu'),
+        BootCommand('config.txt', 3, cond_all, 'gpio', '4,0xf=ip'),  # only applies to 4
+        BootCommand('config.txt', 4, cond_all, 'gpio', '0-7=ip,foo'),  # ignored
+    ]
+
+    with warnings.catch_warnings(record=True) as w:
+        assert list(s['gpio0.mode'].extract(config)) == []
+        assert list(s['gpio0.state'].extract(config)) == []
+        assert list(s['gpio2.mode'].extract(config)) == [
+            (config[0], 'out'),
+            (config[1], 'in'),
+        ]
+        assert list(s['gpio2.state'].extract(config)) == [
+            (config[0], 'high'),
+            (config[1], 'up'),
+        ]
+        assert len(w) == 2
+        assert issubclass(w[0].category, ParseWarning)
+        assert issubclass(w[1].category, ParseWarning)
+
+    for g in (2, 3, 4):
+        s['gpio{}.mode'.format(g)]._value = 'in'
+        s['gpio{}.state'.format(g)]._value = 'up'
+    s['gpio4.state']._value = 'none'
+    for g in (5, 6, 7):
+        s['gpio{}.mode'.format(g)]._value = 'out'
+        s['gpio{}.state'.format(g)]._value = 'high'
+    assert set(s['gpio0.mode'].output()) == {
+        'gpio=2,3=ip,pu',
+        'gpio=4=ip,np',
+        'gpio=5-7=op,dh',
+    }
+    assert list(s['gpio0.state'].output()) == []
+    assert list(s['gpio2.mode'].output()) == []
+    assert list(s['gpio2.state'].output()) == []
+
+
+def test_parse_gpio():
+    with pytest.raises(ValueError):
+        parse_gpio('0')
+    with pytest.raises(ValueError):
+        parse_gpio('4=foo')
+    assert parse_gpio('0=op,dh') == ({0}, 'out', 'high')
+    assert parse_gpio('0=op,np') == ({0}, 'out', 'low')
+    assert parse_gpio('0=ip,dh') == ({0}, 'in', 'none')
+    assert parse_gpio('1,2- 3=op,dh') == ({1}, 'out', 'high')
+    assert parse_gpio('1,2-a=op,dh') == ({1}, 'out', 'high')
+    assert parse_gpio('1,2--3=op,dh') == ({1}, 'out', 'high')
+    assert parse_gpio('1,2, 3=op,dh') == ({1, 2}, 'out', 'high')
+    assert parse_gpio('1,2,-3=op,dh') == ({1, 2}, 'out', 'high')
+    assert parse_gpio('1,2,-3--4=op,dh') == ({1, 2}, 'out', 'high')

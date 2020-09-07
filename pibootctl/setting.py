@@ -80,10 +80,12 @@ like :class:`CommandBool`, :class:`CommandInt`, etc.
 """
 
 import gettext
-from operator import or_
+import warnings
 from textwrap import dedent
 from functools import reduce
 from collections import namedtuple
+from itertools import groupby, chain
+from operator import or_, itemgetter
 from contextlib import contextmanager
 
 from .formatter import FormatDict, TransMap, int_ranges
@@ -739,23 +741,25 @@ class CommandForceIgnore(CommandBool):
         return self._ignore
 
     def extract(self, config):
+        value = None
         for item in config:
             try:
                 if (
                         isinstance(item, BootCommand) and
                         item.command in self.commands and
                         int(item.params)):
-                    yield item, (item.command == self.force)
+                    value = item.command == self.force
+                    yield item, value
             except ValueError:
                 warnings.warn(ParseWarning(
                     '{item.filename} line {item.linenum}: invalid integer '
-                    '{value!r}'.format(item=item, value=value)))
+                    '{item.params!r}'.format(item=item)))
                 # In this case, the "value" of the command is effectively 0
                 # but because this setting is only affected by "positive"
                 # commands there's no change. We yield the line to indicate
                 # it *attempted* to affect the setting, but with the current
                 # (internal) value so it doesn't
-                yield item, self._value
+                yield item, value
 
     def output(self):
         if self.modified:
@@ -1316,17 +1320,23 @@ class CommandBootDelay2(Command):
         boot_delay = boot_delay_ms = 0
         for item in config:
             if isinstance(item, BootCommand):
-                try:
-                    if item.command == 'boot_delay':
+                if item.command == 'boot_delay':
+                    try:
                         boot_delay = to_int(item.params)
-                        yield item, boot_delay + (boot_delay_ms / 1000)
-                    elif item.command == 'boot_delay_ms':
+                    except ValueError:
+                        warnings.warn(ParseWarning(
+                            '{item.filename} line {item.linenum}: invalid '
+                            'integer {item.params!r}'.format(item=item)))
+                        boot_delay = 0
+                    yield item, boot_delay + (boot_delay_ms / 1000)
+                elif item.command == 'boot_delay_ms':
+                    try:
                         boot_delay_ms = to_int(item.params)
-                        yield item, boot_delay + (boot_delay_ms / 1000)
-                except ValueError:
-                    warnings.warn(ParseWarning(
-                        '{item.filename} line {item.linenum}: invalid integer '
-                        '{value!r}'.format(item=item, value=value)))
+                    except ValueError:
+                        warnings.warn(ParseWarning(
+                            '{item.filename} line {item.linenum}: invalid '
+                            'integer {item.params!r}'.format(item=item)))
+                        boot_delay_ms = 0
                     yield item, boot_delay + (boot_delay_ms / 1000)
 
     def output(self):
@@ -1375,7 +1385,7 @@ class CommandKernelAddress(CommandIntHex):
                 except ValueError:
                     warnings.warn(ParseWarning(
                         '{item.filename} line {item.linenum}: invalid integer '
-                        '{value!r}'.format(item=item, value=value)))
+                        '{item.params!r}'.format(item=item)))
                     yield item, None
 
 
@@ -1395,7 +1405,7 @@ class CommandKernel64(CommandBool):
                 except ValueError:
                     warnings.warn(ParseWarning(
                         '{item.filename} line {item.linenum}: invalid integer '
-                        '{value!r}'.format(item=item, value=value)))
+                        '{item.params!r}'.format(item=item)))
                     yield item, None
 
 
@@ -1645,7 +1655,7 @@ class CommandRamFSAddress(CommandIntHex):
                 except ValueError:
                     warnings.warn(ParseWarning(
                         '{item.filename} line {item.linenum}: invalid integer '
-                        '{value!r}'.format(item=item, value=value)))
+                        '{item.params!r}'.format(item=item)))
                     yield item, None
 
 
@@ -2156,7 +2166,8 @@ class CommandGPUMem(CommandInt):
                     except ValueError:
                         warnings.warn(ParseWarning(
                             '{item.filename} line {item.linenum}: invalid '
-                            'integer {value!r}'.format(item=item, value=value)))
+                            'integer {item.params!r}'.format(item=item)))
+                        values[item.command] = None
                 if item.command in ('gpu_mem', override):
                     yield item, (
                         values['gpu_mem']
@@ -2223,3 +2234,200 @@ class CommandVideoLicense(Command):
             new_value = ','.join(self.value)
             with self._override(new_value):
                 yield from super().output()
+
+
+# Notes on parsing the values of the "gpio" command (from experimentation
+# with various pathological settings):
+#
+# 1. Any invalid values/chars on the right of the equals sign invalidates
+#    the entire setting, e.g. "18=xx,op,dh" is entirely ignored
+# 2. Invalid values/chars to the left of the equals sign invalidate all
+#    GPIO numbers after that point, but permit setting all GPIOs mentioned
+#    until that point, e.g. "18,xx,23=op,dh" still sets GPIO18 to out/high
+# 3. Invalid chars include spaces, e.g. "18,23=op, dh" is entirely
+#    ignored (by rule 1)
+# 4. Invalid chars in a range invalidate the entire range, e.g.
+#    "18- 23=op,dh" sets nothing
+# 5. Hex-specifications are not permitted, e.g. "0x17=op,dh" is ignored
+# 6. Multiple valid settings on the right are permitted; only the last
+#    apply, e.g. "18=ip,op,ip,op,dl,dh" sets GPIO18 to out/high
+
+GPIO_MODES = {
+    'ip': 'in',
+    'op': 'out',
+    'a0': 'alt0',
+    'a1': 'alt1',
+    'a2': 'alt2',
+    'a3': 'alt3',
+    'a4': 'alt4',
+    'a5': 'alt5',
+}
+GPIO_IN_STATES = {
+    'pd': 'down',
+    'pu': 'up',
+    'np': 'none',
+    'pn': 'none',
+}
+GPIO_OUT_STATES = {
+    'dl': 'low',
+    'dh': 'high',
+}
+GPIO_MODES_MAP = {v: k for k, v in GPIO_MODES.items()}
+GPIO_STATES_MAP = {
+    v: k
+    for k, v in chain(
+        GPIO_IN_STATES.items(),
+        GPIO_OUT_STATES.items(),
+    )
+}
+GPIO_STATES_MAP['none'] = 'np'  # force this for consistency
+GPIO_COMMANDS = (
+    GPIO_MODES.keys() |
+    GPIO_IN_STATES.keys() |
+    GPIO_OUT_STATES.keys()
+)
+
+def parse_gpio(s):
+    if '=' not in s:
+        raise ValueError('missing = in gpio specification')
+    left, right = s.split('=', 1)
+    commands = right.split(',')
+    # Note we do not strip any values here (remember spaces invalidate)
+    if set(commands) - GPIO_COMMANDS:
+        raise ValueError('invalid command in gpio specification')
+    mode = 'ip'
+    state = 'np'
+    for command in commands:
+        if command in GPIO_MODES:
+            mode = command
+        else:
+            state = command
+    if mode == 'op' and state in GPIO_IN_STATES:
+        state = 'dl'
+    elif mode == 'ip' and state in GPIO_OUT_STATES:
+        state = 'np'
+    gpios = set()
+    for maybe_range in left.split(','):
+        if '-' in maybe_range:
+            gpio_start, gpio_end = maybe_range.split('-', 1)
+            # int() implicitly strips the input; we need to avoid that and note
+            # an invalid point
+            if gpio_start != gpio_start.strip() or gpio_end != gpio_end.strip():
+                break
+            try:
+                gpio_start = int(gpio_start)
+                gpio_end = int(gpio_end)
+            except ValueError:
+                break
+            else:
+                if gpio_end < 0:
+                    break
+                for gpio in range(gpio_start, gpio_end + 1):
+                    gpios.add(gpio)
+        else:
+            gpio = maybe_range
+            if gpio != gpio.lstrip():
+                break
+            try:
+                gpio = int(gpio)
+            except ValueError:
+                break
+            else:
+                gpios.add(gpio)
+    return (
+        gpios, GPIO_MODES[mode],
+        GPIO_IN_STATES[state] if mode == 'ip' else
+        GPIO_OUT_STATES[state] if mode == 'op' else
+        'none'
+    )
+
+
+class CommandGPIOMode(CommandStr):
+    """
+    Handles the mode selection part of the ``gpio`` command.
+    """
+    def __init__(self, name, *, command=None, commands=None, doc='', index=0):
+        super().__init__(name, command=command, commands=commands,
+                         default='in', doc=doc, index=index, valid={
+                             'in':   'Input',
+                             'out':  'Output',
+                             'alt0': 'Alt. Function 0',
+                             'alt1': 'Alt. Function 1',
+                             'alt2': 'Alt. Function 2',
+                             'alt3': 'Alt. Function 3',
+                             'alt4': 'Alt. Function 4',
+                             'alt5': 'Alt. Function 5',
+                         })
+
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootCommand) and item.command == 'gpio':
+                try:
+                    gpios, mode, state = parse_gpio(item.params)
+                except ValueError:
+                    warnings.warn(ParseWarning(
+                        '{item.filename} line {item.linenum}: invalid gpio '
+                        'spec {item.params!r}'.format(item=item)))
+                    # TODO We've no idea if the line *would've* affected this
+                    # gpio here; probably ought to fix that
+                else:
+                    if self.index in gpios:
+                        yield item, mode
+
+    def output(self):
+        # Only gpio0 gets to write output, and does so on behalf of all GPIO
+        # settings
+        if self.index == 0:
+            states = {
+                gpio: (
+                    self._query('gpio{}.mode'.format(gpio)).value,
+                    self._query('gpio{}.state'.format(gpio)).value,
+                )
+                for gpio in range(28)
+                if self._query('gpio{}.mode'.format(gpio)).modified
+                or self._query('gpio{}.state'.format(gpio)).modified
+            }
+            states = sorted(states.items(), key=itemgetter(1))
+            states = {
+                state: set(gpio for gpio, _state in gpios)
+                for state, gpios in groupby(states, key=itemgetter(1))
+            }
+            for (mode, state), gpios in states.items():
+                yield 'gpio={gpios}={mode},{state}'.format(
+                    gpios=int_ranges(gpios, list_sep=','),
+                    mode=GPIO_MODES_MAP[mode],
+                    state=GPIO_STATES_MAP[state])
+
+
+class CommandGPIOState(CommandStr):
+    """
+    Handles the state selection part of the ``gpio`` command.
+    """
+    def __init__(self, name, *, command=None, commands=None, doc='', index=0):
+        super().__init__(name, command=command, commands=commands,
+                         default='none', doc=doc, index=index, valid={
+                             'up':   'Pulled up',
+                             'down': 'Pulled down',
+                             'none': 'No pull/floating',
+                             'low':  'Driven low',
+                             'high': 'Driven high',
+                         })
+
+    def extract(self, config):
+        for item in config:
+            if isinstance(item, BootCommand) and item.command == 'gpio':
+                try:
+                    gpios, mode, state = parse_gpio(item.params)
+                except ValueError:
+                    warnings.warn(ParseWarning(
+                        '{item.filename} line {item.linenum}: invalid gpio '
+                        'spec {item.params!r}'.format(item=item)))
+                    # TODO We've no idea if the line *would've* affected this
+                    # gpio here; probably ought to fix that
+                else:
+                    if self.index in gpios:
+                        yield item, state
+
+    def output(self):
+        # See CommandGPIOMode.output
+        return ()

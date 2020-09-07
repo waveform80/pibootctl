@@ -1297,6 +1297,44 @@ SETTINGS = {
             """)),
 }
 
+SETTINGS |= {spec for gpio in range(28) for spec in (
+    setting.CommandGPIOMode(
+        'gpio{}.mode'.format(gpio), index=gpio, command='gpio', doc=_(
+            """
+            Allows GPIO pins to be set to specific modes at boot time in a way
+            that would previously have needed a custom device-tree blob. The
+            valid modes are:
+
+            {valid}
+
+            The associated gpio{index}.state can be used to set pulls (for
+            inputs) or drives (for outputs).
+
+            GPIO changes made through this mechanism do not have any direct
+            effect on the kernel; they don't cause GPIO pins to be exported to
+            the sysfs interface, and they can be overridden by pinctrl entries
+            in the Device Tree as well as utilities like raspi-gpio.
+            """)),
+    setting.CommandGPIOState(
+        'gpio{}.state'.format(gpio), index=gpio, command='gpio', doc=_(
+            """
+            Allows GPIO pins to be set to specific modes at boot time in a way
+            that would previously have needed a custom device-tree blob. The
+            valid states are:
+
+            {valid}
+
+            Pulls are only valid if the corresponding gpio{index}.mode is set
+            to "in". Likewise drives are only valid when the corresponding
+            mode is "out".
+
+            GPIO changes made through this mechanism do not have any direct
+            effect on the kernel; they don't cause GPIO pins to be exported to
+            the sysfs interface, and they can be overridden by pinctrl entries
+            in the Device Tree as well as utilities like raspi-gpio.
+            """)),
+)}
+
 SETTINGS |= {spec for hdmi in (0, 1) for spec in (
     setting.CommandForceIgnore(
         'video.hdmi{}.enabled'.format(hdmi), index=hdmi,

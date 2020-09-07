@@ -436,7 +436,7 @@ def pairwise(iterable):
     return zip(a, b)
 
 
-def int_ranges(values):
+def int_ranges(values, range_sep='-', list_sep=', '):
     """
     Given a set of integer *values*, returns a compressed string representation
     of all values in the set. For example:
@@ -455,7 +455,7 @@ def int_ranges(values):
     elif len(values) == 1:
         return '{0}'.format(*values)
     elif len(values) == 2:
-        return '{0}, {1}'.format(*values)
+        return '{0}{sep}{1}'.format(*values, sep=list_sep)
     else:
         ranges = []
         start = None
@@ -469,9 +469,9 @@ def int_ranges(values):
             ranges.append((start, j))
         else:
             ranges.append((j, j))
-        return ', '.join(
-            ('{start}-{finish}' if finish > start else '{start}').format(
-                start=start, finish=finish)
+        return list_sep.join(
+            ('{start}{sep}{finish}' if finish > start else '{start}').format(
+                start=start, finish=finish, sep=range_sep)
             for start, finish in ranges
         )
 
