@@ -641,9 +641,9 @@ class Application:
         context = {
             'all': lambda: BootConditions(),
             'model':
-                lambda: BootConditions(pi=get_model_type()),
+                lambda: BootConditions(pi=get_board_type()),
             'serial':
-                lambda: BootConditions(serial=int(get_board_serial(), base=16)),
+                lambda: BootConditions(serial=get_board_serial()),
             'display':
                 lambda: BootConditions(display=get_display_id()),
         }[self._args.context]()
