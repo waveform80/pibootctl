@@ -610,6 +610,9 @@ class CommandStr(Command):
     def hint(self):
         return self._valid.get(self.value)
 
+    def update(self, value):
+        return to_str(value)
+
     def validate(self):
         if self._valid and self.value not in self._valid:
             raise ValueError(_(
