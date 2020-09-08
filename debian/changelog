@@ -1,3 +1,15 @@
+pibootctl (0.5-0ubuntu1) groovy; urgency=medium
+
+  * Configuration re-writing always targets config.txt
+  * Added comment_lines option to permit commenting lines instead of
+    deleting them
+  * Configuration writer searches for an uncomments lines in preference to
+    writing new ones
+  * Added --this-model and --this-serial options to permit adding settings
+    to new/existing conditional sections
+
+ -- Dave Jones <dave.jones@canonical.com>  Wed, 09 Sep 2020 00:10:31 +0100
+
 pibootctl (0.4-2) focal; urgency=medium
 
   * Fix the config.template configuration file
