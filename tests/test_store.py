@@ -433,6 +433,27 @@ gpu_mem=128
 """
 
 
+def test_store_dont_touch_lines_out_of_context(boot_path, store_path):
+    with mock.patch('pibootctl.parser.get_board_types') as get_board_type:
+        get_board_type.return_value = {'pi0', 'pi0w'}
+        store = Store(boot_path, store_path, comment_lines=True)
+        (boot_path / 'config.txt').write_text("""\
+[all]
+gpio=18,23=op,dh
+""")
+        current = store[Current]
+        cond_model = cond_all.evaluate('pi0')
+        mutable = current.mutable()
+        mutable.update({'gpio18.mode': 'in', 'gpio18.state': 'up'}, cond_model)
+        assert mutable.files['config.txt'].content.decode('ascii') == """\
+[all]
+gpio=18,23=op,dh
+[pi0]
+gpio=18=ip,pu
+gpio=23=op,dh
+"""
+
+
 def test_settings_container():
     settings = Settings()
     assert len([s for s in settings]) == len(settings)

@@ -558,8 +558,9 @@ class MutableConfiguration(BootConfiguration):
         }
         for name in values:
             for line in self.settings[name].lines:
-                if line.filename in self._mutable_files and (
-                        line.conditions.enabled or line.conditions <= context):
+                if (
+                        line.filename in self._mutable_files and
+                        line.conditions <= context):
                     new_file = new_path[line.filename]
                     if self._comment_lines:
                         if not new_file[line.linenum - 1].startswith('#'):
