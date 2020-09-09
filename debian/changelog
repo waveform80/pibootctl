@@ -1,3 +1,9 @@
+pibootctl (0.5.1-0ubuntu1) groovy; urgency=medium
+
+  * New upstream release
+
+ -- Dave Jones <dave.jones@canonical.com>  Wed, 09 Sep 2020 16:24:27 +0100
+
 pibootctl (0.5-0ubuntu1) groovy; urgency=medium
 
   * Configuration re-writing always targets config.txt
