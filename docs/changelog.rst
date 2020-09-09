@@ -23,7 +23,7 @@ Changelog
 .. currentmodule:: pibootctl
 
 
-Release 0.5 (2020-09-05)
+Release 0.5 (2020-09-09)
 ========================
 
 * Rewrote the configuration setting code to always target :file:`config.txt`
