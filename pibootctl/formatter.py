@@ -120,6 +120,8 @@ markup renderer.
 
 .. autoclass:: FormatDict
 
+.. autofunction:: int_ranges
+
 .. autofunction:: render
 """
 
@@ -449,6 +451,9 @@ def int_ranges(values, range_sep='-', list_sep=', '):
         '1-4, 8'
         >>> int_ranges({1, 2, 3, 4, 8, 9})
         '1-4, 8-9'
+
+    *range_sep* and *list_sep* can be optionally specified to customize the
+    strings used to separate ranges and lists of ranges respectively.
     """
     if len(values) == 0:
         return ''

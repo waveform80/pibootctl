@@ -22,7 +22,8 @@ parsing the boot configuration of the Raspberry Pi.
 
 The output of this class consists of derivatives of :class:`BootLine`
 (:class:`BootSection`, :class:`BootCommand`, etc.) and :class:`BootFile`
-instances.
+instances, which in turn reference :class:`BootConditions` instances to
+indicate the context in which they were found.
 
 .. autoclass:: BootParser
     :members:

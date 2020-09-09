@@ -76,6 +76,8 @@ like :class:`CommandBool`, :class:`CommandInt`, etc.
 
 .. autoclass:: CommandIncludedFile
 
+.. autoexception:: ParseWarning
+
 .. autoexception:: ValueWarning
 """
 
