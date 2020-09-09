@@ -23,9 +23,10 @@ Changelog
 .. currentmodule:: pibootctl
 
 
-Release 0.5 (2020-09-09)
-========================
+Release 0.5.1 (2020-09-09)
+==========================
 
+* Handle future model numbers elegantly
 * Rewrote the configuration setting code to always target :file:`config.txt`
   as several settings don't work in included files (e.g. ``start_x``).
 * Added ``comment_lines`` configuration option to permit commenting out lines
