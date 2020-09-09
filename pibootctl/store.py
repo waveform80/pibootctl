@@ -642,7 +642,8 @@ class MutableConfiguration(BootConfiguration):
             # Two cases are relevant here: the above case where no root
             # configuration file exists, and the case where no lines in the
             # existing configuration match the desired context
-            new_config[0:0] = list(context.generate(insert_at.conditions))
+            new_config.insert(0, '')
+            new_config[1:1] = list(context.generate(insert_at.conditions))
         try:
             new_file = new_path[self.config_root]
         except KeyError:
@@ -653,6 +654,9 @@ class MutableConfiguration(BootConfiguration):
                 new_file = new_path[self.config_root] = []
         new_config = [line + '\n' for line in new_config]
         new_file[insert_at.linenum:insert_at.linenum] = new_config
+
+        # TODO Add an (optional?) phase to prune (/comment?) empty sections?
+        # TODO Add an (optional?) phase to ensure [all] is always last?
         return new_path
 
 

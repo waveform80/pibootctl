@@ -307,7 +307,7 @@ class Application:
             const="serial", help=_(
                 "Set the specified settings for this Pi's serial number "
                 "only."))
-        # TODO
+        # TODO Finish --this-display
         #group.add_argument(
         #    "--this-display", dest="context", action="store_const",
         #    const="edid", help=_(

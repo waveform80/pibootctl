@@ -312,6 +312,7 @@ max_framebuffers=2
     assert mutable.files['config.txt'].content.decode('ascii') == """\
 [pi4]
 max_framebuffers=2
+
 [all]
 start_x=1
 """
@@ -332,6 +333,7 @@ max_framebuffers=2
         assert mutable.files['config.txt'].content.decode('ascii') == """\
 [pi4]
 max_framebuffers=2
+
 [all]
 [0xF000000D]
 gpu_mem=128
@@ -427,6 +429,7 @@ def test_store_uncomment_bad_section(boot_path, store_path):
 [pi4]
 #start_x=1
 #gpu_mem=128
+
 [all]
 start_x=1
 gpu_mem=128
@@ -448,6 +451,7 @@ gpio=18,23=op,dh
         assert mutable.files['config.txt'].content.decode('ascii') == """\
 [all]
 gpio=18,23=op,dh
+
 [pi0]
 gpio=18=ip,pu
 gpio=23=op,dh
