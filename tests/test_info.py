@@ -26,7 +26,7 @@ def test_get_board_revision():
         assert get_board_revision() == 0xa020d3
     with mock.patch('io.open') as m:
         m.side_effect = FileNotFoundError
-        assert get_board_revision() == -1
+        assert get_board_revision() is None
 
 
 def test_get_board_serial():
@@ -36,7 +36,7 @@ def test_get_board_serial():
         assert get_board_serial() == 0x12345678
     with mock.patch('io.open') as m:
         m.side_effect = FileNotFoundError
-        assert get_board_serial() == -1
+        assert get_board_serial() is None
 
 
 def test_get_board_types():
@@ -44,6 +44,10 @@ def test_get_board_types():
         assert get_board_types() == {'pi3', 'pi3+'}
     with mock.patch('io.open', mock.mock_open(read_data=b'\x00\x00\x00\x0d')) as m:
         assert get_board_types() == {'pi1'}
+    with mock.patch('io.open', mock.mock_open(read_data=b'\x00\xc0\x31\x40')) as m:
+        assert get_board_types() == {'pi4'}
+    with mock.patch('io.open', mock.mock_open(read_data=b'\x00\xc0\x10\xf0')) as m:
+        assert get_board_types() == set()
     with mock.patch('io.open') as m:
         m.side_effect = FileNotFoundError
         assert get_board_types() == set()
@@ -54,6 +58,8 @@ def test_get_board_mem():
         assert get_board_mem() == 1024
     with mock.patch('io.open', mock.mock_open(read_data=b'\x00\x00\x00\x0d')) as m:
         assert get_board_mem() == 512
+    with mock.patch('io.open', mock.mock_open(read_data=b'\x00\xf0\x31\x40')) as m:
+        assert get_board_mem() == 0
     with mock.patch('io.open') as m:
         m.side_effect = FileNotFoundError
         assert get_board_mem() == 0

@@ -41,7 +41,7 @@ def _hexdump(filename, fmt='>L'):
         with io.open(filename, 'rb') as f:
             return struct.unpack(fmt, f.read(size))[0]
     except FileNotFoundError:
-        return -1
+        return None
 
 
 def get_board_revision():
@@ -71,8 +71,10 @@ def get_board_type():
     """
     try:
         rev = get_board_revision()
+        if rev is None:
+            return None
         if rev & 0x800000:
-            return {
+            known_models = {
                 0x0:  'pi1',
                 0x1:  'pi1',
                 0x2:  'pi1',
@@ -88,7 +90,17 @@ def get_board_type():
                 0xe:  'pi3+',
                 0x10: 'pi3+',
                 0x11: 'pi4',
-            }[rev >> 4 & 0xff]
+            }
+            model_id = rev >> 4 & 0xff
+            try:
+                return known_models[model_id]
+            except KeyError:
+                # Assume unknown IDs in excess of the maximum match the [pi4]
+                # section for now
+                if model_id > max(known_models.keys()):
+                    return 'pi4'
+                else:
+                    raise
         else:
             # All old-style revs are pi1 models (A, B, A+, B+, CM1)
             return 'pi1'
@@ -123,6 +135,8 @@ def get_board_mem():
     """
     try:
         rev = get_board_revision()
+        if rev is None:
+            return 0
         if rev & 0x800000:
             return {
                 0: 256,
