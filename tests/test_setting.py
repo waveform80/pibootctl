@@ -1134,12 +1134,29 @@ def test_initrd_filename_extract():
 
 
 def test_initrd_filename_output():
-    initrd = CommandRamFSFilename('initrd.file', commands=('ramfsfile', 'initramfs'))
-    assert list(initrd.output()) == []
-    initrd._value = ['initrd.img']
-    assert list(initrd.output()) == ['ramfsfile=initrd.img']
-    initrd._value = ['initrd.img', 'splash.img']
-    assert list(initrd.output()) == ['ramfsfile=initrd.img,splash.img']
+    settings = make_settings(
+        CommandRamFSFilename('initrd.filename', commands=('ramfsfile', 'initramfs')),
+        CommandRamFSAddress('initrd.address', commands=('ramfsaddr', 'initramfs')),
+    )
+    initfn = settings['initrd.filename']
+    initaddr = settings['initrd.address']
+    assert list(initfn.output()) == []
+    with pytest.raises(DelegatedOutput) as exc:
+        list(initaddr.output())
+        assert exc.value.master == 'initrd.filename'
+    initfn._value = ['initrd.img']
+    assert list(initfn.output()) == ['initramfs initrd.img followkernel']
+    with pytest.raises(DelegatedOutput) as exc:
+        list(initaddr.output())
+        assert exc.value.master == 'initrd.filename'
+    initfn._value = ['initrd.img', 'splash.img']
+    assert list(initfn.output()) == ['initramfs initrd.img,splash.img followkernel']
+    with pytest.raises(DelegatedOutput) as exc:
+        list(initaddr.output())
+        assert exc.value.master == 'initrd.filename'
+    initaddr._value = 0x2400000
+    assert list(chain(initfn.output(), initaddr.output())) == [
+        'ramfsfile=initrd.img,splash.img', 'ramfsaddr=0x2400000']
 
 
 def test_serial_bt():
@@ -1672,15 +1689,27 @@ def test_output_order():
     settings['spi.enabled']._value = True
     settings['i2c.enabled']._value = True
     settings['bluetooth.enabled']._value = False
-    assert list(chain(*(
-        setting.output()
-        for setting in sorted(settings.values(), key=attrgetter('key'))
-    ))) == [
+
+    def get_output():
+        lines = []
+        errors = []
+        for setting in sorted(settings.values(), key=attrgetter('key')):
+            try:
+                lines.extend(setting.output())
+            except DelegatedOutput as exc:
+                errors.append(exc)
+        return lines, errors
+
+    lines, errors = get_output()
+    assert lines == [
         # base overlay params must come first
         'dtparam=i2c_arm=on',
         'dtparam=spi=on',
         'dtoverlay=disable-bt',
     ]
+    assert len(errors) == 1
+    assert isinstance(errors[0], DelegatedOutput)
+    assert errors[0].master == 'boot.initramfs.filename'
 
 
 def test_video_license():

@@ -1687,6 +1687,12 @@ class CommandRamFSAddress(CommandIntHex):
                         '{item.params!r}'.format(item=item)))
                     yield item, None
 
+    def output(self):
+        if self.value == 0:
+            raise DelegatedOutput(self._relative('.filename'))
+        else:
+            yield from super().output()
+
 
 class CommandRamFSFilename(Command):
     """
@@ -1737,7 +1743,12 @@ class CommandRamFSFilename(Command):
         if self.modified:
             new_value = ','.join(self.value)
             with self._override(new_value):
-                yield from super().output()
+                if self._query(self._relative('.address')).value == 0:
+                    # The "followkernel" (automatic) addressing only works
+                    # with initramfs; with the ramfsaddr command it fails
+                    yield 'initramfs {self.value} followkernel'.format(self=self)
+                else:
+                    yield from super().output()
 
 
 class CommandSerialEnabled(CommandBool):
