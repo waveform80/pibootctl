@@ -23,6 +23,11 @@ Changelog
 .. currentmodule:: pibootctl
 
 
+Release 0.5.2 (2020-09-14)
+==========================
+
+* Fix handling of initramfs (ramfsaddr=0 doesn't work)
+
 Release 0.5.1 (2020-09-09)
 ==========================
 
