@@ -1,3 +1,10 @@
+pibootctl (0.5.2-0ubuntu1) groovy; urgency=medium
+
+  * New upstream release
+  * Fixes handling of initramfs and ramfsaddr commands
+
+ -- Dave Jones <dave.jones@canonical.com>  Mon, 14 Sep 2020 09:57:48 +0100
+
 pibootctl (0.5.1-0ubuntu1) groovy; urgency=medium
 
   * New upstream release
