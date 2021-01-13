@@ -446,7 +446,12 @@ def test_ineffective_config(main, tmpdir):
         self['defaults']['store_path'] = str(store_path)
         self['defaults']['config_root'] = 'config.txt'
         return []
-    with mock.patch('configparser.ConfigParser.read', my_read):
+    def my_get_board_type():
+        return 'pi3+'
+    with mock.patch('configparser.ConfigParser.read', my_read), \
+            mock.patch('pibootctl.info.get_board_type', my_get_board_type), \
+            mock.patch('pibootctl.setting.get_board_type', my_get_board_type), \
+            mock.patch('pibootctl.main.get_board_type', my_get_board_type):
         try:
             main(['set', 'camera.enabled=on'])
         except:

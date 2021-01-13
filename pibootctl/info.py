@@ -75,21 +75,23 @@ def get_board_type():
             return None
         if rev & 0x800000:
             known_models = {
-                0x0:  'pi1',
-                0x1:  'pi1',
-                0x2:  'pi1',
-                0x3:  'pi1',
+                0x0:  'pi1',   # a
+                0x1:  'pi1',   # b
+                0x2:  'pi1',   # a+
+                0x3:  'pi1',   # b+
                 0x4:  'pi2',
-                0x5:  'pi1',
-                0x6:  'pi1',
+                0x5:  'pi1',   # alpha prototype
+                0x6:  'pi1',   # cm1
                 0x8:  'pi3',
                 0x9:  'pi0',
-                0xa:  'pi3',
+                0xa:  'pi3',   # cm3
                 0xc:  'pi0w',
-                0xd:  'pi3+',
-                0xe:  'pi3+',
-                0x10: 'pi3+',
+                0xd:  'pi3+',  # 3b+
+                0xe:  'pi3+',  # 3a+
+                0x10: 'pi3+',  # cm3+
                 0x11: 'pi4',
+                0x13: 'pi400',
+                0x14: 'cm4',
             }
             model_id = rev >> 4 & 0xff
             try:
@@ -118,13 +120,15 @@ def get_board_types():
     """
     return {
         None:  set(),
-        'pi0':  {'pi0'},
-        'pi0w': {'pi0', 'pi0w'},
-        'pi1':  {'pi1'},
-        'pi2':  {'pi2'},
-        'pi3':  {'pi3'},
-        'pi3+': {'pi3', 'pi3+'},
-        'pi4':  {'pi4'},
+        'pi0':   {'pi0'},
+        'pi0w':  {'pi0', 'pi0w'},
+        'pi1':   {'pi1'},
+        'pi2':   {'pi2'},
+        'pi3':   {'pi3'},
+        'pi3+':  {'pi3', 'pi3+'},
+        'pi4':   {'pi4'},
+        'pi400': {'pi4', 'pi400'},
+        'cm4':   {'pi4', 'cm4'},
     }[get_board_type()]
 
 

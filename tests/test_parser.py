@@ -134,6 +134,9 @@ def test_bootoverlay_comparisons():
 def test_bootconditions_comparisons():
     cond_pi3 = cond_all.evaluate('pi3')
     cond_pi3p = cond_all.evaluate('pi3+')
+    cond_pi400 = cond_all.evaluate('pi400')
+    cond_cm4 = cond_all.evaluate('cm4')
+    cond_pi4 = cond_all.evaluate('pi4')
     cond_gpio = cond_pi3.evaluate('gpio4=1')
     cond_edid = cond_pi3.evaluate('EDID=foo')
     cond_hdmi = cond_pi3.evaluate('HDMI:1')
@@ -141,6 +144,8 @@ def test_bootconditions_comparisons():
     assert cond_all != 1
     with pytest.raises(TypeError):
         cond_all < 1
+    with pytest.raises(TypeError):
+        cond_all > 1
     assert cond_pi3 != cond_all
     assert cond_pi3 != cond_gpio
     assert cond_pi3 != cond_edid
@@ -150,6 +155,8 @@ def test_bootconditions_comparisons():
     assert cond_pi3 < cond_all
     assert cond_pi3p != cond_pi3
     assert cond_pi3p < cond_pi3
+    assert cond_pi400 < cond_pi4
+    assert cond_cm4 < cond_pi4
     assert cond_gpio < cond_pi3
     assert cond_edid < cond_pi3
     assert cond_hdmi < cond_pi3
@@ -159,6 +166,11 @@ def test_bootconditions_comparisons():
     assert cond_pi3 > cond_serial
     assert cond_pi3 > cond_edid
     assert cond_pi3 > cond_hdmi
+    assert cond_pi4 > cond_pi400
+    assert cond_pi4 > cond_cm4
+    # It's a partial ordering
+    assert not cond_pi400 < cond_cm4
+    assert not cond_cm4 < cond_pi400
 
 
 def test_bootconditions_generate():
@@ -480,6 +492,7 @@ kernel=uboot_4_32b.bin
         cond_pi2 = cond_all._replace(pi='pi2')
         cond_pi3 = cond_all._replace(pi='pi3')
         cond_pi4 = cond_all._replace(pi='pi4')
+        cond_pi400 = cond_all._replace(pi='pi400')
         assert p.config == [
             BootComment('config.txt', 1, cond_all, comment=' This is a comment'),
             BootSection('config.txt', 2, cond_pi2, 'pi2'),
@@ -488,10 +501,11 @@ kernel=uboot_4_32b.bin
             BootCommand('config.txt', 5, cond_pi3, 'kernel', 'uboot_3_32b.bin'),
             BootSection('config.txt', 6, cond_pi4, 'pi4'),
             BootCommand('config.txt', 7, cond_pi4, 'kernel', 'uboot_4_32b.bin'),
-            BootSection('config.txt', 8, cond_pi4, 'pi400'),
+            BootSection('config.txt', 8, cond_pi400, 'pi400'),
         ]
         assert not cond_pi2.enabled
         assert not cond_pi4.enabled
+        assert not cond_pi400.enabled
         assert cond_pi3.enabled
 
 

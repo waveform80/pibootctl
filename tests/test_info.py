@@ -44,7 +44,7 @@ def test_get_board_types():
         assert get_board_types() == {'pi3', 'pi3+'}
     with mock.patch('io.open', mock.mock_open(read_data=b'\x00\x00\x00\x0d')) as m:
         assert get_board_types() == {'pi1'}
-    with mock.patch('io.open', mock.mock_open(read_data=b'\x00\xc0\x31\x40')) as m:
+    with mock.patch('io.open', mock.mock_open(read_data=b'\x00\xc0\x31\x50')) as m:
         assert get_board_types() == {'pi4'}
     with mock.patch('io.open', mock.mock_open(read_data=b'\x00\xc0\x10\xf0')) as m:
         assert get_board_types() == set()

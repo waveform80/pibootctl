@@ -428,6 +428,8 @@ class BootConditions(namedtuple('BootConditions', (
             return NotImplemented
         return (
             (self.pi == other.pi or other.pi is None or (self.pi, other.pi) in {
+                ('cm4', 'pi4'),
+                ('pi400', 'pi4'),
                 ('pi3+', 'pi3'),
                 ('pi0w', 'pi0'),
             }) and
@@ -440,16 +442,40 @@ class BootConditions(namedtuple('BootConditions', (
         )
 
     def __ne__(self, other):
-        return not (self == other)
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return NotImplemented
+        return not result
 
     def __ge__(self, other):
-        return not (self < other)
+        if not isinstance(other, BootConditions):
+            return NotImplemented
+        return (
+            (self.pi == other.pi or self.pi is None or (other.pi, self.pi) in {
+                ('cm4', 'pi4'),
+                ('pi400', 'pi4'),
+                ('pi3+', 'pi3'),
+                ('pi0w', 'pi0'),
+            }) and
+            (self.hdmi == other.hdmi or self.hdmi is None) and
+            (self.edid == other.edid or self.edid is None) and
+            (self.serial == other.serial or self.serial is None) and
+            (self.gpio == other.gpio or self.gpio is None) and
+            (self.none == other.none or not self.none)
+            # See note above regarding suppress_count
+        )
 
     def __lt__(self, other):
-        return (self <= other) and (self != other)
+        result = self.__le__(other)
+        if result is NotImplemented:
+            return NotImplemented
+        return result and self != other
 
     def __gt__(self, other):
-        return (self >= other) and (self != other)
+        result = self.__ge__(other)
+        if result is NotImplemented:
+            return NotImplemented
+        return result and self != other
 
     def evaluate(self, section):
         """
@@ -489,8 +515,12 @@ class BootConditions(namedtuple('BootConditions', (
                 return self._replace(serial=int(section, base=16))
             except ValueError:
                 return self
-        elif section.startswith('pi'):
-            if section in {'pi0', 'pi0w', 'pi1', 'pi2', 'pi3', 'pi3+', 'pi4'}:
+        elif section.startswith(('pi', 'cm')):
+            if section in {
+                'pi0', 'pi0w', 'pi1',
+                'pi2', 'pi3', 'pi3+',
+                'pi4', 'pi400', 'cm4'
+            }:
                 return self._replace(pi=section)
             else:
                 return self
