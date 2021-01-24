@@ -47,7 +47,7 @@ source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
 master_doc = 'index'
 project = info.name
-copyright = '2019-%s %s' % (datetime.now().year, info.author)
+copyright = '2019-{now:%Y} {info.author}'.format(now=datetime.now(), info=info)
 version = info.version
 #release = None
 #language = None
@@ -84,7 +84,7 @@ else:
     html_theme = 'default'
     #html_theme_options = {}
     #html_sidebars = {}
-html_title = '%s %s Documentation' % (project, version)
+html_title = '{info.name} {info.version} Documentation'.format(info=info)
 #html_theme_path = []
 #html_short_title = None
 #html_logo = None
@@ -102,7 +102,7 @@ html_static_path = ['_static']
 #html_show_copyright = True
 #html_use_opensearch = ''
 #html_file_suffix = None
-htmlhelp_basename = '%sdoc' % info.name
+htmlhelp_basename = '{info.name}doc'.format(info=info)
 
 # Hack to make wide tables work properly in RTD
 # See https://github.com/snide/sphinx_rtd_theme/issues/117 for details
@@ -122,8 +122,8 @@ latex_elements = {
 latex_documents = [
     (
         'index',                       # source start file
-        '%s.tex' % project,            # target filename
-        '%s %s Documentation' % (project, version), # title
+        '{info.name}.tex'.format(info=info), # target filename
+        '{info.name} {info.version} Documentation'.format(info=info), # title
         info.author,                   # author
         'manual',                      # documentclass
         True,                          # documents ref'd from toctree only
@@ -143,7 +143,7 @@ epub_basename = project
 #epub_theme = 'epub'
 #epub_title = html_title
 epub_author = info.author
-epub_identifier = 'https://pibootctl.readthedocs.io/'
+epub_identifier = 'https://{info.name}.readthedocs.io/'.format(info=info)
 #epub_tocdepth = 3
 epub_show_urls = 'no'
 #epub_use_index = True
@@ -151,18 +151,18 @@ epub_show_urls = 'no'
 # -- Options for manual page output ---------------------------------------
 
 man_pages = [
-    ('pibootctl',  'pibootctl',        'pibootctl manual', [info.author], 1),
-    ('help',   'pibootctl-help',   'pibootctl manual', [info.author], 1),
-    ('status', 'pibootctl-status', 'pibootctl manual', [info.author], 1),
-    ('get',    'pibootctl-get',    'pibootctl manual', [info.author], 1),
-    ('set',    'pibootctl-set',    'pibootctl manual', [info.author], 1),
-    ('save',   'pibootctl-save',   'pibootctl manual', [info.author], 1),
-    ('load',   'pibootctl-load',   'pibootctl manual', [info.author], 1),
-    ('diff',   'pibootctl-diff',   'pibootctl manual', [info.author], 1),
-    ('show',   'pibootctl-show',   'pibootctl manual', [info.author], 1),
-    ('list',   'pibootctl-list',   'pibootctl manual', [info.author], 1),
-    ('remove', 'pibootctl-remove', 'pibootctl manual', [info.author], 1),
-    ('rename', 'pibootctl-rename', 'pibootctl manual', [info.author], 1),
+    (info.name, info.name,                              '{info.name} manual'.format(info=info), [info.author], 1),
+    ('help',    '{info.name}-help'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
+    ('status',  '{info.name}-status'.format(info=info), '{info.name} manual'.format(info=info), [info.author], 1),
+    ('get',     '{info.name}-get'.format(info=info),    '{info.name} manual'.format(info=info), [info.author], 1),
+    ('set',     '{info.name}-set'.format(info=info),    '{info.name} manual'.format(info=info), [info.author], 1),
+    ('save',    '{info.name}-save'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
+    ('load',    '{info.name}-load'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
+    ('diff',    '{info.name}-diff'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
+    ('show',    '{info.name}-show'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
+    ('list',    '{info.name}-list'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
+    ('remove',  '{info.name}-remove'.format(info=info), '{info.name} manual'.format(info=info), [info.author], 1),
+    ('rename',  '{info.name}-rename'.format(info=info), '{info.name} manual'.format(info=info), [info.author], 1),
 ]
 
 man_show_urls = True
