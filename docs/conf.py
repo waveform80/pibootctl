@@ -28,15 +28,6 @@ from datetime import datetime
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 info = pkginfo.Installed('pibootctl')
 if info.version is None:
-    # pkginfo prior to 1.5 seems broken (succeeds in construction, but doesn't
-    # contain any info); fall back to a horrific configparser hack...
-    import configparser
-    cfg = configparser.ConfigParser()
-    class Attr(dict):
-        __getattr__ = dict.__getitem__
-    assert cfg.read(('../setup.cfg',))
-    info = Attr(**cfg['metadata'])
-if info.version is None:
     raise RuntimeError('Failed to load distro info')
 
 # -- General configuration ------------------------------------------------
