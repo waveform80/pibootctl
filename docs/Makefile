@@ -190,10 +190,10 @@ pseudoxml:
 	gnuplot -e "set term pngcairo transparent size 400,400" $< > $@
 
 %.png: %.svg
-	inkscape -e $@ $<
+	inkscape -e $@ $< || inkscape --export-type=png -o $@ $<
 
 %.pdf: %.svg
-	inkscape -A $@ $<
+	inkscape -A $@ $< || inkscape --export-type=pdf -o $@ $<
 
 %.pdf: %.gpi
 	gnuplot -e "set term pdfcairo size 5cm,5cm" $< > $@
