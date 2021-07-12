@@ -1052,31 +1052,51 @@ def test_dt_addr():
 
 
 def test_initrd_addr():
-    initrd_addr = CommandRamFSAddress('initrd.addr', commands=('ramfsaddr', 'initramfs'))
+    settings = make_settings(
+        Command('boot.prefix', command='os_prefix', default=''),
+        CommandRamFSFilename('initrd.filename', commands=('ramfsfile', 'initramfs')),
+        CommandRamFSAddress('initrd.address', commands=('ramfsaddr', 'initramfs')),
+    )
+    prefix = settings['boot.prefix']
+    initrd_file = settings['initrd.filename']
+    initrd_addr = settings['initrd.address']
+
     assert not initrd_addr.modified
     assert initrd_addr.value == 0
-    assert initrd_addr.hint == 'auto'
+    assert initrd_addr.hint == '0x0'
 
     initrd_addr._value = 0x2400000
     assert initrd_addr.modified
     assert initrd_addr.value == 0x2400000
     assert initrd_addr.hint == '0x2400000'
 
+    initrd_addr._value = -1
+    assert initrd_addr.modified
+    assert initrd_addr.value == -1
+    assert initrd_addr.hint == 'auto'
+
+    with pytest.raises(ValueError):
+        initrd_addr.validate()
+    initrd_file._value = ['initrd.img']
+    initrd_addr.validate()
+
 
 def test_initrd_addr_extract():
     initrd_addr = CommandRamFSAddress('initrd.addr', commands=('ramfsaddr', 'initramfs'))
     config = [
         BootCommand('config.txt', 1, cond_all, 'initramfs', ('initrd.img', 'followkernel'), hdmi=0),
-        BootCommand('config.txt', 2, cond_all, 'initramfs', ('initrd.img', '0x2400000'), hdmi=0),
-        BootCommand('config.txt', 3, cond_all, 'ramfsaddr', '0x2700000', hdmi=0),
-        BootCommand('config.txt', 4, cond_all, 'ramfsaddr', 'f000000', hdmi=0)
+        BootCommand('config.txt', 2, cond_all, 'initramfs', ('initrd.img', '0'), hdmi=0),
+        BootCommand('config.txt', 3, cond_all, 'initramfs', ('initrd.img', '0x2400000'), hdmi=0),
+        BootCommand('config.txt', 4, cond_all, 'ramfsaddr', '0x2700000', hdmi=0),
+        BootCommand('config.txt', 5, cond_all, 'ramfsaddr', 'f000000', hdmi=0)
     ]
     with warnings.catch_warnings(record=True) as w:
         assert list(initrd_addr.extract(config)) == [
-            (config[0], None),
-            (config[1], 0x2400000),
-            (config[2], 0x2700000),
-            (config[3], None),
+            (config[0], -1),
+            (config[1], -1),
+            (config[2], 0x2400000),
+            (config[3], 0x2700000),
+            (config[4], None),
         ]
         assert len(w) == 1
         assert issubclass(w[0].category, ParseWarning)
@@ -1141,14 +1161,14 @@ def test_initrd_filename_output():
     initfn = settings['initrd.filename']
     initaddr = settings['initrd.address']
     assert list(initfn.output()) == []
-    with pytest.raises(DelegatedOutput) as exc:
-        list(initaddr.output())
-        assert exc.value.master == 'initrd.filename'
+    assert list(initaddr.output()) == []
     initfn._value = ['initrd.img']
-    assert list(initfn.output()) == ['initramfs initrd.img followkernel']
+    assert list(chain(initfn.output(), initaddr.output())) == ['ramfsfile=initrd.img']
+    initaddr._value = -1
     with pytest.raises(DelegatedOutput) as exc:
         list(initaddr.output())
         assert exc.value.master == 'initrd.filename'
+    assert list(initfn.output()) == ['initramfs initrd.img followkernel']
     initfn._value = ['initrd.img', 'splash.img']
     assert list(initfn.output()) == ['initramfs initrd.img,splash.img followkernel']
     with pytest.raises(DelegatedOutput) as exc:
@@ -1689,6 +1709,8 @@ def test_output_order():
     settings['spi.enabled']._value = True
     settings['i2c.enabled']._value = True
     settings['bluetooth.enabled']._value = False
+    settings['boot.initramfs.address']._value = -1
+    settings['boot.initramfs.filename']._value = ['initrd.img']
 
     def get_output():
         lines = []
@@ -1702,6 +1724,7 @@ def test_output_order():
 
     lines, errors = get_output()
     assert lines == [
+        'initramfs initrd.img followkernel',
         # base overlay params must come first
         'dtparam=i2c_arm=on',
         'dtparam=spi=on',

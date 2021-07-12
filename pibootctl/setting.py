@@ -1663,13 +1663,16 @@ class CommandRamFSAddress(CommandIntHex):
     """
     @property
     def hint(self):
-        if self.value == 0:
+        if self.value == -1:
             return _('auto')  # followkernel
         else:
             # FIXME What?
             return super().hint
 
     def extract(self, config):
+        # This has some subtleties: 0 in ramfsaddr really means 0, whereas in
+        # initramfs it means "followkernel", so we store the latter as -1 to
+        # be able to distinguish the semantics
         for item in config:
             if isinstance(item, BootCommand):
                 try:
@@ -1678,7 +1681,9 @@ class CommandRamFSAddress(CommandIntHex):
                     elif item.command == 'initramfs':
                         filename, address = item.params
                         if address == 'followkernel':
-                            yield item, None
+                            yield item, -1
+                        elif to_int(address) == 0:
+                            yield item, -1
                         else:
                             yield item, to_int(address)
                 except ValueError:
@@ -1687,8 +1692,15 @@ class CommandRamFSAddress(CommandIntHex):
                         '{item.params!r}'.format(item=item)))
                     yield item, None
 
+    def validate(self):
+        other = self._query(self._relative('.filename'))
+        if self.modified and not other.modified:
+            raise ValueError(_(
+                'Must set {other.name} when {self.name} is set').format(
+                    other=other, self=self))
+
     def output(self):
-        if self.value == 0:
+        if self.value == -1:
             raise DelegatedOutput(self._relative('.filename'))
         else:
             yield from super().output()
@@ -1743,7 +1755,7 @@ class CommandRamFSFilename(Command):
         if self.modified:
             new_value = ','.join(self.value)
             with self._override(new_value):
-                if self._query(self._relative('.address')).value == 0:
+                if self._query(self._relative('.address')).value == -1:
                     # The "followkernel" (automatic) addressing only works
                     # with initramfs; with the ramfsaddr command it fails
                     yield 'initramfs {self.value} followkernel'.format(self=self)
