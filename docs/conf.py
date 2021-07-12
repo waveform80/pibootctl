@@ -22,13 +22,13 @@
 
 import sys
 import os
-import pkginfo
+from pathlib import Path
 from datetime import datetime
+from setuptools.config import read_configuration
 
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
-info = pkginfo.Installed('pibootctl')
-if info.version is None:
-    raise RuntimeError('Failed to load distro info')
+config = read_configuration(str(Path(__file__).parent / '..' / 'setup.cfg'))
+info = config['metadata']
 
 # -- General configuration ------------------------------------------------
 
@@ -46,9 +46,9 @@ templates_path = ['_templates']
 source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
 master_doc = 'index'
-project = info.name
-copyright = '2019-{now:%Y} {info.author}'.format(now=datetime.now(), info=info)
-version = info.version
+project = info['name']
+copyright = '2019-{now:%Y} {info[author]}'.format(now=datetime.now(), info=info)
+version = info['version']
 #release = None
 #language = None
 #today_fmt = '%B %d, %Y'
@@ -69,22 +69,17 @@ autodoc_member_order = 'groupwise'
 # -- Intersphinx configuration --------------------------------------------
 
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3.5', None),
+    'python': ('https://docs.python.org/3.7', None),
 }
 intersphinx_cache_limit = 7
 
 # -- Options for HTML output ----------------------------------------------
 
-if on_rtd:
-    html_theme = 'sphinx_rtd_theme'
-    pygments_style = 'default'
-    #html_theme_options = {}
-    #html_sidebars = {}
-else:
-    html_theme = 'default'
-    #html_theme_options = {}
-    #html_sidebars = {}
-html_title = '{info.name} {info.version} Documentation'.format(info=info)
+html_theme = 'sphinx_rtd_theme'
+pygments_style = 'default'
+#html_theme_options = {}
+#html_sidebars = {}
+html_title = '{info[name]} {info[version]} Documentation'.format(info=info)
 #html_theme_path = []
 #html_short_title = None
 #html_logo = None
@@ -102,12 +97,12 @@ html_static_path = ['_static']
 #html_show_copyright = True
 #html_use_opensearch = ''
 #html_file_suffix = None
-htmlhelp_basename = '{info.name}doc'.format(info=info)
+htmlhelp_basename = '{info[name]}doc'.format(info=info)
 
 # Hack to make wide tables work properly in RTD
 # See https://github.com/snide/sphinx_rtd_theme/issues/117 for details
-def setup(app):
-    app.add_stylesheet('style_override.css')
+#def setup(app):
+#    app.add_stylesheet('style_override.css')
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -121,12 +116,12 @@ latex_elements = {
 
 latex_documents = [
     (
-        'index',                       # source start file
-        '{info.name}.tex'.format(info=info), # target filename
-        '{info.name} {info.version} Documentation'.format(info=info), # title
-        info.author,                   # author
-        'manual',                      # documentclass
-        True,                          # documents ref'd from toctree only
+        'index',           # source start file
+        project + '.tex',  # target filename
+        html_title,        # title
+        info['author'],    # author
+        'manual',          # documentclass
+        True,              # documents ref'd from toctree only
     ),
 ]
 
@@ -142,8 +137,8 @@ latex_show_urls = 'footnote'
 epub_basename = project
 #epub_theme = 'epub'
 #epub_title = html_title
-epub_author = info.author
-epub_identifier = 'https://{info.name}.readthedocs.io/'.format(info=info)
+epub_author = info['author']
+epub_identifier = 'https://{info[name]}.readthedocs.io/'.format(info=info)
 #epub_tocdepth = 3
 epub_show_urls = 'no'
 #epub_use_index = True
@@ -151,18 +146,18 @@ epub_show_urls = 'no'
 # -- Options for manual page output ---------------------------------------
 
 man_pages = [
-    (info.name, info.name,                              '{info.name} manual'.format(info=info), [info.author], 1),
-    ('help',    '{info.name}-help'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
-    ('status',  '{info.name}-status'.format(info=info), '{info.name} manual'.format(info=info), [info.author], 1),
-    ('get',     '{info.name}-get'.format(info=info),    '{info.name} manual'.format(info=info), [info.author], 1),
-    ('set',     '{info.name}-set'.format(info=info),    '{info.name} manual'.format(info=info), [info.author], 1),
-    ('save',    '{info.name}-save'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
-    ('load',    '{info.name}-load'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
-    ('diff',    '{info.name}-diff'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
-    ('show',    '{info.name}-show'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
-    ('list',    '{info.name}-list'.format(info=info),   '{info.name} manual'.format(info=info), [info.author], 1),
-    ('remove',  '{info.name}-remove'.format(info=info), '{info.name} manual'.format(info=info), [info.author], 1),
-    ('rename',  '{info.name}-rename'.format(info=info), '{info.name} manual'.format(info=info), [info.author], 1),
+    (info['name'], info['name'],                         '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('help',    '{info[name]}-help'.format(info=info),   '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('status',  '{info[name]}-status'.format(info=info), '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('get',     '{info[name]}-get'.format(info=info),    '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('set',     '{info[name]}-set'.format(info=info),    '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('save',    '{info[name]}-save'.format(info=info),   '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('load',    '{info[name]}-load'.format(info=info),   '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('diff',    '{info[name]}-diff'.format(info=info),   '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('show',    '{info[name]}-show'.format(info=info),   '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('list',    '{info[name]}-list'.format(info=info),   '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('remove',  '{info[name]}-remove'.format(info=info), '{info[name]} manual'.format(info=info), [info['author']], 1),
+    ('rename',  '{info[name]}-rename'.format(info=info), '{info[name]} manual'.format(info=info), [info['author']], 1),
 ]
 
 man_show_urls = True
