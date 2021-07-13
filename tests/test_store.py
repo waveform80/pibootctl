@@ -458,6 +458,21 @@ gpio=23=op,dh
 """
 
 
+def test_initramfs_filename_quirk(boot_path, store_path):
+    store = Store(boot_path, store_path)
+    (boot_path / 'config.txt').write_text("""\
+[all]
+ramfsfile=initrd.img
+""")
+    current = store[Current]
+    mutable = current.mutable()
+    mutable.update({'boot.initramfs.address': -1}, cond_all)
+    assert mutable.files['config.txt'].content.decode('ascii') == """\
+[all]
+initramfs initrd.img followkernel
+"""
+
+
 def test_settings_container():
     settings = Settings()
     assert len([s for s in settings]) == len(settings)

@@ -68,7 +68,7 @@ from zipfile import ZipFile, BadZipFile, ZIP_DEFLATED
 
 from .files import AtomicReplaceFile
 from .parser import BootParser, BootFile, BootComment, BootConditions
-from .setting import CommandIncludedFile
+from .setting import CommandIncludedFile, Influences
 from .settings import SETTINGS
 from .exc import InvalidConfiguration, IneffectiveConfiguration, DelegatedOutput
 
@@ -354,7 +354,7 @@ class BootConfiguration:
         for setting in self._settings.values():
             lines = []
             for item, value in setting.extract(parser.config):
-                if item.conditions.enabled:
+                if item.conditions.enabled and value is not Influences:
                     setting._value = value
                 lines.append(item)
             setting._lines = tuple(lines[::-1])

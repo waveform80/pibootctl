@@ -951,8 +951,10 @@ SETTINGS = {
         'boot.initramfs.address', commands=('ramfsaddr', 'initramfs'), doc=_(
             """
             The address at which the bootloader should place the initramfs. By
-            default this is 0, which causes the bootloader to place the
-            initramfs immediately after the kernel in memory.
+            default this is 0. This is almost certainly not what you want;
+            commonly, this is set to the special value -1, which causes the
+            bootloader to place the initramfs immediately after the kernel in
+            memory.
             """)),
     setting.CommandRamFSFilename(
         'boot.initramfs.filename', commands=('ramfsfile', 'initramfs'),

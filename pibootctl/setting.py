@@ -124,6 +124,17 @@ class ValueWarning(Warning):
     """
 
 
+class Influences:
+    """
+    Singleton representing a value that influences a setting, but doesn't
+    *directly* change it. This is used during parsing to indicate that any
+    changes made to this setting should also erase lines that influenced it.
+    """
+    def __repr__(self):
+        return 'Influences'
+Influences = Influences()
+
+
 class Setting:
     """
     Represents a configuration setting.
@@ -1673,11 +1684,14 @@ class CommandRamFSAddress(CommandIntHex):
         # This has some subtleties: 0 in ramfsaddr really means 0, whereas in
         # initramfs it means "followkernel", so we store the latter as -1 to
         # be able to distinguish the semantics
+        # NOTE: not super().extract(config) so we see all configuration lines
         for item in config:
             if isinstance(item, BootCommand):
                 try:
                     if item.command == 'ramfsaddr':
                         yield item, to_int(item.params)
+                    elif item.command == 'ramfsfile':
+                        yield item, Influences
                     elif item.command == 'initramfs':
                         filename, address = item.params
                         if address == 'followkernel':
@@ -1697,7 +1711,7 @@ class CommandRamFSAddress(CommandIntHex):
         if self.modified and not other.modified:
             raise ValueError(_(
                 'Must set {other.name} when {self.name} is set').format(
-                    other=other, self=self))
+                    self=self, other=other))
 
     def output(self):
         if self.value == -1:
