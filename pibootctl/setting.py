@@ -883,6 +883,9 @@ class CommandFilename(Command):
         else:
             return None
 
+    def update(self, value):
+        return to_str(value)
+
 
 class CommandIncludedFile(CommandFilename):
     """
