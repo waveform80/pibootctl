@@ -878,6 +878,11 @@ def test_kernel_filename():
         arm8._value = True
         assert filename.value == 'kernel8.img'
 
+        filename._value = filename.update('vmlinuz')
+        assert filename.value == 'vmlinuz'
+        filename._value = filename.update(UserStr(''))
+        assert filename.value == 'kernel8.img'
+
 
 def test_camera_firmware(fw_settings):
     with mock.patch('pibootctl.setting.get_board_type') as get_board_type:

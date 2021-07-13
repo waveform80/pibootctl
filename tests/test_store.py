@@ -45,6 +45,7 @@ cond_none = cond_all.evaluate('none')
 def test_singleton_reprs():
     assert repr(Current) == 'Current'
     assert repr(Default) == 'Default'
+    assert repr(Influences) == 'Influences'
 
 
 def test_store_container(boot_path, store_path):
