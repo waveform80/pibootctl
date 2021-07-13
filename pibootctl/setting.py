@@ -1555,10 +1555,11 @@ class CommandFirmwareCamera(CommandBool):
         }
 
     def extract(self, config):
-        for item, value in super().extract(config):
+        for item in config:
             # NOTE: start_x is only valid in config.txt
-            if item.filename == 'config.txt' and item.command == 'start_x':
-                yield item, True if value else None
+            if isinstance(item, BootCommand) and item.filename == 'config.txt':
+                if item.command == 'start_x':
+                    yield item, True if bool(to_int(item.params)) else None
 
     def output(self):
         if self.modified and self.value:
@@ -1583,10 +1584,11 @@ class CommandFirmwareDebug(CommandBool):
         ) == (FW_START[pi4].debug, FW_FIXUP[pi4].debug)
 
     def extract(self, config):
-        for item, value in super().extract(config):
+        for item in config:
             # NOTE: start_debug is only valid in config.txt
-            if item.filename == 'config.txt' and item.command == 'start_debug':
-                yield item, True if value else None
+            if isinstance(item, BootCommand) and item.filename == 'config.txt':
+                if item.command == 'start_debug':
+                    yield item, True if bool(to_int(item.params)) else None
 
     def output(self):
         if self.modified and self.value:
@@ -1615,7 +1617,7 @@ class CommandFirmwareFilename(CommandFilename):
 
     def extract(self, config):
         for item, value in super().extract(config):
-            # NOTE: start_filename is only valid in config.txt
+            # NOTE: start_file is only valid in config.txt
             if item.filename == 'config.txt':
                 yield item, value
 
@@ -1677,14 +1679,12 @@ class CommandRamFSAddress(CommandIntHex):
         if self.value == -1:
             return _('auto')  # followkernel
         else:
-            # FIXME What?
             return super().hint
 
     def extract(self, config):
         # This has some subtleties: 0 in ramfsaddr really means 0, whereas in
         # initramfs it means "followkernel", so we store the latter as -1 to
         # be able to distinguish the semantics
-        # NOTE: not super().extract(config) so we see all configuration lines
         for item in config:
             if isinstance(item, BootCommand):
                 try:
@@ -1694,9 +1694,7 @@ class CommandRamFSAddress(CommandIntHex):
                         yield item, Influences
                     elif item.command == 'initramfs':
                         filename, address = item.params
-                        if address == 'followkernel':
-                            yield item, -1
-                        elif to_int(address) == 0:
+                        if address == 'followkernel' or to_int(address) == 0:
                             yield item, -1
                         else:
                             yield item, to_int(address)
@@ -1769,7 +1767,8 @@ class CommandRamFSFilename(Command):
         if self.modified:
             new_value = ','.join(self.value)
             with self._override(new_value):
-                if self._query(self._relative('.address')).value == -1:
+                addr = self._query(self._relative('.address'))
+                if addr.value == -1:
                     # The "followkernel" (automatic) addressing only works
                     # with initramfs; with the ramfsaddr command it fails
                     yield 'initramfs {self.value} followkernel'.format(self=self)
