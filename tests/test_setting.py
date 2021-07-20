@@ -1310,6 +1310,66 @@ def test_l2_cache():
         assert cache.default is False
 
 
+def test_cpu_volt():
+    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+        settings = make_settings(
+            CommandCPUVoltMax('cpu.max', command='over_voltage'),
+            CommandVoltage('cpu.min', command='over_voltage_min'),
+            CommandBool('cpu.turbo.force', command='force_turbo'))
+        volt_max = settings['cpu.max']
+        volt_min = settings['cpu.min']
+        turbo = settings['cpu.turbo.force']
+
+        get_board_type.return_value = None
+        assert not turbo.modified
+        assert not turbo.value
+        assert not volt_min.modified
+        assert not volt_max.modified
+        assert volt_min.hint == '1.2V'
+        assert volt_max.hint == '1.35V'
+        assert (volt_min.default, volt_max.default) == (0, 0)
+
+        get_board_type.return_value = 'pi1'
+        assert volt_min.hint == '1.2V'
+        assert volt_max.hint == '1.2V'
+        volt_min._value = -1
+        volt_max._value = 1
+        assert volt_min.hint == '1.175V'
+        assert volt_max.hint == '1.225V'
+
+        get_board_type.return_value = 'pi3'
+        volt_min._value = -4
+        volt_max._value = 4
+        assert volt_min.hint == '1.1V'
+        assert volt_max.hint == '1.45V'
+
+        get_board_type.return_value = 'pi4'
+        volt_min._value = -16
+        volt_max._value = 8
+        turbo._value = True
+        assert volt_min.hint == '0.8V'
+        assert volt_max.hint == '1.55V'
+
+        volt_min.validate()
+        volt_max.validate()
+
+        # volt_max > 6 requires turbo
+        turbo._value = False
+        with pytest.raises(ValueError):
+            volt_max.validate()
+
+        # volt_max must be >= volt_min
+        volt_min._value = 0
+        volt_max._value = -1
+        with pytest.raises(ValueError):
+            volt_max.validate()
+
+        # voltage must be in range -16..8
+        volt_max._value = 255
+        with pytest.raises(ValueError):
+            volt_max.validate()
+
+
 def test_cpu_freq():
     with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
         settings = make_settings(

@@ -1974,7 +1974,75 @@ class CommandCPUL2Cache(CommandBoolInv):
         }.get(get_board_type())
 
 
-class CommandCPUFreqMax(CommandInt):
+class CommandIntMax(CommandInt):
+    """
+    A utility class that ensures this setting is always >= its sibling ".min"
+    setting.
+    """
+    def validate(self):
+        other = self._query(self._relative('.min'))
+        if self.value < other.value:
+            raise ValueError(_(
+                '{self.name} cannot be less than {other.name}').format(
+                    self=self, other=other))
+
+
+class CommandVoltage(CommandInt):
+    """
+    Handles the ``over_voltage`` command.
+    """
+    @property
+    def hint(self):
+        min_value = -16
+        max_value = 8
+        min_volt = 0.8
+        max_volt = 1.4
+        voltage = (
+            (self.value - min_value) /
+            (max_value - min_value) *
+            (max_volt - min_volt) +
+            min_volt
+        )
+        return '{voltage:.4g}V'.format(voltage=voltage)
+
+    def validate(self):
+        super().validate()
+        if not -16 <= self.value <= 8:
+            raise ValueError(_(
+                '{self.name} must be in the range -16..8').format(self=self))
+
+
+class CommandCPUVoltMax(CommandVoltage, CommandIntMax):
+    """
+    Handles the ``over_voltage`` command.
+    """
+    @property
+    def hint(self):
+        if get_board_type() == 'pi1':
+            return super().hint
+        else:
+            min_value = -16
+            max_value = 8
+            min_volt = 0.95
+            max_volt = 1.55
+            voltage = (
+                (self.value - min_value) /
+                (max_value - min_value) *
+                (max_volt - min_volt) +
+                min_volt
+            )
+            return '{voltage:.4g}V'.format(voltage=voltage)
+
+    def validate(self):
+        super().validate()
+        other = self._query('cpu.turbo.force')
+        if self.value > 6 and not other.value:
+            raise ValueError(_(
+                '{other.name} must be set when {self.name} is more than 6'
+            ).format(self=self, other=other))
+
+
+class CommandCPUFreqMax(CommandIntMax):
     """
     Handles the ``arm_freq`` command.
     """
@@ -1989,13 +2057,6 @@ class CommandCPUFreqMax(CommandInt):
             'pi3+': 1400,
             'pi4':  1500,
         }.get(get_board_type(), 0)
-
-    def validate(self):
-        other = self._query(self._relative('.min'))
-        if self.value < other.value:
-            raise ValueError(_(
-                '{self.name} cannot be less then {other.name}').format(
-                    self=self, other=other))
 
     @property
     def hint(self):
@@ -2026,7 +2087,7 @@ class CommandCPUFreqMin(CommandInt):
         return 'MHz'
 
 
-class CommandCoreFreqMax(CommandInt):
+class CommandCoreFreqMax(CommandIntMax):
     """
     Handles the ``core_freq`` command.
     """
@@ -2066,13 +2127,6 @@ class CommandCoreFreqMax(CommandInt):
                 yield 'gpu_freq={value}'.format(value=self.value)
             else:
                 yield from super().output()
-
-    def validate(self):
-        other = self._query(self._relative('.min'))
-        if self.value < other.value:
-            raise ValueError(_(
-                '{self.name} cannot be less then {other.name}').format(
-                    self=self, other=other))
 
     @property
     def hint(self):
@@ -2114,7 +2168,7 @@ class CommandCoreFreqMin(CommandInt):
         return 'MHz'
 
 
-class CommandGPUFreqMax(CommandInt):
+class CommandGPUFreqMax(CommandIntMax):
     """
     Handles the ``h264_freq``, ``isp_freq``, and ``v3d_freq`` commands.
     """
@@ -2148,13 +2202,6 @@ class CommandGPUFreqMax(CommandInt):
                 raise DelegatedOutput(self._relative('...core.frequency.max'))
             else:
                 yield from super().output()
-
-    def validate(self):
-        other = self._query(self._relative('.min'))
-        if self.value < other.value:
-            raise ValueError(_(
-                '{self.name} cannot be less then {other.name}').format(
-                    self=self, other=other))
 
     @property
     def hint(self):

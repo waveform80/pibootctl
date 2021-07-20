@@ -1150,6 +1150,32 @@ SETTINGS = {
 
             [1]: https://www.raspberrypi.org/forums/viewtopic.php?f=29&t=6201&start=425#p180099
             """)),
+    setting.CommandCPUVoltMax(
+        'cpu.voltage.max', command='over_voltage', default=0, doc=_(
+            """
+            CPU/GPU core upper voltage limit.
+
+            The value should be in the range -16 to 8 which equates to the
+            range 0.95V to 1.55V (or 0.8V to 1.4V on the RPi 1) with 0.025V
+            steps.
+
+            In other words, specifying -16 will give 0.95V (or 0.8V on RPi 1)
+            as the maximum CPU/GPU core voltage, and specifying 8 will allow up
+            to 1.55V (1.4V on RPi 1). Values above 6 are only allowed when
+            cpu.turbo.force is enabled; this sets the warranty bit if
+            any cpu.mem.*.voltage setting is > 0.
+            """)),
+    setting.CommandVoltage(
+        'cpu.voltage.min', command='over_voltage_min', default=0, doc=_(
+            """
+            Minimum CPU voltage used for dynamic frequency clocking.
+
+            The value should be in the range -16 to 8 which equates to the
+            range 0.8V to 1.4V with 0.025V steps.
+
+            In other words, specifying -16 will give 0.8V as the CPU/GPU core
+            idle voltage, and specifying 8 will give a minimum of 1.4V.
+            """)),
     setting.CommandCPUFreqMax(
         'cpu.frequency.max', command='arm_freq', doc=_(
             """
