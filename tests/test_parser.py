@@ -137,6 +137,7 @@ def test_bootconditions_comparisons():
     cond_pi400 = cond_all.evaluate('pi400')
     cond_cm4 = cond_all.evaluate('cm4')
     cond_pi4 = cond_all.evaluate('pi4')
+    cond_pi4000 = cond_all.evaluate('pi4000')
     cond_gpio = cond_pi3.evaluate('gpio4=1')
     cond_edid = cond_pi3.evaluate('EDID=foo')
     cond_hdmi = cond_pi3.evaluate('HDMI:1')
@@ -168,6 +169,7 @@ def test_bootconditions_comparisons():
     assert cond_pi3 > cond_hdmi
     assert cond_pi4 > cond_pi400
     assert cond_pi4 > cond_cm4
+    assert cond_all == cond_pi4000
     # It's a partial ordering
     assert not cond_pi400 < cond_cm4
     assert not cond_cm4 < cond_pi400
