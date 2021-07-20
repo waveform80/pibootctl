@@ -1370,6 +1370,47 @@ def test_cpu_volt():
             volt_max.validate()
 
 
+def test_sdram_volt_output():
+    settings = make_settings(
+        CommandSDRAMVoltage('mem.ctrl.voltage', commands=('over_voltage_sdram_c', 'over_voltage_sdram')),
+        CommandSDRAMVoltage('mem.io.voltage', commands=('over_voltage_sdram_i', 'over_voltage_sdram')),
+        CommandSDRAMVoltage('mem.phy.voltage', commands=('over_voltage_sdram_p', 'over_voltage_sdram')),
+    )
+
+    def get_volt_output():
+        lines = []
+        errors = []
+        for setting in sorted(settings.values(), key=attrgetter('key')):
+            if setting.name.startswith('mem.'):
+                try:
+                    lines.extend(setting.output())
+                except DelegatedOutput as exc:
+                    errors.append(exc)
+        return lines, errors
+
+    lines, errors = get_volt_output()
+    assert lines == []
+    assert errors == []
+
+    settings['mem.ctrl.voltage']._value = 2
+    lines, errors = get_volt_output()
+    assert lines == ['over_voltage_sdram_c=2']
+    assert errors == []
+
+    settings['mem.io.voltage']._value = -4
+    lines, errors = get_volt_output()
+    assert lines == ['over_voltage_sdram_c=2', 'over_voltage_sdram_i=-4']
+    assert errors == []
+
+    settings['mem.io.voltage']._value = 2
+    settings['mem.phy.voltage']._value = 2
+    lines, errors = get_volt_output()
+    assert lines == ['over_voltage_sdram=2']
+    assert len(errors) == 2
+    assert all(isinstance(exc, DelegatedOutput) for exc in errors)
+    assert {exc.master for exc in errors} == {'mem.ctrl.voltage'}
+
+
 def test_cpu_freq():
     with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
         settings = make_settings(

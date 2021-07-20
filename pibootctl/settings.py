@@ -1176,6 +1176,36 @@ SETTINGS = {
             In other words, specifying -16 will give 0.8V as the CPU/GPU core
             idle voltage, and specifying 8 will give a minimum of 1.4V.
             """)),
+    setting.CommandSDRAMVoltage(
+        'cpu.mem.ctrl.voltage',
+        commands=('over_voltage_sdram_c', 'over_voltage_sdram'), default=0,
+        doc=_(
+            """
+            The voltage for the SDRAM controller.
+
+            The value should be in the range -16 to 8 which equates to the
+            range 0.8V to 1.4V with 0.025V steps.
+            """)),
+    setting.CommandSDRAMVoltage(
+        'cpu.mem.io.voltage',
+        commands=('over_voltage_sdram_i', 'over_voltage_sdram'), default=0,
+        doc=_(
+            """
+            The voltage for SDRAM I/O.
+
+            The value should be in the range -16 to 8 which equates to the
+            range 0.8V to 1.4V with 0.025V steps.
+            """)),
+    setting.CommandSDRAMVoltage(
+        'cpu.mem.phy.voltage',
+        commands=('over_voltage_sdram_p', 'over_voltage_sdram'), default=0,
+        doc=_(
+            """
+            The voltage for the SDRAM PHY.
+
+            The value should be in the range -16 to 8 which equates to the
+            range 0.8V to 1.4V with 0.025V steps.
+            """)),
     setting.CommandCPUFreqMax(
         'cpu.frequency.max', command='arm_freq', doc=_(
             """

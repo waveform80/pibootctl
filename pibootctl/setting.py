@@ -693,6 +693,19 @@ class CommandIntHex(CommandInt):
         yield from super().output(fmt)
 
 
+class CommandIntMax(CommandInt):
+    """
+    An integer-valued configuration *command* that has a sibling ".min"
+    setting, which this setting must be greater than or equal to.
+    """
+    def validate(self):
+        other = self._query(self._relative('.min'))
+        if self.value < other.value:
+            raise ValueError(_(
+                '{self.name} cannot be less than {other.name}').format(
+                    self=self, other=other))
+
+
 class CommandBool(Command):
     """
     Represents a boolean-valued configuration *command* or *commands*.
@@ -1974,19 +1987,6 @@ class CommandCPUL2Cache(CommandBoolInv):
         }.get(get_board_type())
 
 
-class CommandIntMax(CommandInt):
-    """
-    A utility class that ensures this setting is always >= its sibling ".min"
-    setting.
-    """
-    def validate(self):
-        other = self._query(self._relative('.min'))
-        if self.value < other.value:
-            raise ValueError(_(
-                '{self.name} cannot be less than {other.name}').format(
-                    self=self, other=other))
-
-
 class CommandVoltage(CommandInt):
     """
     Handles the ``over_voltage`` command.
@@ -2040,6 +2040,28 @@ class CommandCPUVoltMax(CommandVoltage, CommandIntMax):
             raise ValueError(_(
                 '{other.name} must be set when {self.name} is more than 6'
             ).format(self=self, other=other))
+
+
+class CommandSDRAMVoltage(CommandVoltage):
+    """
+    Handles the ``over_voltage_sdram_*`` commands.
+    """
+    def output(self):
+        blocks = [self] + [
+            self._query(self._relative(
+                '..{block}.voltage'.format(block=block)
+            ))
+            for block in ('ctrl', 'io', 'phy')
+        ]
+        if any(block.modified for block in blocks):
+            if all(self.value == block.value for block in blocks):
+                ctrl_name = self._relative('..ctrl.voltage')
+                if self.name == ctrl_name:
+                    yield 'over_voltage_sdram={value}'.format(value=self.value)
+                else:
+                    raise DelegatedOutput(ctrl_name)
+            else:
+                yield from super().output()
 
 
 class CommandCPUFreqMax(CommandIntMax):
