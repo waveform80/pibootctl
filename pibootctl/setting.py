@@ -2137,7 +2137,7 @@ class CommandCoreFreqMax(CommandIntMax):
             self._query(self._relative(
                 '...{block}.frequency.max'.format(block=block)
             ))
-            for block in ('h264', 'isp', 'v3d')
+            for block in ('h264', 'isp', 'v3d', 'hevc')
         ]
         if any(block.modified for block in blocks):
             if all(self.value == block.value for block in blocks):
@@ -2172,7 +2172,7 @@ class CommandCoreFreqMin(CommandInt):
             self._query(self._relative(
                 '...{block}.frequency.min'.format(block=block)
             ))
-            for block in ('h264', 'isp', 'v3d')
+            for block in ('h264', 'isp', 'v3d', 'hevc')
         ]
         if any(block.modified for block in blocks):
             if all(self.value == block.value for block in blocks):
@@ -2211,7 +2211,7 @@ class CommandGPUFreqMax(CommandIntMax):
             self._query(self._relative(
                 '...{block}.frequency.max'.format(block=block)
             ))
-            for block in ('core', 'h264', 'isp', 'v3d')
+            for block in ('core', 'h264', 'isp', 'v3d', 'hevc')
         ]
         if any(block.modified for block in blocks):
             if all(self.value == block.value for block in blocks):
@@ -2242,7 +2242,7 @@ class CommandGPUFreqMin(CommandInt):
             self._query(self._relative(
                 '...{block}.frequency.min'.format(block=block)
             ))
-            for block in ('core', 'h264', 'isp', 'v3d')
+            for block in ('core', 'h264', 'isp', 'v3d', 'hevc')
         ]
         if any(block.modified for block in blocks):
             if all(self.value == block.value for block in blocks):
@@ -2253,6 +2253,30 @@ class CommandGPUFreqMin(CommandInt):
     @property
     def hint(self):
         return 'MHz'
+
+
+class CommandHEVCFreqMax(CommandGPUFreqMax):
+    """
+    Handles the ``hevc_freq`` command.
+    """
+    @property
+    def default(self):
+        if 'pi4' in get_board_types():
+            return super().default
+        else:
+            return 0
+
+
+class CommandHEVCFreqMin(CommandGPUFreqMin):
+    """
+    Handles the ``hevc_freq_min`` command.
+    """
+    @property
+    def default(self):
+        if 'pi4' in get_board_types():
+            return super().default
+        else:
+            return 0
 
 
 class CommandTotalMem(CommandInt):

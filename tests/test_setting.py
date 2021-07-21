@@ -1485,6 +1485,8 @@ def test_gpu_freq():
             CommandGPUFreqMin('gpu.isp.frequency.min', commands=('isp_freq_min', 'gpu_freq_min')),
             CommandGPUFreqMax('gpu.v3d.frequency.max', commands=('v3d_freq', 'gpu_freq')),
             CommandGPUFreqMin('gpu.v3d.frequency.min', commands=('v3d_freq_min', 'gpu_freq_min')),
+            CommandHEVCFreqMax('gpu.hevc.frequency.max', commands=('hevc_freq', 'gpu_freq')),
+            CommandHEVCFreqMin('gpu.hevc.frequency.min', commands=('hevc_freq_min', 'gpu_freq_min')),
             CommandBool('cpu.turbo.force', command='force_turbo'),
             CommandBool('video.hdmi.4kp60', command='hdmi_enable_4kp60'),
             CommandTVOut('video.tv.enabled', command='enable_tvout'),
@@ -1528,6 +1530,10 @@ def test_gpu_freq():
             settings['gpu.h264.frequency.min'].value,
             settings['gpu.h264.frequency.max'].value,
         ) == (250, 250)
+        assert (
+            settings['gpu.hevc.frequency.min'].value,
+            settings['gpu.hevc.frequency.max'].value,
+        ) == (0, 0)
 
         get_board_type.return_value = 'pi4'
         get_board_types.return_value = {'pi4'}
@@ -1540,6 +1546,10 @@ def test_gpu_freq():
         assert (
             settings['gpu.h264.frequency.min'].value,
             settings['gpu.h264.frequency.max'].value,
+        ) == (500, 500)
+        assert (
+            settings['gpu.hevc.frequency.min'].value,
+            settings['gpu.hevc.frequency.max'].value,
         ) == (500, 500)
 
         # Turbo locks min to max
@@ -1609,6 +1619,8 @@ def test_gpu_freq_output():
             CommandGPUFreqMin('gpu.isp.frequency.min', commands=('isp_freq_min', 'gpu_freq_min')),
             CommandGPUFreqMax('gpu.v3d.frequency.max', commands=('v3d_freq', 'gpu_freq')),
             CommandGPUFreqMin('gpu.v3d.frequency.min', commands=('v3d_freq_min', 'gpu_freq_min')),
+            CommandHEVCFreqMax('gpu.hevc.frequency.max', commands=('hevc_freq', 'gpu_freq')),
+            CommandHEVCFreqMin('gpu.hevc.frequency.min', commands=('hevc_freq_min', 'gpu_freq_min')),
             CommandBool('cpu.turbo.force', command='force_turbo'),
             OverlayBluetoothEnabled('bluetooth.enabled'),
             OverlaySerialUART('serial.uart'),
@@ -1645,9 +1657,10 @@ def test_gpu_freq_output():
 
         settings['gpu.isp.frequency.max']._value = 600
         settings['gpu.v3d.frequency.max']._value = 600
+        settings['gpu.hevc.frequency.max']._value = 600
         lines, errors = get_gpu_output()
         assert lines == ['gpu_freq=600']
-        assert len(errors) == 3
+        assert len(errors) == 4
         assert all(isinstance(exc, DelegatedOutput) for exc in errors)
         assert {exc.master for exc in errors} == {'gpu.core.frequency.max'}
 
@@ -1655,15 +1668,16 @@ def test_gpu_freq_output():
         settings['gpu.h264.frequency.min']._value = 400
         lines, errors = get_gpu_output()
         assert lines == ['gpu_freq=600', 'core_freq_min=400', 'h264_freq_min=400']
-        assert len(errors) == 3
+        assert len(errors) == 4
         assert all(isinstance(exc, DelegatedOutput) for exc in errors)
         assert {exc.master for exc in errors} == {'gpu.core.frequency.max'}
 
         settings['gpu.isp.frequency.min']._value = 400
         settings['gpu.v3d.frequency.min']._value = 400
+        settings['gpu.hevc.frequency.min']._value = 400
         lines, errors = get_gpu_output()
         assert lines == ['gpu_freq=600', 'gpu_freq_min=400']
-        assert len(errors) == 6
+        assert len(errors) == 8
         assert all(isinstance(exc, DelegatedOutput) for exc in errors)
         assert {exc.master for exc in errors} == {
             'gpu.core.frequency.max', 'gpu.core.frequency.min'}

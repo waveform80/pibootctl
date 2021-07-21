@@ -1322,6 +1322,23 @@ SETTINGS = {
             Minimum value of gpu.frequency.v3d.max used for dynamic frequency
             clocking. The default value is 250, or 500 on Pi 4B.
             """)),
+    setting.CommandGPUFreqMax(
+        'gpu.hevc.frequency.max', commands=('hevc_freq', 'gpu_freq'), doc=_(
+            """
+            Frequency of the GPU's High Efficiency Video Codec block in MHz.
+            The default value is 500MHz.
+
+            This option applies to the Pi 4 only.
+            """)),
+    setting.CommandGPUFreqMin(
+        'gpu.hevc.frequency.min', commands=('hevc_freq_min', 'gpu_freq_min'),
+        doc=_(
+            """
+            Minimum value of gpu.frequency.v3d.max used for dynamic frequency
+            clocking. The default value is 250MHz.
+
+            This option applies to the Pi 4 only.
+            """)),
     setting.CommandGPUMem(
         'gpu.mem',
         commands=('gpu_mem', 'gpu_mem_256', 'gpu_mem_512', 'gpu_mem_1024'),
