@@ -1528,7 +1528,11 @@ SETTINGS |= {spec for hdmi in (0, 1) for spec in (
             both HDMI ports of the Raspberry Pi 4 for 4k output, then you are
             limited to 30Hz on both.
 
+            For more information about DMT mode 81 on the Raspberry Pi 4 please
+            refer to [2].
+
             [1]: https://www.raspberrypi.org/forums/viewtopic.php?f=26&t=20155&p=195443#p195443
+            [2]: https://www.raspberrypi.org/documentation/configuration/config-txt/pi4-hdmi.md
             """)),
     setting.CommandInt(
         'video.hdmi{}.encoding'.format(hdmi), index=hdmi,

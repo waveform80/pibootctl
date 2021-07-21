@@ -1139,7 +1139,7 @@ class CommandDisplayMode(CommandInt):
             78: DisplayMode('2560x1600', '75Hz',  '16:10'),
             79: DisplayMode('2560x1600', '85Hz',  '16:10'),
             80: DisplayMode('2560x1600', '120Hz', '16:10',  'reduced blanking'),
-            81: DisplayMode('1366x768',  '60Hz',  '16:9'),
+            81: DisplayMode('1366x768',  '60Hz',  '16:9',   'incompatible with Pi 4'),
             82: DisplayMode('1920x1080', '60Hz',  '16:9',   '1080p'),
             83: DisplayMode('1600x900',  '60Hz',  '16:9',   'reduced blanking'),
             84: DisplayMode('2048x1152', '60Hz',  '16:9',   'reduced blanking'),
