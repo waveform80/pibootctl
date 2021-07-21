@@ -2105,6 +2105,30 @@ class CommandCPUFreqMin(CommandInt):
         return 'MHz'
 
 
+class CommandCPUTempLimit(CommandInt):
+    """
+    Handles the ``temp_limit`` command.
+    """
+    @property
+    def default(self):
+        return 85
+
+    def extract(self, config):
+        for item, value in super().extract(config):
+            if value > 85:
+                value = 85
+            yield item, value
+
+    def validate(self):
+        if self.value > 85:
+            raise ValueError(_(
+                '{self.name} cannot be greater than 85').format(self=self))
+
+    @property
+    def hint(self):
+        return '°C'
+
+
 class CommandCoreFreqMax(CommandIntMax):
     """
     Handles the ``core_freq`` command.

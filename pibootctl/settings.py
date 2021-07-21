@@ -1226,6 +1226,15 @@ SETTINGS = {
             The minimum value of cpu.frequency.max used for dynamic frequency
             clocking.
             """)),
+    setting.CommandCPUTempLimit(
+        'cpu.temperature.limit', command='temp_limit', doc=_(
+            """
+            Specifies the overheat protection limit in degrees celsius.
+
+            When the SoC reaches the temperature specified by this setting,
+            clocks and voltages will be set to default. Values over 85°C will
+            be clamped to 85°C.
+            """)),
     setting.CommandCoreFreqMax(
         'gpu.core.frequency.max', commands=('core_freq', 'gpu_freq'), doc=_(
             """

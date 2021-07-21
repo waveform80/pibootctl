@@ -1411,6 +1411,30 @@ def test_sdram_volt_output():
     assert {exc.master for exc in errors} == {'mem.ctrl.voltage'}
 
 
+def test_cpu_temp_limit():
+    limit = CommandCPUTempLimit('cpu.temp.limit', command='temp_limit')
+
+    assert limit.value == 85
+    assert not limit.modified
+    assert limit.hint == '°C'
+
+    limit.validate()
+    limit._value = 90
+    with pytest.raises(ValueError):
+        limit.validate()
+
+    limit._value = limit.update(UserStr('80'))
+    assert limit.modified
+    assert limit.value == 80
+    limit.validate()
+
+    assert list(limit.output()) == ['temp_limit=80']
+    config = [BootCommand('config.txt', 1, cond_all, 'temp_limit', '90', hdmi=0)]
+    assert list(limit.extract(config)) == [(config[0], 85)]
+    config = [BootCommand('config.txt', 1, cond_all, 'temp_limit', '80', hdmi=0)]
+    assert list(limit.extract(config)) == [(config[0], 80)]
+
+
 def test_cpu_freq():
     with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
         settings = make_settings(
