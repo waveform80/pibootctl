@@ -1233,7 +1233,7 @@ SETTINGS = {
             performance because it drives the L2 cache and memory bus. The
             default values for various models are as follows:
 
-            | Model | Frequency (Mhz) |
+            | Model | Frequency (MHz) |
             | Pi 0 | 400 |
             | Pi 1 | 250 |
             | Pi 2 | 250 |
@@ -1250,8 +1250,8 @@ SETTINGS = {
         doc=_(
             """
             Minimum value of gpu.frequency.core.max used for dynamic frequency
-            clocking. The default value is 250Mhz. On Pi 4B the default is
-            275Mhz when video.hdmi.mode.4kp60 is on.
+            clocking. The default value is 250MHz. On Pi 4B the default is
+            275MHz when video.hdmi.mode.4kp60 is on.
             """)),
     setting.CommandGPUFreqMax(
         'gpu.h264.frequency.max', commands=('h264_freq', 'gpu_freq'), doc=_(
@@ -1259,7 +1259,7 @@ SETTINGS = {
             Frequency of the GPU's hardware video block in MHz. The default
             values for various models are as follows:
 
-            | Model | Frequency (Mhz) |
+            | Model | Frequency (MHz) |
             | Pi 0 | 400 |
             | Pi 1 | 250 |
             | Pi 2 | 250 |
@@ -1267,7 +1267,7 @@ SETTINGS = {
             | Pi 3+ | 300 |
             | Pi 4 | 500 |
 
-            600Mhz is the only other accepted value.
+            600MHz is the only other accepted value.
             """)),
     setting.CommandGPUFreqMin(
         'gpu.h264.frequency.min', commands=('h264_freq_min', 'gpu_freq_min'),
@@ -1282,7 +1282,7 @@ SETTINGS = {
             Frequency of the GPU's image sensor pipeline block in MHz. The
             default values for various models are as follows:
 
-            | Model | Frequency (Mhz) |
+            | Model | Frequency (MHz) |
             | Pi 0 | 400 |
             | Pi 1 | 250 |
             | Pi 2 | 250 |
@@ -1290,7 +1290,7 @@ SETTINGS = {
             | Pi 3+ | 300 |
             | Pi 4 | 500 |
 
-            600Mhz is the only other accepted value.
+            600MHz is the only other accepted value.
             """)),
     setting.CommandGPUFreqMin(
         'gpu.isp.frequency.min', commands=('isp_freq_min', 'gpu_freq_min'),
@@ -1305,7 +1305,7 @@ SETTINGS = {
             Frequency of the GPU's 3D block in MHz. The default values for
             various models are as follows:
 
-            | Model | Frequency (Mhz) |
+            | Model | Frequency (MHz) |
             | Pi 0 | 400 |
             | Pi 1 | 250 |
             | Pi 2 | 250 |
@@ -1313,7 +1313,7 @@ SETTINGS = {
             | Pi 3+ | 300 |
             | Pi 4 | 500 |
 
-            600Mhz is the only other accepted value.
+            600MHz is the only other accepted value.
             """)),
     setting.CommandGPUFreqMin(
         'gpu.v3d.frequency.min', commands=('v3d_freq_min', 'gpu_freq_min'),
