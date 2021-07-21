@@ -861,7 +861,7 @@ def test_kernel_address():
 
 
 def test_kernel_filename():
-    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         settings = make_settings(
             CommandKernel64('kernel.64bit', commands=('arm_64bit', 'arm_control')),
             CommandKernelFilename('kernel.filename', command='kernel_filename'))
@@ -869,11 +869,11 @@ def test_kernel_filename():
         filename = settings['kernel.filename']
 
         assert not filename.modified
-        get_board_type.return_value = 'pi0'
+        get_board_types.return_value = {'pi0'}
         assert filename.value == 'kernel.img'
-        get_board_type.return_value = 'pi4'
+        get_board_types.return_value = {'pi4', 'pi400'}
         assert filename.value == 'kernel7l.img'
-        get_board_type.return_value = 'pi3+'
+        get_board_types.return_value = {'pi3', 'pi3+'}
         assert filename.value == 'kernel7.img'
         arm8._value = True
         assert filename.value == 'kernel8.img'
@@ -885,7 +885,7 @@ def test_kernel_filename():
 
 
 def test_camera_firmware(fw_settings):
-    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         cam = fw_settings['camera.enabled']
         mem = fw_settings['gpu.mem']
         start = fw_settings['boot.firmware.filename']
@@ -896,7 +896,7 @@ def test_camera_firmware(fw_settings):
         cam.validate()
 
         # camera mode can be enabled (by default) by specifying firmware manually
-        get_board_type.return_value = 'pi0'
+        get_board_types.return_value = {'pi0'}
         start._value = 'start_x.elf'
         fixup._value = 'fixup_x.dat'
         assert not cam.modified
@@ -905,7 +905,7 @@ def test_camera_firmware(fw_settings):
         cam.validate()
         assert list(cam.output()) == []
 
-        get_board_type.return_value = 'pi4'
+        get_board_types.return_value = {'pi4', 'cm4'}
         assert not cam.value
         assert not cam.default
 
@@ -920,7 +920,7 @@ def test_camera_firmware(fw_settings):
         assert list(cam.output()) == ['start_x=1']
 
         mem._value = 32
-        get_board_type.return_value = 'pi0'
+        get_board_types.return_value = {'pi0'}
         with pytest.raises(ValueError):
             cam.validate()
 
@@ -954,7 +954,7 @@ def test_firmware_file_extract(fw_settings):
 
 
 def test_debug_firmware(fw_settings):
-    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         debug = fw_settings['boot.debug.enabled']
         start = fw_settings['boot.firmware.filename']
         fixup = fw_settings['boot.firmware.fixup']
@@ -963,7 +963,7 @@ def test_debug_firmware(fw_settings):
         debug.validate()
 
         # debug mode can be enabled by specifying firmware manually
-        get_board_type.return_value = 'pi0'
+        get_board_types.return_value = {'pi0', 'pi0w'}
         start._value = 'start_db.elf'
         fixup._value = 'fixup_db.dat'
         assert not debug.modified
@@ -972,7 +972,7 @@ def test_debug_firmware(fw_settings):
         debug.validate()
         assert list(debug.output()) == []
 
-        get_board_type.return_value = 'pi4'
+        get_board_types.return_value = {'pi4'}
         assert not debug.value
         assert not debug.default
 
@@ -1001,14 +1001,14 @@ def test_debug_firmware_extract(fw_settings):
 
 
 def test_firmware_filename(fw_settings):
-    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         cam = fw_settings['camera.enabled']
         debug = fw_settings['boot.debug.enabled']
         start = fw_settings['boot.firmware.filename']
         fixup = fw_settings['boot.firmware.fixup']
         mem = fw_settings['gpu.mem']
 
-        get_board_type.return_value = 'pi0'
+        get_board_types.return_value = {'pi0'}
         assert not start.modified
         assert not fixup.modified
         assert start.value == 'start.elf'
@@ -1027,7 +1027,7 @@ def test_firmware_filename(fw_settings):
         mem._value = None
         cam._value = None
         debug._value = None
-        get_board_type.return_value = 'pi4'
+        get_board_types.return_value = {'pi4'}
         assert not start.modified
         assert not fixup.modified
         assert start.value == 'start4.elf'
@@ -1185,7 +1185,7 @@ def test_initrd_filename_output():
 
 
 def test_serial_bt():
-    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         settings = make_settings(
             CommandSerialEnabled('serial.enabled', command='enable_uart'),
             OverlayBluetoothEnabled('bluetooth.enabled'),
@@ -1194,7 +1194,7 @@ def test_serial_bt():
         bt = settings['bluetooth.enabled']
         uart = settings['serial.uart']
 
-        get_board_type.return_value = None
+        get_board_types.return_value = set()
         enable.validate()
         uart.validate()
         assert not enable.modified
@@ -1206,7 +1206,7 @@ def test_serial_bt():
         assert uart.hint == '/dev/ttyAMA0; PL011'
 
         # Pi3 (and above) moves serial to mini-UART
-        get_board_type.return_value = 'pi3'
+        get_board_types.return_value = {'pi3', 'pi3+'}
         enable.validate()
         uart.validate()
         assert not enable.value
@@ -1264,7 +1264,7 @@ def test_serial_bt_extract():
 
 
 def test_serial_bt_output():
-    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         settings = make_settings(
             CommandSerialEnabled('serial.enabled', command='enable_uart'),
             OverlayBluetoothEnabled('bluetooth.enabled'),
@@ -1273,7 +1273,7 @@ def test_serial_bt_output():
         bt = settings['bluetooth.enabled']
         uart = settings['serial.uart']
 
-        get_board_type.return_value = 'pi3'
+        get_board_types.return_value = {'pi3'}
         assert list(chain(enable.output(), bt.output(), uart.output())) == []
         bt._value = True
         assert list(chain(enable.output(), bt.output(), uart.output())) == []
@@ -1298,15 +1298,15 @@ def test_serial_bt_output():
 
 
 def test_l2_cache():
-    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types:
         cache = CommandCPUL2Cache('l2.enabled', command='disable_l2_cache')
 
-        get_board_type.return_value = None
+        get_board_types.return_value = set()
         assert not cache.modified
-        assert cache.default is None
-        get_board_type.return_value = 'pi0'
+        assert cache.default is False
+        get_board_types.return_value = {'pi0'}
         assert cache.default is True
-        get_board_type.return_value = 'pi4'
+        get_board_types.return_value = {'pi4', 'pi400'}
         assert cache.default is False
 
 
@@ -1470,7 +1470,8 @@ def test_cpu_freq():
 
 
 def test_gpu_freq():
-    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types, \
+            mock.patch('pibootctl.setting.get_board_type') as get_board_type:
         # There are an absolute ton of cross-dependencies on GPU frequencies:
         # between the different blocks, the enabled video-outs (on the 4), and
         # whether or not mini-UART serial is enabled (which in turn depends on
@@ -1492,6 +1493,7 @@ def test_gpu_freq():
             CommandSerialEnabled('serial.enabled', command='enable_uart'))
 
         get_board_type.return_value = None
+        get_board_types.return_value = set()
         assert settings['serial.enabled'].value
         assert settings['serial.uart'].value == 0
         assert not settings['video.tv.enabled'].modified
@@ -1506,6 +1508,7 @@ def test_gpu_freq():
                 assert setting.default == 0
 
         get_board_type.return_value = 'pi0w'
+        get_board_types.return_value = {'pi0', 'pi0w'}
         assert (
             settings['gpu.core.frequency.min'].value,
             settings['gpu.core.frequency.max'].value,
@@ -1516,6 +1519,7 @@ def test_gpu_freq():
         ) == (250, 300)
 
         get_board_type.return_value = 'pi2'
+        get_board_types.return_value = {'pi2'}
         assert (
             settings['gpu.core.frequency.min'].value,
             settings['gpu.core.frequency.max'].value,
@@ -1526,6 +1530,7 @@ def test_gpu_freq():
         ) == (250, 250)
 
         get_board_type.return_value = 'pi4'
+        get_board_types.return_value = {'pi4'}
         assert not settings['video.tv.enabled'].modified
         assert not settings['video.tv.enabled'].value
         assert (
@@ -1593,7 +1598,8 @@ def test_gpu_freq():
 
 
 def test_gpu_freq_output():
-    with mock.patch('pibootctl.setting.get_board_type') as get_board_type:
+    with mock.patch('pibootctl.setting.get_board_types') as get_board_types, \
+            mock.patch('pibootctl.setting.get_board_type') as get_board_type:
         settings = make_settings(
             CommandCoreFreqMax('gpu.core.frequency.max', commands=('core_freq', 'gpu_freq')),
             CommandCoreFreqMin('gpu.core.frequency.min', commands=('core_freq_min', 'gpu_freq_min')),
@@ -1620,11 +1626,13 @@ def test_gpu_freq_output():
             return lines, errors
 
         get_board_type.return_value = None
+        get_board_types.return_value = set()
         lines, errors = get_gpu_output()
         assert lines == []
         assert errors == []
 
         get_board_type.return_value = 'pi3'
+        get_board_types.return_value = {'pi3'}
         settings['gpu.h264.frequency.max']._value = 600
         lines, errors = get_gpu_output()
         assert lines == ['h264_freq=600']

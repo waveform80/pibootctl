@@ -94,7 +94,7 @@ from .exc import DelegatedOutput
 from .formatter import FormatDict, TransMap, int_ranges
 from .parser import BootOverlay, BootParam, BootCommand, coalesce
 from .userstr import UserStr, to_bool, to_int, to_float, to_list, to_str
-from .info import get_board_type, get_board_mem
+from .info import get_board_type, get_board_types, get_board_mem
 
 _ = gettext.gettext
 
@@ -1474,10 +1474,10 @@ class CommandKernelFilename(CommandFilename):
         if self._query(self._relative('.64bit')).value:
             return 'kernel8.img'
         else:
-            board_type = get_board_type()
-            if board_type == 'pi4':
+            board_types = get_board_types()
+            if 'pi4' in board_types:
                 return 'kernel7l.img'
-            elif board_type in {'pi2', 'pi3', 'pi3+'}:
+            elif {'pi2', 'pi3'} & board_types:
                 return 'kernel7.img'
             else:
                 return 'kernel.img'
@@ -1559,7 +1559,7 @@ class CommandFirmwareCamera(CommandBool):
     """
     @property
     def default(self):
-        pi4 = get_board_type() == 'pi4'
+        pi4 = 'pi4' in get_board_types()
         return (self._query('gpu.mem').value >= 64) and (
             self._query('boot.firmware.filename').value,
             self._query('boot.firmware.fixup').value
@@ -1593,7 +1593,7 @@ class CommandFirmwareDebug(CommandBool):
     """
     @property
     def default(self):
-        pi4 = get_board_type() == 'pi4'
+        pi4 = 'pi4' in get_board_types()
         return (self._query('gpu.mem').value > 16) and (
             self._query('boot.firmware.filename').value,
             self._query('boot.firmware.fixup').value
@@ -1617,7 +1617,7 @@ class CommandFirmwareFilename(CommandFilename):
     """
     @property
     def default(self):
-        pi4 = get_board_type() == 'pi4'
+        pi4 = 'pi4' in get_board_types()
         debug = self._query('boot.debug.enabled')
         camera = self._query('camera.enabled')
         # The "modified" tests below appear extraneous but aren't; they guard
@@ -1646,7 +1646,7 @@ class CommandFirmwareFixup(CommandFilename):
     """
     @property
     def default(self):
-        pi4 = get_board_type() == 'pi4'
+        pi4 = 'pi4' in get_board_types()
         debug = self._query('boot.debug.enabled')
         camera = self._query('camera.enabled')
         # See notes above
@@ -1798,7 +1798,7 @@ class CommandSerialEnabled(CommandBool):
     """
     @property
     def default(self):
-        if get_board_type() in {'pi0w', 'pi3', 'pi3+', 'pi4'}:
+        if {'pi0w', 'pi3', 'pi4'} & get_board_types():
             return not self._query('bluetooth.enabled').value
         else:
             return True
@@ -1811,7 +1811,7 @@ class OverlaySerialUART(Setting):
     """
     @property
     def default(self):
-        if get_board_type() in {'pi0w', 'pi3', 'pi3+', 'pi4'}:
+        if {'pi0w', 'pi3', 'pi4'} & get_board_types():
             if self._query('bluetooth.enabled').value:
                 return 1
             else:
@@ -1858,7 +1858,7 @@ class OverlayBluetoothEnabled(Setting):
     """
     @property
     def default(self):
-        return get_board_type() in {'pi0w', 'pi3', 'pi3+', 'pi4'}
+        return bool({'pi0w', 'pi3', 'pi4'} & get_board_types())
 
     @property
     def key(self):
@@ -1976,15 +1976,7 @@ class CommandCPUL2Cache(CommandBoolInv):
     """
     @property
     def default(self):
-        return {
-            'pi0':  True,
-            'pi0w': True,
-            'pi1':  True,
-            'pi2':  False,
-            'pi3':  False,
-            'pi3+': False,
-            'pi4':  False,
-        }.get(get_board_type())
+        return bool({'pi0', 'pi1'} & get_board_types())
 
 
 class CommandVoltage(CommandInt):
@@ -2071,13 +2063,15 @@ class CommandCPUFreqMax(CommandIntMax):
     @property
     def default(self):
         return {
-            'pi0':  1000,
-            'pi0w': 1000,
-            'pi1':  700,
-            'pi2':  900,
-            'pi3':  1200,
-            'pi3+': 1400,
-            'pi4':  1500,
+            'pi0':   1000,
+            'pi0w':  1000,
+            'pi1':   700,
+            'pi2':   900,
+            'pi3':   1200,
+            'pi3+':  1400,
+            'pi4':   1500,
+            'cm4':   1500,
+            'pi400': 1800,
         }.get(get_board_type(), 0)
 
     @property
@@ -2095,13 +2089,15 @@ class CommandCPUFreqMin(CommandInt):
             return self._query(self._relative('.max')).value
         else:
             return {
-                'pi0':  700,
-                'pi0w': 700,
-                'pi1':  700,
-                'pi2':  600,
-                'pi3':  600,
-                'pi3+': 600,
-                'pi4':  600,
+                'pi0':   700,
+                'pi0w':  700,
+                'pi1':   700,
+                'pi2':   600,
+                'pi3':   600,
+                'pi3+':  600,
+                'pi4':   600,
+                'cm4':   600,
+                'pi400': 600,
             }.get(get_board_type(), 0)
 
     @property
@@ -2121,8 +2117,7 @@ class CommandCoreFreqMax(CommandIntMax):
                 not self._query('cpu.turbo.force').value):
             return self._query(self._relative('.min')).value
         else:
-            board_type = get_board_type()
-            if board_type == 'pi4':
+            if 'pi4' in get_board_types():
                 return (
                     360 if self._query('video.tv.enabled').value else
                     550 if self._query('video.hdmi.4kp60').value else
@@ -2135,7 +2130,7 @@ class CommandCoreFreqMax(CommandIntMax):
                     'pi2':  250,
                     'pi3':  400,
                     'pi3+': 400,
-                }.get(board_type, 0)
+                }.get(get_board_type(), 0)
 
     def output(self):
         blocks = [self] + [
@@ -2164,10 +2159,10 @@ class CommandCoreFreqMin(CommandInt):
         if self._query('cpu.turbo.force').value:
             return self._query(self._relative('.max')).value
         else:
-            board_type = get_board_type()
-            if board_type == 'pi4' and self._query('video.hdmi.4kp60').value:
+            board_types = get_board_types()
+            if 'pi4' in board_types and self._query('video.hdmi.4kp60').value:
                 return 275
-            elif board_type:
+            elif board_types:
                 return 250
             else:
                 return 0
@@ -2196,8 +2191,7 @@ class CommandGPUFreqMax(CommandIntMax):
     """
     @property
     def default(self):
-        board_type = get_board_type()
-        if board_type == 'pi4':
+        if 'pi4' in get_board_types():
             return (
                 360 if self._query('video.tv.enabled').value else
                 550 if self._query('video.hdmi.4kp60').value else
@@ -2210,7 +2204,7 @@ class CommandGPUFreqMax(CommandIntMax):
                 'pi2':  250,
                 'pi3':  400,
                 'pi3+': 400,
-            }.get(board_type, 0)
+            }.get(get_board_type(), 0)
 
     def output(self):
         blocks = [
@@ -2240,8 +2234,8 @@ class CommandGPUFreqMin(CommandInt):
         if self._query('cpu.turbo.force').value:
             return self._query(self._relative('.max')).value
         else:
-            board_type = get_board_type()
-            return 500 if board_type == 'pi4' else 250 if board_type else 0
+            board_types = get_board_types()
+            return 500 if 'pi4' in board_types else 250 if board_types else 0
 
     def output(self):
         blocks = [
@@ -2343,7 +2337,7 @@ class CommandTVOut(CommandBool):
     """
     @property
     def default(self):
-        return get_board_type() != 'pi4'
+        return 'pi4' not in get_board_types()
 
     def validate(self):
         other = self._query('video.hdmi.4kp60')
