@@ -1176,6 +1176,31 @@ SETTINGS = {
             In other words, specifying -16 will give 0.8V as the CPU/GPU core
             idle voltage, and specifying 8 will give a minimum of 1.4V.
             """)),
+    # TODO config.txt only or permitted elsewhere?
+    setting.CommandInt(
+        'cpu.voltage.dynamic', command='dvfs', default=2, valid={
+            1: 'allow under-voltage',
+            2: 'no under-voltage',
+        }, doc=_(
+            """
+            Configures dynamic voltage (and frequency) scaling (DVFS) [1].
+
+            This technique allows Raspberry Pi 4 devices to run at lower
+            temperatures whilst still providing the same performance. Due to
+            possible system stability problems involved with running an
+            under-voltage, two DVFS modes are available and can be configured
+            with the following values:
+
+            {valid}
+
+            Interactive systems should use 2 (which is the default), while
+            headless systems *may* benefit from using 1 provided peripheral use
+            is managed.
+
+            This option applies to the Raspberry Pi 4 only.
+
+            [1]: https://www.raspberrypi.org/documentation/hardware/raspberrypi/frequency-management.md
+            """)),
     setting.CommandSDRAMVoltage(
         'cpu.mem.ctrl.voltage',
         commands=('over_voltage_sdram_c', 'over_voltage_sdram'), default=0,
@@ -1337,7 +1362,7 @@ SETTINGS = {
             Frequency of the GPU's High Efficiency Video Codec block in MHz.
             The default value is 500MHz.
 
-            This option applies to the Pi 4 only.
+            This option applies to the Raspberry Pi 4 only.
             """)),
     setting.CommandGPUFreqMin(
         'gpu.hevc.frequency.min', commands=('hevc_freq_min', 'gpu_freq_min'),
@@ -1346,7 +1371,7 @@ SETTINGS = {
             Minimum value of gpu.frequency.v3d.max used for dynamic frequency
             clocking. The default value is 250MHz.
 
-            This option applies to the Pi 4 only.
+            This option applies to the Raspberry Pi 4 only.
             """)),
     setting.CommandGPUMem(
         'gpu.mem',
