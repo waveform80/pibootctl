@@ -23,6 +23,30 @@ Changelog
 .. currentmodule:: pibootctl
 
 
+Release 0.6 (2021-07-22)
+========================
+
+* Add handling of the new ``[cm4]` and ``[pi400]`` conditional sections
+* Fixed handling of the "followkernel" option in the "initramfs" command
+  (`#1`_)
+* Fixed the interactions of ``camera.enabled`` with custom ``start_file``
+  and ``fixup_file`` settings
+* Fixed resetting filename settings (like ``kernel.filename``) to their
+  defaults
+* Added support for the ``over_voltage`` commands (`#2`_) under the
+  ``cpu.voltage.*`` and ``cpu.mem.*.voltage`` settings
+* Added support for modifying the HEVC frequencies on Pi 4 models under the
+  ``gpu.hevc.*`` settings
+* Added support for the ``temp_limit`` command with the
+  ``cpu.temperature.limit`` setting
+* Added support for the ``dvfs`` command with the ``cpu.voltage.dynamic``
+  setting
+* Added a corrections facility to suggest spellings for the ``help`` command
+
+.. _#1: https://github.com/waveform80/pibootctl/issues/1
+.. _#2: https://github.com/waveform80/pibootctl/issues/2
+
+
 Release 0.5.2 (2020-09-14)
 ==========================
 
