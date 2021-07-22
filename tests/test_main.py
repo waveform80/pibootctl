@@ -95,8 +95,11 @@ def test_help_setting(main, capsys):
     assert {'start_x', 'start_debug', 'start_file', 'fixup_file'} <= set(
         captured.out.replace(',', '').split())
 
-    with pytest.raises(ValueError):
+    with pytest.raises(SystemExit) as exc_info:
         main(['help', 'foo.bar'])
+    assert exc_info.value.args[0] != 0
+    captured = capsys.readouterr()
+    assert 'foo.bar' in captured.err
 
 
 def test_help_config_command(main, capsys):

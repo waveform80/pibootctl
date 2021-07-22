@@ -1,5 +1,5 @@
-# Copyright (c) 2020 Canonical Ltd.
-# Copyright (c) 2019, 2020 Dave Jones <dave@waveform.org.uk>
+# Copyright (c) 2021 Canonical Ltd.
+# Copyright (c) 2021 Dave Jones <dave@waveform.org.uk>
 #
 # This file is part of pibootctl.
 #
@@ -158,7 +158,7 @@ edge [fontname=Sans, fontsize=10];
             ),
             edges='\n'.join(
                 '{from_node}->{to_node} '
-                '[label="{label}", color={color}];'.format(
+                '[label="{label}", color="{color}"];'.format(
                     from_node=nodes[from_state], to_node=nodes[to_state],
                     label=str(input),
                     color='red' if (from_state, input) in self._marked else 'black')
