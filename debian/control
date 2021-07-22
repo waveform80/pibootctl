@@ -12,7 +12,8 @@ Build-Depends:
  python3-pkginfo,
  python3-pytest,
  python3-pytest-cov,
- python3-sphinx
+ python3-sphinx,
+ python3-sphinx-rtd-theme,
 Standards-Version: 4.5.0
 Vcs-Git: https://github.com/waveform80/pibootctl.git
 Vcs-Browser: https://github.com/waveform80/pibootctl
