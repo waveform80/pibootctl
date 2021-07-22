@@ -51,7 +51,7 @@ for :func:`corrections`, but are documented here for completeness:
 .. note::
 
     It would potentially be more efficient to turn this into a `DFA`_ with a
-    `powerset construction`_, but for the intended edit distances (<=2) and
+    `powerset construction`_, but for the intended edit distances (1-5) and
     tiny corpus sizes (<1000) this is simpler to comprehend and sufficiently
     fast, even on a Pi.
 
@@ -252,16 +252,16 @@ def corrections(query, corpus, max_edits=2):
     the *query* string.
     """
     g = build(query, max_edits)
-    results = [
+    results = {
         (s, min(
-            (edits for index, edits in traverse(g, s)),
+            {edits for index, edits in traverse(g, s)},
             default=max_edits + 1))
         for s in corpus
-    ]
-    results = [
+    }
+    results = {
         (s, edits)
         for s, edits in results
         if edits <= max_edits
-    ]
+    }
     results = sorted(results, key=itemgetter(1))
     return [s for s, edits in results]

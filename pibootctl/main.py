@@ -540,10 +540,15 @@ class Application:
                                           file=sys.stdout)
                 raise SystemExit(0)
             if '.' in self._args.cmd:
-                guesses = corrections(self._args.cmd, default)
-                raise ValueError(_(
-                    'Unknown setting "{self._args.cmd}", did you mean:\n\n'
-                    '{guesses}').format(self=self, guesses='\n'.join(guesses)))
+                print(
+                    _('Unknown setting "{self._args.cmd}"').format(self=self),
+                    file=sys.stderr)
+                guesses = corrections(self._args.cmd, default, max_edits=4)
+                if guesses:
+                    print(_('Did you mean:'), file=sys.stderr)
+                    print(file=sys.stderr)
+                    print('\n'.join(guesses), file=sys.stderr)
+                raise SystemExit(1)
             if '_' in self._args.cmd:
                 # Old-style command
                 commands = [
