@@ -4,7 +4,7 @@ Homepage: http://pibootctl.readthedocs.io/
 Section: admin
 Priority: optional
 Build-Depends:
- debhelper (>= 10),
+ debhelper (>= 13),
  dh-python,
  python3-all,
  python3-yaml,
@@ -14,7 +14,7 @@ Build-Depends:
  python3-pytest-cov,
  python3-sphinx,
  python3-sphinx-rtd-theme,
-Standards-Version: 4.5.0
+Standards-Version: 4.5.1
 Vcs-Git: https://github.com/waveform80/pibootctl.git
 Vcs-Browser: https://github.com/waveform80/pibootctl
 
