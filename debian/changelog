@@ -1,3 +1,9 @@
+pibootctl (0.6-0ubuntu1) impish; urgency=medium
+
+  * New upstream release
+
+ -- Dave Jones <dave.jones@canonical.com>  Thu, 22 Jul 2021 17:42:04 +0100
+
 pibootctl (0.5.2-0ubuntu1) groovy; urgency=medium
 
   * New upstream release
