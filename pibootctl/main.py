@@ -58,6 +58,7 @@ from .term import ErrorHandler, pager
 from .userstr import UserStr
 from .output import Output
 from .info import get_board_type, get_board_serial
+from .corrections import corrections
 from .exc import InvalidConfiguration, IneffectiveConfiguration
 
 try:
@@ -539,10 +540,10 @@ class Application:
                                           file=sys.stdout)
                 raise SystemExit(0)
             if '.' in self._args.cmd:
-                # TODO Mis-spelled setting; use something like levenshtein to
-                # detect "close" but incorrect setting names
+                guesses = corrections(self._args.cmd, default)
                 raise ValueError(_(
-                    'Unknown setting "{self._args.cmd}"').format(self=self))
+                    'Unknown setting "{self._args.cmd}", did you mean:\n\n'
+                    '{guesses}').format(self=self, guesses='\n'.join(guesses)))
             if '_' in self._args.cmd:
                 # Old-style command
                 commands = [
