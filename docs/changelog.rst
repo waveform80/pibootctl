@@ -26,7 +26,7 @@ Changelog
 Release 0.6 (2021-07-22)
 ========================
 
-* Add handling of the new ``[cm4]` and ``[pi400]`` conditional sections
+* Add handling of the new ``[cm4]`` and ``[pi400]`` conditional sections
 * Fixed handling of the "followkernel" option in the "initramfs" command
   (`#1`_)
 * Fixed the interactions of ``camera.enabled`` with custom ``start_file``
