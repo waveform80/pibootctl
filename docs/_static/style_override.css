@@ -1,10 +1,15 @@
 /* override table width restrictions */
-.wy-table-responsive table td, .wy-table-responsive table th {
-    /* !important prevents the common CSS stylesheets from
-       overriding this as on RTD they are loaded after this stylesheet */
-    white-space: normal !important;
+@media screen and (min-width: 767px) {
+    .wy-table-responsive table td, .wy-table-responsive table th {
+        /* !important prevents the common CSS stylesheets from
+           overriding this as on RTD they are loaded after this stylesheet */
+        white-space: normal !important;
+    }
+
+    .wy-table-responsive {
+        overflow: visible !important;
+    }
 }
 
-.wy-table-responsive {
-    overflow: visible !important;
-}
+/* ensure unicode table output in consoles appears "together" */
+html body .rst-content .highlight pre { line-height: normal; }
