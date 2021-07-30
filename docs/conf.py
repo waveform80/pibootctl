@@ -98,6 +98,7 @@ html_static_path = ['_static']
 #html_use_opensearch = ''
 #html_file_suffix = None
 htmlhelp_basename = '{info[name]}doc'.format(info=info)
+manpages_url = 'https://manpages.ubuntu.com/manpages/focal/en/man{section}/{page}.{section}.html'
 
 # Hack to make wide tables work properly in RTD
 # See https://github.com/snide/sphinx_rtd_theme/issues/117 for details
