@@ -16,16 +16,16 @@
 .. You should have received a copy of the GNU General Public License
 .. along with pibootctl.  If not, see <https://www.gnu.org/licenses/>.
 
-===========
-User Manual
-===========
+=================
+Command Reference
+=================
 
 The :command:`pibootctl` utility defines several commands which can be used to
 query and manipulate the boot configuration of the Raspberry Pi:
 
-.. include:: commands.rst
+.. program:: pibootctl
 
-.. include:: usage.rst
+.. include:: commands.rst
 
 .. toctree::
     :maxdepth: 1

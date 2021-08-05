@@ -26,9 +26,10 @@ Contents
     :includehidden:
 
     install
+    guides
     manual
-    development
     api
+    development
     changelog
     license
 
